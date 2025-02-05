@@ -20,6 +20,9 @@ decoder: $(SRC_2)
 run-encoder:
 	./$(BIN_1) $(SAMPLE_AUDIO_1) $(OUTPUT_SAMPLE_PLAYLIST) 
 
+tidy:
+	clang-format -i *.cpp
+
 build-all: build-encoder build-decoder
 
 remove:
