@@ -47,40 +47,40 @@ This process ensures that the input audio file is divided into smaller chunks fo
 ```mermaid
 flowchart TD
     A[Start] --> B[Initialize FFmpeg Network]
-    B --> C[Open Input File (avformat_open_input)]
+    B --> C[Open Input File - avformat_open_input]
     C --> D{Input File Opened?}
     D -->|No| E[Log Error and Exit]
-    D -->|Yes| F[Retrieve Stream Info (avformat_find_stream_info)]
+    D -->|Yes| F[Retrieve Stream Info - avformat_find_stream_info]
     F --> G{Stream Info Found?}
     G -->|No| E
-    G -->|Yes| H[Find Audio Stream (Loop Over Streams)]
+    G -->|Yes| H[Find Audio Stream - Loop Over Streams]
     H --> I{Audio Stream Found?}
     I -->|No| E
-    I -->|Yes| J[Allocate Output Context (avformat_alloc_output_context2)]
+    I -->|Yes| J[Allocate Output Context - avformat_alloc_output_context2]
     J --> K{Output Context Allocated?}
     K -->|No| E
-    K -->|Yes| L[Create New Stream for Output (avformat_new_stream)]
+    K -->|Yes| L[Create New Stream for Output - avformat_new_stream]
     L --> M{Stream Created?}
     M -->|No| E
-    M -->|Yes| N[Copy Codec Parameters (avcodec_parameters_copy)]
+    M -->|Yes| N[Copy Codec Parameters - avcodec_parameters_copy]
     N --> O{Codec Parameters Copied?}
     O -->|No| E
-    O -->|Yes| P[Open Output File (avio_open)]
+    O -->|Yes| P[Open Output File - avio_open]
     P --> Q{Output File Opened?}
     Q -->|No| E
-    Q -->|Yes| R[Set HLS Options (av_dict_set)]
-    R --> S[Write Header (avformat_write_header)]
+    Q -->|Yes| R[Set HLS Options - av_dict_set]
+    R --> S[Write Header - avformat_write_header]
     S --> T{Header Written?}
     T -->|No| E
-    T -->|Yes| U[Read and Process Packets (av_read_frame)]
+    T -->|Yes| U[Read and Process Packets - av_read_frame]
     U --> V{Packet Stream Index Matches?}
     V -->|No| W[Skip Packet]
     V -->|Yes| X[Rescale Timestamps and Durations]
-    X --> Y[Write Packet to Output (av_interleaved_write_frame)]
+    X --> Y[Write Packet to Output - av_interleaved_write_frame]
     Y --> Z{Packet Written?}
     Z -->|No| E
     Z -->|Yes| U
-    U --> AA[Finalize and Close (av_write_trailer)]
+    U --> AA[Finalize and Close - av_write_trailer]
     AA --> AB[Close Input and Output Contexts]
     AB --> AC[End]
 
