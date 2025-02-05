@@ -1,0 +1,6 @@
+*.ts
+*.m3u8
+*.out
+hls_decoder
+hls_segmenter
+docs/
