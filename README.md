@@ -39,6 +39,14 @@ ffplay output.m3u8 # should have normal expected audio playback
 
 Check out `APIref.md`
 
+## **SERVER**
+
+To generate certificates:
+
+```bash 
+openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
+```
+
 ## **DOCUMENTATION**
 
 Have Doxygen installed.

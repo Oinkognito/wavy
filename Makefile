@@ -4,8 +4,11 @@ PKG_CONFIG := pkg-config
 DEPS := $(shell $(PKG_CONFIG) --libs --cflags libavutil libavformat libavcodec libswresample)
 BIN_1 := hls_segmenter
 BIN_2 := hls_decoder
+SERVER_BIN := hls_server
 SRC_1 := encode.cpp
 SRC_2 := decode.cpp
+SERVER := server.cpp
+SERVER_LIBS := -lboost_log -lboost_log_setup -lboost_system -lboost_thread -lboost_filesystem -lboost_date_time -lboost_regex -lpthread -lssl -lcrypto
 SAMPLE_AUDIO_1 := sample1.mp3
 OUTPUT_SAMPLE_PLAYLIST := sample1.m3u8
 
@@ -20,6 +23,9 @@ decoder: $(SRC_2)
 run-encoder:
 	./$(BIN_1) $(SAMPLE_AUDIO_1) $(OUTPUT_SAMPLE_PLAYLIST) 
 
+build-server:
+	$(CPP) -DBOOST_LOG_DYN_LINK $(SERVER) -o $(SERVER_BIN) $(SERVER_LIBS)
+
 tidy:
 	clang-format -i *.cpp
 
@@ -29,4 +35,4 @@ remove:
 	rm -f *.ts *.m3u8
 
 clean:
-	rm -f $(BIN_1) $(BIN_2) *.ts *.m3u8
+	rm -f $(BIN_1) $(BIN_2) $(SERVER_BIN) *.ts *.m3u8

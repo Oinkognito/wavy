@@ -1,6 +1,10 @@
 *.ts
 *.m3u8
 *.out
+*.log
 hls_decoder
 hls_segmenter
+hls_server
+*.crt
+*.key
 docs/
