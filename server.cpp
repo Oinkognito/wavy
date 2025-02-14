@@ -42,17 +42,18 @@ private:
   void do_read()
   {
     auto self(shared_from_this());
-    boost::asio::async_read_until(socket_, request_, "\r\n\r\n",
-                                  [this, self](boost::system::error_code ec, std::size_t bytes_transferred)
-                                  {
-                                    if (ec)
-                                    {
-                                      LOG_ERROR << "Read error: " << ec.message();
-                                      return;
-                                    }
-                                    LOG_INFO << "Received " << bytes_transferred << " bytes";
-                                    process_request();
-                                  });
+    boost::asio::async_read_until(
+      socket_, request_, "\r\n\r\n",
+      [this, self](boost::system::error_code ec, std::size_t bytes_transferred)
+      {
+        if (ec)
+        {
+          LOG_ERROR << "Read error: " << ec.message();
+          return;
+        }
+        LOG_INFO << "Received " << bytes_transferred << " bytes";
+        process_request();
+      });
   }
 
   void process_request()
@@ -102,24 +103,26 @@ private:
   void do_write()
   {
     auto self(shared_from_this());
-    boost::asio::async_write(socket_, boost::asio::buffer(response_),
-                             [this, self](boost::system::error_code ec, std::size_t bytes_transferred)
-                             {
-                               if (ec)
-                               {
-                                 LOG_ERROR << "Write error: " << ec.message();
-                                 return;
-                               }
-                               LOG_INFO << "Sent " << bytes_transferred << " bytes";
-                               socket_.shutdown();
-                             });
+    boost::asio::async_write(
+      socket_, boost::asio::buffer(response_),
+      [this, self](boost::system::error_code ec, std::size_t bytes_transferred)
+      {
+        if (ec)
+        {
+          LOG_ERROR << "Write error: " << ec.message();
+          return;
+        }
+        LOG_INFO << "Sent " << bytes_transferred << " bytes";
+        socket_.shutdown();
+      });
   }
 };
 
 class HLS_Server
 {
 public:
-  HLS_Server(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context, short port)
+  HLS_Server(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
+             short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context)
   {
     LOG_INFO << "Starting HLS server on port " << port;

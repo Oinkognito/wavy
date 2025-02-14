@@ -1,4 +1,7 @@
+#include <fstream>
 #include <iostream>
+#include <vector>
+
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -8,16 +11,31 @@ extern "C"
 
 /**
  * @class HLS_Encoder
- * @brief This class handles the process of encoding an input audio file into HLS segments.
+ * @brief Encodes an input audio file into HLS segments with Adaptive Bitrate (ABR) support.
  *
- * The HLS_Encoder class encapsulates the entire process of opening an input file, encoding it to
- * HLS segments, and logging the details of the encoding process.
+ * The HLS_Encoder class handles the process of encoding an input audio file into multiple
+ * HLS segments, supporting multiple bitrates for Adaptive Bitrate (ABR) streaming.
+ *
+ * ## **Concepts**
+ * - **HLS (HTTP Live Streaming)**: A protocol used for streaming media over the web.
+ * - **ABR (Adaptive Bitrate Streaming)**: A technique where multiple bitrate versions of a media
+ * file are created, allowing the player to switch based on network conditions.
+ * - **M3U8 Playlist**: A playlist format used by HLS, consisting of a **master playlist** and
+ * **variant playlists**.
+ *
+ * ## **How It Works**
+ * - The class extracts the audio stream from the input file.
+ * - It transcodes the audio to different bitrates.
+ * - Each bitrate has its own HLS playlist.
+ * - A **master playlist** (`index.m3u8`) is generated, referencing all variant playlists.
  */
 class HLS_Encoder
 {
 public:
   /**
-   * @brief Constructs the encoder object.
+   * @brief Initializes the HLS encoder.
+   *
+   * This constructor initializes the FFmpeg network stack and sets the log level for debugging.
    */
   HLS_Encoder()
   {
@@ -26,44 +44,74 @@ public:
   }
 
   /**
-   * @brief Destructs the encoder object.
+   * @brief Cleans up resources and deinitializes FFmpeg network stack.
    */
   ~HLS_Encoder() { avformat_network_deinit(); }
-
   /**
-   * @brief Creates HLS segments from the input audio file and saves the playlist to the specified
-   * output file.
-   *
-   * This method opens the input audio file, allocates the necessary output context for HLS,
-   * copies codec parameters, and writes HLS segments to the output playlist. It also handles
-   * packet conversion and logging of the encoding process.
+   * @brief Creates HLS segments for multiple bitrates.
    *
    * @param input_file The path to the input audio file.
-   * @param output_playlist The path where the HLS playlist will be saved.
+   * @param bitrates A vector of bitrates (in kbps) for encoding.
+   * @param output_dir The directory where HLS playlists and segments will be stored.
+   *
+   * This function iterates over the provided bitrates, encoding each into an HLS playlist.
+   * It then generates a master playlist linking all variant playlists.
    */
-  void create_hls_segments(const char* input_file, const char* output_playlist)
+  void create_hls_segments(const char* input_file, const std::vector<int>& bitrates,
+                           const char* output_dir)
+  {
+    std::vector<std::string> playlist_files;
+
+    for (int bitrate : bitrates)
+    {
+      std::string output_playlist =
+        std::string(output_dir) + "/hls_" + std::to_string(bitrate) + ".m3u8";
+      playlist_files.push_back(output_playlist);
+
+      if (!encode_variant(input_file, output_playlist.c_str(), bitrate))
+      {
+        av_log(nullptr, AV_LOG_ERROR, "Encoding failed for bitrate: %d\n", bitrate);
+        return;
+      }
+    }
+
+    create_master_playlist(playlist_files, bitrates, output_dir);
+  }
+
+private:
+  /**
+   * @brief Encodes an audio file into HLS format at a specific bitrate.
+   *
+   * @param input_file The input audio file.
+   * @param output_playlist The output HLS playlist (.m3u8 file).
+   * @param bitrate The target bitrate (in kbps).
+   * @return `true` on success, `false` on failure.
+   *
+   * This function extracts the audio stream, sets the encoding bitrate, and writes HLS segments.
+   */
+  bool encode_variant(const char* input_file, const char* output_playlist, int bitrate)
   {
     AVFormatContext* input_ctx          = nullptr;
     AVFormatContext* output_ctx         = nullptr;
     AVStream*        audio_stream       = nullptr;
     int              audio_stream_index = -1;
-    int64_t          total_duration     = 0;
-    int              packet_count       = 0;
 
-    if (avformat_open_input(&input_ctx, input_file, nullptr, nullptr) < 0 || !input_ctx)
+    AVDictionary* options = nullptr;
+
+    if (avformat_open_input(&input_ctx, input_file, nullptr, nullptr) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to open input file: %s\n", input_file);
-      return;
+      return false;
     }
 
     if (avformat_find_stream_info(input_ctx, nullptr) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve stream info\n");
       avformat_close_input(&input_ctx);
-      return;
+      return false;
     }
 
-    // Find audio stream index
+    // Find audio stream
     for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
     {
       if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
@@ -77,26 +125,25 @@ public:
     {
       av_log(nullptr, AV_LOG_ERROR, "No audio stream found\n");
       avformat_close_input(&input_ctx);
-      return;
+      return false;
     }
 
     // Allocate output context for HLS
-    if (avformat_alloc_output_context2(&output_ctx, nullptr, "hls", output_playlist) < 0 ||
-        !output_ctx)
+    if (avformat_alloc_output_context2(&output_ctx, nullptr, "hls", output_playlist) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate output context\n");
       avformat_close_input(&input_ctx);
-      return;
+      return false;
     }
 
-    // Create new stream for output
+    // Create new stream
     audio_stream = avformat_new_stream(output_ctx, nullptr);
     if (!audio_stream)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to create new stream\n");
       avformat_close_input(&input_ctx);
       avformat_free_context(output_ctx);
-      return;
+      return false;
     }
 
     if (avcodec_parameters_copy(audio_stream->codecpar,
@@ -105,72 +152,41 @@ public:
       av_log(nullptr, AV_LOG_ERROR, "Failed to copy codec parameters\n");
       avformat_close_input(&input_ctx);
       avformat_free_context(output_ctx);
-      return;
+      return false;
     }
 
-    // Open output file for writing
-    if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
-    {
-      if (avio_open(&output_ctx->pb, output_playlist, AVIO_FLAG_WRITE) < 0 || !output_ctx->pb)
-      {
-        av_log(nullptr, AV_LOG_ERROR, "Could not open output file: %s\n", output_playlist);
-        avformat_close_input(&input_ctx);
-        avformat_free_context(output_ctx);
-        return;
-      }
-    }
+    // Set bitrate
+    audio_stream->codecpar->bit_rate = bitrate * 1000; // Convert kbps to bps
 
-    // Set options for HLS
-    AVDictionary* options = nullptr;
+    // Set HLS options
     av_dict_set(&options, "hls_time", "10", 0);
     av_dict_set(&options, "hls_list_size", "0", 0);
     av_dict_set(&options, "hls_flags", "independent_segments", 0);
 
+    // Write header
     if (avformat_write_header(output_ctx, &options) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Error occurred while writing header\n");
+      av_dict_free(&options);
       avformat_close_input(&input_ctx);
-      if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
-        avio_closep(&output_ctx->pb);
       avformat_free_context(output_ctx);
-      return;
+      return false;
     }
 
+    // Packet processing loop
     AVPacket pkt;
     while (av_read_frame(input_ctx, &pkt) >= 0)
     {
       if (pkt.stream_index == audio_stream_index)
       {
         pkt.stream_index = audio_stream->index;
-        packet_count++;
-        int64_t original_pts      = pkt.pts;
-        int64_t original_dts      = pkt.dts;
-        int64_t original_duration = pkt.duration;
 
-        // Rescale packet timebase
-        if (pkt.pts != AV_NOPTS_VALUE)
-          pkt.pts = av_rescale_q(pkt.pts, input_ctx->streams[audio_stream_index]->time_base,
-                                 audio_stream->time_base);
-        if (pkt.dts != AV_NOPTS_VALUE)
-          pkt.dts = av_rescale_q(pkt.dts, input_ctx->streams[audio_stream_index]->time_base,
-                                 audio_stream->time_base);
-        /*
-         * @NOTE:
-         * This ensures that the packet duration is properly scaled when moving from the input
-         * stream's time base to the output stream's time base. Without this conversion, durations
-         * could be inconsistent, leading to incorrect segment durations in HLS.
-         */
-        if (pkt.duration > 0)
-          pkt.duration =
-            av_rescale_q(pkt.duration, input_ctx->streams[audio_stream_index]->time_base,
-                         audio_stream->time_base);
-
-        total_duration += pkt.duration;
-
-        av_log(nullptr, AV_LOG_DEBUG,
-               "Packet #%d - PTS: %ld -> %ld, DTS: %ld -> %ld, Duration: %ld -> %ld\n",
-               packet_count, original_pts, pkt.pts, original_dts, pkt.dts, original_duration,
-               pkt.duration);
+        pkt.pts      = av_rescale_q(pkt.pts, input_ctx->streams[audio_stream_index]->time_base,
+                                    audio_stream->time_base);
+        pkt.dts      = av_rescale_q(pkt.dts, input_ctx->streams[audio_stream_index]->time_base,
+                                    audio_stream->time_base);
+        pkt.duration = av_rescale_q(pkt.duration, input_ctx->streams[audio_stream_index]->time_base,
+                                    audio_stream->time_base);
 
         if (av_interleaved_write_frame(output_ctx, &pkt) < 0)
         {
@@ -182,29 +198,63 @@ public:
       av_packet_unref(&pkt);
     }
 
-    av_log(nullptr, AV_LOG_INFO, "Total packets processed: %d\n", packet_count);
-    av_log(nullptr, AV_LOG_INFO, "Total estimated duration: %.2f seconds\n",
-           total_duration * av_q2d(audio_stream->time_base));
-
     av_write_trailer(output_ctx);
 
+    av_dict_free(&options);
     avformat_close_input(&input_ctx);
-    if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
-      avio_closep(&output_ctx->pb);
-    avformat_free_context(output_ctx);
+    if (output_ctx)
+    {
+      if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
+        avio_closep(&output_ctx->pb);
+      avformat_free_context(output_ctx);
+    }
+
+    return true;
+  }
+  /**
+   * @brief Generates the master playlist (.m3u8) linking all variant playlists.
+   *
+   * @param playlists The list of variant playlists.
+   * @param bitrates The corresponding bitrates.
+   * @param output_dir The directory to save the master playlist.
+   */
+  void create_master_playlist(const std::vector<std::string>& playlists,
+                              const std::vector<int>& bitrates, const char* output_dir)
+  {
+    std::string   master_playlist = std::string(output_dir) + "/index.m3u8";
+    std::ofstream m3u8(master_playlist);
+
+    if (!m3u8)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to create master playlist\n");
+      return;
+    }
+
+    m3u8 << "#EXTM3U\n";
+    m3u8 << "#EXT-X-VERSION:3\n";
+
+    for (size_t i = 0; i < playlists.size(); i++)
+    {
+      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << (bitrates[i] * 1000) << ",CODECS=\"mp4a.40.2\"\n";
+      m3u8 << playlists[i].substr(strlen(output_dir) + 1) << "\n";
+    }
+
+    m3u8.close();
   }
 };
 
-int main(int argc, char* argv[])
+auto main(int argc, char* argv[]) -> int
 {
   if (argc < 3)
   {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input file> <output playlist.m3u8>\n", argv[0]);
+    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input file> <output directory>\n", argv[0]);
     return 1;
   }
 
+  std::vector<int> bitrates = {64, 128, 256}; // Example bitrates in kbps
+
   HLS_Encoder encoder;
-  encoder.create_hls_segments(argv[1], argv[2]);
+  encoder.create_hls_segments(argv[1], bitrates, argv[2]);
 
   return 0;
 }
