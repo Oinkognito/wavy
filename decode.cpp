@@ -210,7 +210,7 @@ void convert_to_mp3(const char* input_playlist, const char* output_file)
   avformat_free_context(output_ctx);
 }
 
-int main(int argc, char* argv[])
+auto main(int argc, char* argv[]) -> int
 {
   if (argc < 3)
   {

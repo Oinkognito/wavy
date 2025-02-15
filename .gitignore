@@ -2,9 +2,8 @@
 *.m3u8
 *.out
 *.log
-hls_decoder
-hls_segmenter
-hls_server
+hls_*
 *.crt
 *.key
 docs/
+output/
