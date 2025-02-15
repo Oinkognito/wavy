@@ -89,7 +89,7 @@ private:
    *
    * This function extracts the audio stream, sets the encoding bitrate, and writes HLS segments.
    */
-  bool encode_variant(const char* input_file, const char* output_playlist, int bitrate)
+  auto encode_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
   {
     AVFormatContext* input_ctx          = nullptr;
     AVFormatContext* output_ctx         = nullptr;
@@ -158,10 +158,21 @@ private:
     // Set bitrate
     audio_stream->codecpar->bit_rate = bitrate * 1000; // Convert kbps to bps
 
-    // Set HLS options
+    // Convert output_playlist to std::string
+    std::string output_playlist_str = output_playlist;
+
+    // Extract directory from output_playlist
+    size_t last_slash = output_playlist_str.find_last_of('/');
+    std::string output_dir = (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
+
+    // Format segment filename
+    std::string segment_filename_format =
+      output_dir + "/hls_" + std::to_string(bitrate) + "_%d.ts";
+
     av_dict_set(&options, "hls_time", "10", 0);
     av_dict_set(&options, "hls_list_size", "0", 0);
     av_dict_set(&options, "hls_flags", "independent_segments", 0);
+    av_dict_set(&options, "hls_segment_filename", segment_filename_format.c_str(), 0);
 
     // Write header
     if (avformat_write_header(output_ctx, &options) < 0)
