@@ -1,39 +1,56 @@
+#include <archive.h>
+#include <archive_entry.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
-#include <boost/asio/ssl.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
-#include <archive.h>
-#include <archive_entry.h>
 
-#include "logger.hpp"
+#include "../include/logger.hpp"
+#include "../include/macros.hpp"
 
 /*
  * DISPATCHER
  *
  * After encoder encodes the song into HLS streams and stores them in an output directory,
  *
- * The dispatchers job is to find every related playlist file, transport stream, link them and finally compress then into 
- * a gzip file (reduces data size to be transferred by sizeable amount)
+ * The dispatchers job is to find every related playlist file, transport stream, link them and
+ * finally compress then into a gzip file (reduces data size to be transferred by sizeable amount)
  *
- * The gzip file is then transferred to the server using boost beast SSL connection 
+ * The gzip file is then transferred to the server using boost beast SSL connection
  *
  * NOTE:
  *
- * SSL certification is self signed. So when trying to send a request to the server (using curl for example),
+ * SSL certification is self signed. So when trying to send a request to the server (using curl for
+ * example),
  * -> You need to give the `-k` parameter, as curl cannot certify and validate self-signed certs
  *
- * Maybe we will use certbot or something like that to certify for our domain but since this is in testing this is aight.
+ * Maybe we will use certbot or something like that to certify for our domain but since this is in
+ * testing this is aight.
  *
  * 1. Why make the client do this much?
  *
- * Making this a client side operation reduces server load of operations and dependencies (server does NOT need ffmpeg at all)
+ * Making this a client side operation reduces server load of operations and dependencies (server
+ * does NOT need ffmpeg at all)
+ *
+ * 2. Why GZIP?
+ *
+ * This was chosen as a test to see how the server functionaility setup.
+ * Once we do more research and find a more efficient compression algorithm for data transfer
+ * (that ideally does not need any extra dependencies) we will switch to that.
+ *
+ * Possible future for compression algorithms:
+ *
+ * -> AAC
+ * -> Opus
+ *
+ * But doing the above will require additional dependencies in the server.
  *
  */
 
@@ -48,7 +65,9 @@ class Dispatcher
 {
 public:
   Dispatcher(std::string server, std::string port, std::string directory, std::string playlist_name)
-      : resolver_(context_), ssl_ctx_(ssl::context::sslv23), stream_(context_, ssl_ctx_), server_(std::move(server)), port_(std::move(port)), directory_(std::move(directory)), playlist_name_(std::move(playlist_name))
+      : resolver_(context_), ssl_ctx_(ssl::context::sslv23), stream_(context_, ssl_ctx_),
+        server_(std::move(server)), port_(std::move(port)), directory_(std::move(directory)),
+        playlist_name_(std::move(playlist_name))
   {
     if (!fs::exists(directory_))
     {
@@ -57,7 +76,7 @@ public:
     }
 
     ssl_ctx_.set_default_verify_paths();
-    stream_.set_verify_mode(boost::asio::ssl::verify_none);  // [TODO]: Improve SSL verification
+    stream_.set_verify_mode(boost::asio::ssl::verify_none); // [TODO]: Improve SSL verification
   }
 
   auto process_and_upload() -> bool
@@ -78,7 +97,7 @@ public:
 
     print_hierarchy();
 
-    std::string archive_path = fs::path(directory_) / "hls_data.tar.gz";
+    std::string archive_path = fs::path(directory_) / macros::to_string(macros::DISPATCH_ARCHIVE_NAME);
     if (!compress_files(archive_path))
     {
       LOG_ERROR << "[Dispatcher] Compression failed.";
@@ -89,17 +108,17 @@ public:
   }
 
 private:
-  net::io_context context_;
-  ssl::context    ssl_ctx_;
-  tcp::resolver   resolver_;
+  net::io_context                context_;
+  ssl::context                   ssl_ctx_;
+  tcp::resolver                  resolver_;
   beast::ssl_stream<tcp::socket> stream_;
-  std::string     server_, port_, directory_, playlist_name_;
+  std::string                    server_, port_, directory_, playlist_name_;
 
   std::unordered_map<std::string, std::vector<std::string>> reference_playlists_;
-  std::vector<std::string> transport_streams_;
-  std::string master_playlist_content_;
+  std::vector<std::string>                                  transport_streams_;
+  std::string                                               master_playlist_content_;
 
-    auto verify_master_playlist(const std::string& path) -> bool
+  auto verify_master_playlist(const std::string& path) -> bool
   {
     std::ifstream file(path);
     if (!file.is_open())
@@ -114,15 +133,16 @@ private:
     bool        has_stream_inf = false;
     while (std::getline(file, line))
     {
-      if (line.find("#EXT-X-STREAM-INF") != std::string::npos)
+      if (line.find(macros::to_string(macros::PLAYLIST_HEADER)) != std::string::npos)
       {
         has_stream_inf = true;
-        if (!std::getline(file, line) || line.empty() || line.find(".m3u8") == std::string::npos)
+        if (!std::getline(file, line) || line.empty() ||
+            line.find(macros::to_string(macros::PLAYLIST_EXT)) == std::string::npos)
         {
           LOG_ERROR << "[Dispatcher] Invalid reference playlist in master.";
           return false;
         }
-        std::string playlist_path = fs::path(directory_) / line;
+        std::string playlist_path           = fs::path(directory_) / line;
         reference_playlists_[playlist_path] = {}; // Store referenced playlists
         LOG_INFO << "[Dispatcher] Found reference playlist: " << playlist_path;
       }
@@ -153,7 +173,7 @@ private:
       std::string line;
       while (std::getline(file, line))
       {
-        if (line.find(".ts") != std::string::npos)
+        if (line.find(macros::to_string(macros::TRANSPORT_STREAM_EXT)) != std::string::npos)
         {
           std::string ts_path = fs::path(directory_) / line;
           segments.push_back(ts_path);
@@ -176,7 +196,7 @@ private:
     return true;
   }
 
-  bool compress_files(const std::string& archive_path)
+  auto compress_files(const std::string& archive_path) -> bool
   {
     struct archive* archive = archive_write_new();
     archive_write_add_filter_gzip(archive);
@@ -188,7 +208,8 @@ private:
       return false;
     }
 
-    auto add_file_to_archive = [&](const std::string& file_path) -> bool {
+    auto add_file_to_archive = [&](const std::string& file_path) -> bool
+    {
       std::ifstream file(file_path, std::ios::binary);
       if (!file)
       {
@@ -227,71 +248,72 @@ private:
 
   auto upload_to_server(const std::string& archive_path) -> bool
   {
-      try
-      {
-          auto const results = resolver_.resolve(server_, port_);
-          net::connect(stream_.next_layer(), results.begin(), results.end()); 
-          stream_.handshake(ssl::stream_base::client);
+    try
+    {
+      auto const results = resolver_.resolve(server_, port_);
+      net::connect(stream_.next_layer(), results.begin(), results.end());
+      stream_.handshake(ssl::stream_base::client);
 
-          send_http_request("POST", archive_path);
+      send_http_request("POST", archive_path);
 
-          LOG_INFO << "[Dispatcher] Upload process completed successfully.";
-          return true;
-      }
-      catch (const std::exception& e)
-      {
-          LOG_ERROR << "[Dispatcher] Upload failed: " << e.what();
-          return false;
-      }
+      LOG_INFO << "[Dispatcher] Upload process completed successfully.";
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR << "[Dispatcher] Upload failed: " << e.what();
+      return false;
+    }
   }
 
   void send_http_request(const std::string& method, const std::string& archive_path)
   {
-      std::ifstream file(archive_path, std::ios::binary);
-      std::string   content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::ifstream file(archive_path, std::ios::binary);
+    std::string   content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-      http::request<http::string_body> req{http::verb::post, "/", 11};
-      req.set(http::field::host, server_);
-      req.set(http::field::content_type, "application/gzip");
-      req.set(http::field::content_disposition, "attachment; filename=\"" + fs::path(archive_path).filename().string() + "\"");
-      req.body() = content;
-      req.prepare_payload();
+    http::request<http::string_body> req{http::verb::post, "/", 11};
+    req.set(http::field::host, server_);
+    req.set(http::field::content_type, macros::to_string(macros::CONTENT_TYPE_COMPRESSION));
+    req.set(http::field::content_disposition,
+            "attachment; filename=\"" + fs::path(archive_path).filename().string() + "\"");
+    req.body() = content;
+    req.prepare_payload();
 
-      try
+    try
+    {
+      http::write(stream_, req);
+      beast::flat_buffer                buffer;
+      http::response<http::string_body> res;
+      http::read(stream_, buffer, res);
+
+      if (res.result() != http::status::ok)
       {
-          http::write(stream_, req);
-          beast::flat_buffer buffer;
-          http::response<http::string_body> res;
-          http::read(stream_, buffer, res);
-
-          if (res.result() != http::status::ok)
-          {
-              LOG_ERROR << "[Dispatcher] Server error: " << res.result_int();
-          }
-          else
-          {
-              LOG_INFO << "[Dispatcher] Successfully uploaded archive.";
-          }
+        LOG_ERROR << "[Dispatcher] Server error: " << res.result_int();
       }
-      catch (const std::exception& e)
+      else
       {
-          LOG_ERROR << "[Dispatcher] HTTP request failed: " << e.what();
+        LOG_INFO << "[Dispatcher] Successfully uploaded archive.";
       }
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR << "[Dispatcher] HTTP request failed: " << e.what();
+    }
   }
 
   void print_hierarchy()
   {
-      LOG_INFO << "\n HLS Playlist Hierarchy:\n";
-      std::cout << ">> " << playlist_name_ << "\n";
+    LOG_INFO << "\n HLS Playlist Hierarchy:\n";
+    std::cout << ">> " << playlist_name_ << "\n";
 
-      for (const auto& [playlist, segments] : reference_playlists_)
+    for (const auto& [playlist, segments] : reference_playlists_)
+    {
+      std::cout << "   ├── > " << fs::path(playlist).filename().string() << "\n";
+      for (const auto& ts : segments)
       {
-          std::cout << "   ├── > " << fs::path(playlist).filename().string() << "\n";
-          for (const auto& ts : segments)
-          {
-              std::cout << "   │   ├── @ " << fs::path(ts).filename().string() << "\n";
-          }
+        std::cout << "   │   ├── @ " << fs::path(ts).filename().string() << "\n";
       }
+    }
   }
 };
 
@@ -305,9 +327,9 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  std::string server  = argv[1];
-  std::string port    = argv[2];
-  std::string dir     = argv[3];
+  std::string server          = argv[1];
+  std::string port            = argv[2];
+  std::string dir             = argv[3];
   std::string master_playlist = argv[4];
 
   try

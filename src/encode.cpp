@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include "../include/macros.hpp"
 
 extern "C"
 {
@@ -65,7 +66,7 @@ public:
     for (int bitrate : bitrates)
     {
       std::string output_playlist =
-        std::string(output_dir) + "/hls_" + std::to_string(bitrate) + ".m3u8";
+        std::string(output_dir) + "/hls_" + std::to_string(bitrate) + macros::to_string(macros::PLAYLIST_EXT);
       playlist_files.push_back(output_playlist);
 
       if (!encode_variant(input_file, output_playlist.c_str(), bitrate))
@@ -162,12 +163,12 @@ private:
     std::string output_playlist_str = output_playlist;
 
     // Extract directory from output_playlist
-    size_t last_slash = output_playlist_str.find_last_of('/');
-    std::string output_dir = (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
+    size_t      last_slash = output_playlist_str.find_last_of('/');
+    std::string output_dir =
+      (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
 
     // Format segment filename
-    std::string segment_filename_format =
-      output_dir + "/hls_" + std::to_string(bitrate) + "_%d.ts";
+    std::string segment_filename_format = output_dir + "/hls_" + std::to_string(bitrate) + "_%d.ts";
 
     av_dict_set(&options, "hls_time", "10", 0);
     av_dict_set(&options, "hls_list_size", "0", 0);
@@ -232,7 +233,7 @@ private:
   void create_master_playlist(const std::vector<std::string>& playlists,
                               const std::vector<int>& bitrates, const char* output_dir)
   {
-    std::string   master_playlist = std::string(output_dir) + "/index.m3u8";
+    std::string   master_playlist = std::string(output_dir) + "/" + macros::to_string(macros::MASTER_PLAYLIST);
     std::ofstream m3u8(master_playlist);
 
     if (!m3u8)

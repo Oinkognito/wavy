@@ -1,4 +1,9 @@
-#include "logger.hpp"
+#if __cplusplus < 202002L
+#error "Wavy-Server requires C++20 or later."
+#endif
+
+#include "../include/logger.hpp"
+#include "../include/macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/asio/ip/tcp.hpp>
@@ -15,33 +20,36 @@
 #include <sstream>
 #include <vector>
 
-/* 
+/*
  * SERVER
  *
  * The server's main responsibility the way we see it is:
  *
- * -> Accepting requests through secure SSL transfer with valid certification (TBD) to upload files (POST)
- * -> Upload of GZip file (which supposedly contains .m3u8 and .ts files with apt references and hierarchial format as expected of HLS encoding)
- * -> Validation of the above GZip file's contents to match expected encoded files 
+ * -> Accepting requests through secure SSL transfer with valid certification (TBD) to upload files
+ * (POST)
+ * -> Upload of GZip file (which supposedly contains .m3u8 and .ts files with apt references and
+ * hierarchial format as expected of HLS encoding)
+ * -> Validation of the above GZip file's contents to match expected encoded files
  * -> Assign client a UUID upon validation
- * -> Create and expose the client's uploaded content through UUID 
+ * -> Create and expose the client's uploaded content through UUID
  * -> Serve required files to receiver through GET
  *
- * Boost libs ensures that every operation (if not then most) in the server occurs asynchronously without any concurrency issues
+ * Boost libs ensures that every operation (if not then most) in the server occurs asynchronously
+ * without any concurrency issues
  *
  * Although not tried and tested with multiple clients, it should give expected results.
  *
  * Boost should also ensure safety and shared lifetimes of a lot of critical objects.
  *
  * @NOTE:
- * 
+ *
  * ==> This file **CANNOT** be compiled for < -std=c++20
  *
  * Look at Makefile for more information
  *
- * ==> STORAGE_DIR and TEMP_DIR are in the same parent directory as boost has problems renaming content to different directories
- * (gives a very big cross-link error)
- * 
+ * ==> STORAGE_DIR and TEMP_DIR are in the same parent directory as boost has problems renaming
+ * content to different directories (gives a very big cross-link error)
+ *
  */
 
 namespace fs    = boost::filesystem;
@@ -54,7 +62,7 @@ const std::string STORAGE_DIR = "/tmp/hls_storage"; // this will use /tmp of the
 
 auto is_valid_extension(const std::string& filename) -> bool
 {
-  return filename.ends_with(".m3u8") || filename.ends_with(".ts");
+  return filename.ends_with(macros::to_string(macros::PLAYLIST_EXT)) || filename.ends_with(".ts");
 }
 
 auto validate_m3u8_format(const std::string& content) -> bool
@@ -158,7 +166,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
     std::ifstream        infile(file.path().string(), std::ios::binary);
     std::vector<uint8_t> data((std::istreambuf_iterator<char>(infile)), {});
 
-    if (fname.ends_with(".m3u8"))
+    if (fname.ends_with(macros::to_string(macros::PLAYLIST_EXT)))
     {
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
@@ -236,7 +244,8 @@ private:
     auto self(shared_from_this());
 
     auto parser = std::make_shared<http::request_parser<http::string_body>>();
-    parser->body_limit(100 * 1024 * 1024); // for now 100MiB is alright, when lossless codecs come in the picture we will have to think about it.
+    parser->body_limit(100 * 1024 * 1024); // for now 100MiB is alright, when lossless codecs come
+                                           // in the picture we will have to think about it.
 
     http::async_read(
       socket_, buffer_, *parser,
@@ -284,7 +293,7 @@ private:
     LOG_INFO << "[Upload] Handling GZIP file upload";
 
     std::string client_id = boost::uuids::to_string(boost::uuids::random_generator()());
-    std::string gzip_path = TEMP_DIR + "/" + client_id + ".tar.gz";
+    std::string gzip_path = TEMP_DIR + "/" + client_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
     fs::create_directories(TEMP_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
@@ -376,12 +385,12 @@ private:
     buffer << file.rdbuf();
     std::string file_content = buffer.str();
 
-    std::string content_type = "application/octet-stream";
-    if (filename.ends_with(".m3u8"))
+    std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
+    if (filename.ends_with(macros::to_string(macros::PLAYLIST_EXT)))
     {
       content_type = "application/vnd.apple.mpegurl";
     }
-    else if (filename.ends_with(".ts"))
+    else if (filename.ends_with(macros::to_string(macros::TRANSPORT_STREAM_EXT)))
     {
       content_type = "video/mp2t";
     }
@@ -390,7 +399,7 @@ private:
     auto response = std::make_shared<http::response<http::string_body>>();
     response->version(request_.version());
     response->result(http::status::ok);
-    response->set(http::field::server, "HLS-Server");
+    response->set(http::field::server, "Wavy-Server");
     response->set(http::field::content_type, content_type);
     response->body() = std::move(file_content);
     response->prepare_payload();

@@ -15,7 +15,7 @@
 #include <iostream>
 #include <sstream>
 
-/* 
+/*
  * LOGGER
  *
  * This is a logging header that neatly wraps around boost logger
