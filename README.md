@@ -1,9 +1,12 @@
-# Wavy (ig)
+# Wavy
 
 ## **DEPENDENCIES**
 
 1. FFmpeg (should come with its libraries)
 2. base-devel (g++ / clang++ work as CXX COMPILERS)
+3. OpenSSL
+4. Boost C++ libs 
+5. CMake and Make (GNU-Make) [Build System]
 
 ## **BUILDING**
 
@@ -12,32 +15,20 @@ To build just run:
 ```bash 
 make encoder # to build encode.cpp
 make decoder # to build decode.cpp
+make dispatcher 
+make server
 make remove # to cleanup all the transport streams and playlists
 
-# To build both decoder and encoder 
-make build-all
+make all
 ```
 
-**EXPECTED OUTPUT**:
+## **ARCHITECTURE**
 
-1. For encoder, it should create a `.m3u8` playlist file that references to every HLS encoded segment (transport stream [.ts] files)
-
-To verify no loss in data over segmentation:
-
-```bash
-ffplay output.m3u8 # should have normal expected audio playback
-```
-
-> [!NOTE]
-> 
-> The encoder should work for any audio file except for lossless, we will use FLAC / WAV codecs for it (maybe)
->
-> Alternatively, we could transcode WAV/FLAC to AAC (adv audio coding) for HLS compatability
-> 
+Read `ARCHITECTURE.md` for more on the intended working model of the project.
 
 ## **API REFERENCES**
 
-Check out `APIref.md`
+Check out `APIREF.md`
 
 ## **SERVER**
 
@@ -45,7 +36,30 @@ To generate certificates:
 
 ```bash 
 openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
+# email is not necessary
 ```
+
+Or just Makefile:
+
+```bash 
+make server-cert # fill out the fields (email not necessary)
+```
+
+> [!NOTE]
+> 
+> This server.crt and server.key should be placed in the CWD of wavy
+> 
+
+> [!WARNING]
+> 
+> This is a self-signed certificate! 
+> 
+> We will register to a domain and get a valid certificate in the future but for testing purposes,
+> 
+> Ensure that when using:
+> --> cURL to test the server --> append `-k` flag to your command 
+> --> VLC/MPV let it know that you accept this self signed certificate and acknowledge that VLC/MPV cannot validate it.
+> 
 
 ## **DOCUMENTATION**
 

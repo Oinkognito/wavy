@@ -6,4 +6,8 @@ hls_*
 *.crt
 *.key
 docs/
-output/
+output*/
+build*/
+.cache/
+*.mp3
+*.wav
