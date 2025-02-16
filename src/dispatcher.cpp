@@ -97,7 +97,7 @@ public:
     print_hierarchy();
 
     std::string archive_path =
-      fs::path(directory_) / macros::to_string(macros::DISPATCH_ARCHIVE_NAME);
+      fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
     if (!compress_files(archive_path))
     {
       LOG_ERROR << "[Dispatcher] Compression failed.";
@@ -133,11 +133,11 @@ private:
     bool        has_stream_inf = false;
     while (std::getline(file, line))
     {
-      if (line.find(macros::to_string(macros::PLAYLIST_HEADER)) != std::string::npos)
+      if (line.find(macros::PLAYLIST_HEADER) != std::string::npos)
       {
         has_stream_inf = true;
         if (!std::getline(file, line) || line.empty() ||
-            line.find(macros::to_string(macros::PLAYLIST_EXT)) == std::string::npos)
+            line.find(macros::PLAYLIST_EXT) == std::string::npos)
         {
           LOG_ERROR << "[Dispatcher] Invalid reference playlist in master.";
           return false;
@@ -173,7 +173,7 @@ private:
       std::string line;
       while (std::getline(file, line))
       {
-        if (line.find(macros::to_string(macros::TRANSPORT_STREAM_EXT)) != std::string::npos)
+        if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
           std::string ts_path = fs::path(directory_) / line;
           segments.push_back(ts_path);
@@ -273,7 +273,7 @@ private:
 
     http::request<http::string_body> req{http::verb::post, "/", 11};
     req.set(http::field::host, server_);
-    req.set(http::field::content_type, macros::to_string(macros::CONTENT_TYPE_COMPRESSION));
+    req.set(http::field::content_type, macros::CONTENT_TYPE_COMPRESSION);
     req.set(http::field::content_disposition,
             "attachment; filename=\"" + fs::path(archive_path).filename().string() + "\"");
     req.body() = content;

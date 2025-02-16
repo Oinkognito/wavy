@@ -47,7 +47,7 @@
  *
  * Look at Makefile for more information
  *
- * ==> STORAGE_DIR and macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) are in the same parent directory as boost has problems renaming
+ * ==> macros::SERVER_STORAGE_DIR and macros::SERVER_TEMP_STORAGE_DIR) are in the same parent directory as boost has problems renaming
  * content to different directories (gives a very big cross-link error)
  *
  */
@@ -59,7 +59,7 @@ using boost::asio::ip::tcp;
 
 auto is_valid_extension(const std::string& filename) -> bool
 {
-  return filename.ends_with(macros::to_string(macros::PLAYLIST_EXT)) || filename.ends_with(".ts");
+  return filename.ends_with(macros::PLAYLIST_EXT) || filename.ends_with(".ts");
 }
 
 auto validate_m3u8_format(const std::string& content) -> bool
@@ -163,7 +163,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
     std::ifstream        infile(file.path().string(), std::ios::binary);
     std::vector<uint8_t> data((std::istreambuf_iterator<char>(infile)), {});
 
-    if (fname.ends_with(macros::to_string(macros::PLAYLIST_EXT)))
+    if (fname.ends_with(macros::PLAYLIST_EXT))
     {
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
@@ -292,7 +292,7 @@ private:
     std::string client_id = boost::uuids::to_string(boost::uuids::random_generator()());
     std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
-    fs::create_directories(macros::to_string(macros::SERVER_TEMP_STORAGE_DIR));
+    fs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
@@ -383,11 +383,11 @@ private:
     std::string file_content = buffer.str();
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
-    if (filename.ends_with(macros::to_string(macros::PLAYLIST_EXT)))
+    if (filename.ends_with(macros::PLAYLIST_EXT))
     {
       content_type = "application/vnd.apple.mpegurl";
     }
-    else if (filename.ends_with(macros::to_string(macros::TRANSPORT_STREAM_EXT)))
+    else if (filename.ends_with(macros::TRANSPORT_STREAM_EXT))
     {
       content_type = "video/mp2t";
     }
