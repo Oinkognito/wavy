@@ -1,0 +1,88 @@
+cmake_minimum_required(VERSION 3.22)
+
+project(Wavy LANGUAGES CXX VERSION 1.0)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release" "Verbose")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+endif()
+
+set(ENCODER_BIN hls_segmenter)
+set(DECODER_BIN hls_decoder)
+set(SERVER_BIN hls_server)
+set(DISPATCHER_BIN hls_dispatcher)
+
+set(ENCODER_SRC src/encode.cpp)
+set(DECODER_SRC src/decode.cpp)
+set(SERVER_SRC src/server.cpp)
+set(DISPATCHER_SRC src/dispatcher.cpp)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED libavutil libavformat libavcodec libswresample)
+find_package(Boost REQUIRED COMPONENTS log log_setup system thread filesystem date_time regex)
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_library(ARCHIVE_LIB archive)
+
+set(CMAKE_CXX_FLAGS_RELEASE "-Wall -Wextra -O2")
+set(CMAKE_CXX_FLAGS_VERBOSE "-Wall -Wextra -O2 -DVERBOSE")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_VERBOSE}")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+endif()
+
+function(add_custom_executable name src_file)
+    add_executable(${name} ${src_file})
+    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES} OpenSSL::Crypto)
+endfunction()
+
+add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
+add_custom_executable(${DECODER_BIN} ${DECODER_SRC})
+add_executable(${SERVER_BIN} ${SERVER_SRC})
+target_link_libraries(${SERVER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB})
+
+add_executable(${DISPATCHER_BIN} ${DISPATCHER_SRC})
+target_link_libraries(${DISPATCHER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB})
+
+add_custom_target(format COMMAND clang-format -i src/*.cpp include/*.h)
+add_custom_target(tidy COMMAND clang-tidy -fix src/*.cpp include/*.h --)
+
+add_custom_target(remove COMMAND rm -f *.ts *.m3u8)
+
+# Individual build targets
+add_custom_target(build_encoder COMMAND ${CMAKE_COMMAND} --build . --target ${ENCODER_BIN})
+add_custom_target(build_decoder COMMAND ${CMAKE_COMMAND} --build . --target ${DECODER_BIN})
+add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SERVER_BIN})
+add_custom_target(build_dispatcher COMMAND ${CMAKE_COMMAND} --build . --target ${DISPATCHER_BIN})
+
+if(DEFINED BUILD_TARGET)
+    set(TARGET_BUILT ${BUILD_TARGET})
+else()
+    set(TARGET_BUILT "All")
+endif()
+
+message(STATUS "\n\n-- Building the ${PROJECT_NAME} project v${PROJECT_VERSION}...")
+message(STATUS "┌─ Build Configuration for ${PROJECT_NAME} ────────────────────────")
+message(STATUS "│ Operating System        : ${CMAKE_SYSTEM_NAME}")
+message(STATUS "│ Build Type              : ${CMAKE_BUILD_TYPE}")
+message(STATUS "│ Target(s)               : ${TARGET_BUILT}")
+message(STATUS "│ CMake Version           : ${CMAKE_VERSION}")
+message(STATUS "│ Compiler                : ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "│ Compiler Flags          : ${CMAKE_CXX_FLAGS}")
+message(STATUS "│ Executable Names        : ${ENCODER_BIN}, ${DECODER_BIN}, ${SERVER_BIN}, ${DISPATCHER_BIN}")
+message(STATUS "│ C++ Standard            : ${CMAKE_CXX_STANDARD}")
+message(STATUS "│ FFmpeg Libraries        : ${FFMPEG_LIBRARIES}")
+message(STATUS "│ Boost Libraries         : Boost::log, Boost::system, Boost::thread, etc.")
+message(STATUS "│ OpenSSL                 : OpenSSL::SSL, OpenSSL::Crypto")
+message(STATUS "│ Archive Library         : ${ARCHIVE_LIB}")
+message(STATUS "└──────────────────────────────────────────────────────────\n")
