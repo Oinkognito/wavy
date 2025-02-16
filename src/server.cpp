@@ -47,7 +47,7 @@
  *
  * Look at Makefile for more information
  *
- * ==> STORAGE_DIR and TEMP_DIR are in the same parent directory as boost has problems renaming
+ * ==> STORAGE_DIR and macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) are in the same parent directory as boost has problems renaming
  * content to different directories (gives a very big cross-link error)
  *
  */
@@ -56,9 +56,6 @@ namespace fs    = boost::filesystem;
 namespace beast = boost::beast;
 namespace http  = beast::http;
 using boost::asio::ip::tcp;
-
-const std::string TEMP_DIR    = "/tmp/hls_temp";
-const std::string STORAGE_DIR = "/tmp/hls_storage"; // this will use /tmp of the server's filesystem
 
 auto is_valid_extension(const std::string& filename) -> bool
 {
@@ -143,7 +140,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
     return false;
   }
 
-  std::string temp_extract_path = TEMP_DIR + "/" + client_id;
+  std::string temp_extract_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id;
   fs::create_directories(temp_extract_path);
 
   if (!extract_gzip(gzip_path, temp_extract_path))
@@ -155,7 +152,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
   LOG_INFO << "[Extract] Extraction complete, validating files...";
 
   // Move valid files to storage
-  std::string storage_path = STORAGE_DIR + "/" + client_id;
+  std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id;
   fs::create_directories(storage_path);
 
   int valid_file_count = 0;
@@ -293,9 +290,9 @@ private:
     LOG_INFO << "[Upload] Handling GZIP file upload";
 
     std::string client_id = boost::uuids::to_string(boost::uuids::random_generator()());
-    std::string gzip_path = TEMP_DIR + "/" + client_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
+    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
-    fs::create_directories(TEMP_DIR);
+    fs::create_directories(macros::to_string(macros::SERVER_TEMP_STORAGE_DIR));
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
@@ -364,7 +361,7 @@ private:
     std::string filename  = parts[2];
 
     // Construct the file path
-    std::string file_path = STORAGE_DIR + "/" + client_id + "/" + filename;
+    std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id + "/" + filename;
 
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
     {
@@ -480,8 +477,8 @@ auto main() -> int
       boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 |
       boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
 
-    ssl_context.use_certificate_file("server.crt", boost::asio::ssl::context::pem);
-    ssl_context.use_private_key_file("server.key", boost::asio::ssl::context::pem);
+    ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT), boost::asio::ssl::context::pem);
+    ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY), boost::asio::ssl::context::pem);
 
     HLS_Server server(io_context, ssl_context, 8080);
     io_context.run();

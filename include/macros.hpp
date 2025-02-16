@@ -11,7 +11,11 @@
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")              \
   X(CONTENT_TYPE_COMPRESSION, "application/gzip")          \
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream") \
-  X(PLAYLIST_HEADER, "#EXT-X-STREAM-INF")
+  X(PLAYLIST_HEADER, "#EXT-X-STREAM-INF")                  \
+  X(SERVER_CERT, "server.crt")                             \
+  X(SERVER_PRIVATE_KEY, "server.key")                      \
+  X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")              \
+  X(SERVER_STORAGE_DIR, "/tmp/hls_storage") // this will use /tmp of the server's filesystem
 
 namespace macros
 {

@@ -8,7 +8,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -65,7 +64,7 @@ class Dispatcher
 {
 public:
   Dispatcher(std::string server, std::string port, std::string directory, std::string playlist_name)
-      : resolver_(context_), ssl_ctx_(ssl::context::sslv23), stream_(context_, ssl_ctx_),
+      : ssl_ctx_(ssl::context::sslv23), resolver_(context_), stream_(context_, ssl_ctx_),
         server_(std::move(server)), port_(std::move(port)), directory_(std::move(directory)),
         playlist_name_(std::move(playlist_name))
   {
@@ -97,7 +96,8 @@ public:
 
     print_hierarchy();
 
-    std::string archive_path = fs::path(directory_) / macros::to_string(macros::DISPATCH_ARCHIVE_NAME);
+    std::string archive_path =
+      fs::path(directory_) / macros::to_string(macros::DISPATCH_ARCHIVE_NAME);
     if (!compress_files(archive_path))
     {
       LOG_ERROR << "[Dispatcher] Compression failed.";
