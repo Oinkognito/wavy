@@ -24,7 +24,7 @@ make all
 
 ## **ARCHITECTURE**
 
-![wavy-arch](https://github.com/nots1dd/wavy/blob/main/assets/wavy-arch.jpeg)
+<img src="assets/wavy-arch.jpeg" alt="Description" width="350">
 
 Read [ARCHITECTURE](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md) for more on the intended working model of the project.
 
