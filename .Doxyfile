@@ -1,7 +1,7 @@
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = "Wavy"
 PROJECT_NUMBER         = 
-PROJECT_BRIEF          = "Something"
+PROJECT_BRIEF          = "Local audio streaming and sharing platform for all audio formats"
 PROJECT_LOGO           = 
 PROJECT_ICON           =
 
