@@ -33,10 +33,20 @@
  * Maybe we will use certbot or something like that to certify for our domain but since this is in
  * testing this is aight.
  *
- * 1. Why make the client do this much?
+ * @FAQ
  *
- * Making this a client side operation reduces server load of operations and dependencies (server
- * does NOT need ffmpeg at all)
+ * ----------------------------------------------------------------------------------------------------
+ *
+ * 1. Why not just send the song over and have a codec in the server?
+ *
+ * Because now you need a codec in the server. In this model of architecture of the application,
+ * the aim is to reduce the server load and it's operational reach. It is supposed to be that way,
+ * so that it can focus on being a stable and efficient multi-client network gateway.
+ *
+ * This also works well in case you want a docker image to run as your server, then something minimal
+ * like an alpine image with minimal dependencies is always appreciated.
+ *
+ * ----------------------------------------------------------------------------------------------------
  *
  * 2. Why GZIP?
  *
@@ -48,8 +58,24 @@
  *
  * -> AAC
  * -> Opus
+ * -> Zstd + tar compression (most likely approach)
  *
  * But doing the above will require additional dependencies in the server.
+ *
+ * ----------------------------------------------------------------------------------------------------
+ *
+ * 3. Why Boost C++?
+ *
+ * Boost provies ASIO -> Async I/O networking operations that allows for efficient handling of 
+ * multiple operations with minimal overhead that is quite scalable.
+ *
+ * Another great feature that Boost has is the OpenSSL support that manages SSL and HTTP 
+ * requests, all neatly wrapped back into Boost.Asio
+ *
+ * It is far more logical than pointless going with a scratch implementation or using low-level 
+ * networking headers and threads for a asynchronous operational server.
+ *
+ * ----------------------------------------------------------------------------------------------------
  *
  */
 
@@ -176,9 +202,25 @@ private:
         if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
           std::string ts_path = fs::path(directory_) / line;
+          
+          std::ifstream ts_file(ts_path, std::ios::binary);
+          if (!ts_file.is_open())
+          {
+            LOG_ERROR << "[Dispatcher] Failed to open transport stream: " << ts_path;
+            return false;
+          }
+
+          char sync_byte;
+          ts_file.read(&sync_byte, 1);  // Read the first byte
+          if (sync_byte != TRANSPORT_STREAM_START_BYTE) // sanity check for transport stream references in playlist files
+          {
+            LOG_ERROR << "[Dispatcher] Invalid transport stream: " << ts_path << " (Missing 0x47 sync byte)";
+            return false;
+          }
+
           segments.push_back(ts_path);
           transport_streams_.push_back(ts_path);
-          LOG_INFO << "[Dispatcher] Found transport stream: " << ts_path;
+          LOG_INFO << "[Dispatcher] Found valid transport stream: " << ts_path;
         }
       }
     }

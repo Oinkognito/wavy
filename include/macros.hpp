@@ -3,6 +3,8 @@
 #include <string>
 #include <string_view>
 
+#define TRANSPORT_STREAM_START_BYTE 0x47 // 0x47 (MPEG-TS sync byte)
+
 #define STRING_CONSTANTS(X)                                \
   X(PLAYLIST_EXT, ".m3u8")                                 \
   X(MASTER_PLAYLIST, "index.m3u8")                         \
