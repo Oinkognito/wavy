@@ -7,23 +7,33 @@
 
 #define STRING_CONSTANTS(X)                                \
   X(PLAYLIST_EXT, ".m3u8")                                 \
+  X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                     \
   X(MASTER_PLAYLIST, "index.m3u8")                         \
   X(TRANSPORT_STREAM_EXT, ".ts")                           \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                     \
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")              \
   X(CONTENT_TYPE_COMPRESSION, "application/gzip")          \
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream") \
-  X(PLAYLIST_HEADER, "#EXT-X-STREAM-INF")                  \
+  X(PLAYLIST_STREAM_HEADER, "#EXT-X-STREAM-INF")           \
   X(SERVER_CERT, "server.crt")                             \
   X(SERVER_PRIVATE_KEY, "server.key")                      \
   X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")              \
   X(SERVER_STORAGE_DIR, "/tmp/hls_storage") // this will use /tmp of the server's filesystem
+
+#define PROTOCOL_CONSTANTS(X)                                                              \
+  X(SERVER_ERROR_404, "HTTP/1.1 404 Not Found\r\n\r\nFile not found")                      \
+  X(SERVER_ERROR_500,                                                                      \
+    "HTTP/1.1 500 Internal Server Error\r\n\r\nUnable to read file (or) File write error") \
+  X(SERVER_ERROR_400, "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request format")            \
+  X(SERVER_ERROR_405, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")                           \
+  X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large\r\n\r\n")
 
 namespace macros
 {
 
 #define DECLARE_STRING_VIEW(name, value) constexpr std::string_view name = value;
 STRING_CONSTANTS(DECLARE_STRING_VIEW)
+PROTOCOL_CONSTANTS(DECLARE_STRING_VIEW)
 #undef DECLARE_STRING_VIEW
 
 // Convert string_view to string using a function (avoiding constexpr std::string)

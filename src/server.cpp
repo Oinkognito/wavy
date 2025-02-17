@@ -47,8 +47,9 @@
  *
  * Look at Makefile for more information
  *
- * ==> macros::SERVER_STORAGE_DIR and macros::SERVER_TEMP_STORAGE_DIR) are in the same parent directory as boost has problems renaming
- * content to different directories (gives a very big cross-link error)
+ * ==> macros::SERVER_STORAGE_DIR and macros::SERVER_TEMP_STORAGE_DIR) are in the same parent
+ * directory as boost has problems renaming content to different directories (gives a very big
+ * cross-link error)
  *
  */
 
@@ -64,7 +65,7 @@ auto is_valid_extension(const std::string& filename) -> bool
 
 auto validate_m3u8_format(const std::string& content) -> bool
 {
-  return content.find("#EXTM3U") != std::string::npos;
+  return content.find(macros::PLAYLIST_GLOBAL_HEADER) != std::string::npos;
 }
 
 auto validate_ts_file(const std::vector<uint8_t>& data) -> bool
@@ -140,7 +141,8 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
     return false;
   }
 
-  std::string temp_extract_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id;
+  std::string temp_extract_path =
+    macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id;
   fs::create_directories(temp_extract_path);
 
   if (!extract_gzip(gzip_path, temp_extract_path))
@@ -254,7 +256,7 @@ private:
           if (ec == http::error::body_limit)
           {
             LOG_ERROR << "[Session] Upload size exceeded the limit!";
-            send_response("HTTP/1.1 413 Payload Too Large\r\n\r\n");
+            send_response(macros::to_string(macros::SERVER_ERROR_413));
           }
           return;
         }
@@ -269,6 +271,42 @@ private:
     socket_.next_layer().set_option(option);
   }
 
+  void handle_list_clients()
+  {
+    LOG_INFO << "[List Clients] Handling client listing request";
+
+    std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
+    if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
+    {
+      LOG_ERROR << "[List Clients] Storage directory not found: " << storage_path;
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      return;
+    }
+
+    std::ostringstream client_list;
+    client_list << " Client IDs: " << std::endl;
+
+    bool clients_found = false;
+    for (fs::directory_entry& entry : fs::directory_iterator(storage_path))
+    {
+      if (fs::is_directory(entry.status()))
+      {
+        client_list << entry.path().filename().string() << "\n";
+        clients_found = true;
+      }
+    }
+
+    if (!clients_found)
+    {
+      LOG_WARNING << "[List Clients] No clients found in storage";
+      send_response(macros::to_string(macros::SERVER_ERROR_404));
+      return;
+    }
+
+    // Return the list of client IDs
+    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + client_list.str());
+  }
+
   void process_request()
   {
     if (request_.method() == http::verb::post)
@@ -277,11 +315,18 @@ private:
     }
     else if (request_.method() == http::verb::get)
     {
-      handle_download();
+      if (request_.target() == "/hls/clients") // Request for all client IDs
+      {
+        handle_list_clients();
+      }
+      else
+      {
+        handle_download();
+      }
     }
     else
     {
-      send_response("HTTP/1.1 405 Method Not Allowed\r\n\r\n");
+      send_response(macros::to_string(macros::SERVER_ERROR_405));
     }
   }
 
@@ -290,14 +335,15 @@ private:
     LOG_INFO << "[Upload] Handling GZIP file upload";
 
     std::string client_id = boost::uuids::to_string(boost::uuids::random_generator()());
-    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
+    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id +
+                            macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
     fs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
       LOG_ERROR << "[Upload] Failed to open output file for writing: " << gzip_path;
-      send_response("HTTP/1.1 500 Internal Server Error\r\n\r\nFile write error");
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -306,7 +352,7 @@ private:
     if (!output_file.good())
     {
       LOG_ERROR << "[Upload] Failed to write data to file: " << gzip_path;
-      send_response("HTTP/1.1 500 Internal Server Error\r\n\r\nFile write error");
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -328,12 +374,27 @@ private:
     else
     {
       LOG_ERROR << "[Upload] Extraction or validation failed!";
-      send_response("HTTP/1.1 400 Bad Request\r\n\r\nInvalid GZIP file");
+      send_response(macros::to_string(macros::SERVER_ERROR_400));
     }
 
     fs::remove(gzip_path);
   }
 
+  /*
+   * NOTE:
+   *
+   * Currently this is a **PERSISTENT** download approach.
+   *
+   * So previous clients storage is also present regardless of whether the server was restarted or
+   * not.
+   *
+   * This means that unless the server's filesystem purposefully removes the hls storage, the
+   * client's extracted data will *ALWAYS* be present in the server.
+   *
+   * TLDR: Previous server instances of client storage is persistent and can be accessed until they
+   * are removed from server's filesystem.
+   *
+   */
   void handle_download()
   {
     // Parse request target (expected: /hls/<client_id>/<filename>)
@@ -353,7 +414,7 @@ private:
     if (parts.size() < 3 || parts[0] != "hls")
     {
       LOG_ERROR << "[Download] Invalid request path: " << target;
-      send_response("HTTP/1.1 400 Bad Request\r\n\r\nInvalid request format");
+      send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
 
@@ -361,12 +422,13 @@ private:
     std::string filename  = parts[2];
 
     // Construct the file path
-    std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id + "/" + filename;
+    std::string file_path =
+      macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id + "/" + filename;
 
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
     {
       LOG_ERROR << "[Download] File not found: " << file_path;
-      send_response("HTTP/1.1 404 Not Found\r\n\r\nFile not found");
+      send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
 
@@ -374,7 +436,7 @@ private:
     if (!file)
     {
       LOG_ERROR << "[Download] Failed to open file: " << file_path;
-      send_response("HTTP/1.1 500 Internal Server Error\r\n\r\nUnable to read file");
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -418,15 +480,41 @@ private:
   void send_response(const std::string& msg)
   {
     auto self(shared_from_this());
-    boost::asio::async_write(socket_, boost::asio::buffer(msg),
-                             [this, self](boost::system::error_code ec, std::size_t)
-                             {
-                               if (ec)
-                               {
-                                 LOG_ERROR << "[Session] Write error: " << ec.message();
-                               }
-                               socket_.lowest_layer().close();
-                             });
+    boost::asio::async_write(
+      socket_, boost::asio::buffer(msg),
+      [this, self, msg](boost::system::error_code ec, std::size_t bytes_transferred)
+      {
+        if (ec)
+        {
+          LOG_ERROR << "[Session] Write error: " << ec.message();
+          socket_.lowest_layer().close();
+          return;
+        }
+
+        if (bytes_transferred != msg.size())
+        {
+          LOG_WARNING << "[Session] Not all data was sent. Retrying...";
+          boost::asio::async_write(
+            socket_,
+            boost::asio::buffer(msg.data() + bytes_transferred, msg.size() - bytes_transferred),
+            [this, self](boost::system::error_code ec, std::size_t)
+            {
+              if (ec)
+              {
+                LOG_ERROR << "[Session] Write error during retry: " << ec.message();
+                socket_.lowest_layer().close();
+              }
+              else
+              {
+                socket_.lowest_layer().close(); // Graceful close after successful transmission
+              }
+            });
+          return;
+        }
+
+        socket_.lowest_layer().shutdown(tcp::socket::shutdown_send);
+        socket_.lowest_layer().close();
+      });
   }
 };
 
@@ -477,8 +565,10 @@ auto main() -> int
       boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 |
       boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
 
-    ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT), boost::asio::ssl::context::pem);
-    ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY), boost::asio::ssl::context::pem);
+    ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT),
+                                     boost::asio::ssl::context::pem);
+    ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
+                                     boost::asio::ssl::context::pem);
 
     HLS_Server server(io_context, ssl_context, 8080);
     io_context.run();

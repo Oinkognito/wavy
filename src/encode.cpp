@@ -1,7 +1,7 @@
+#include "../include/macros.hpp"
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include "../include/macros.hpp"
 
 extern "C"
 {
@@ -65,8 +65,8 @@ public:
 
     for (int bitrate : bitrates)
     {
-      std::string output_playlist =
-        std::string(output_dir) + "/hls_" + std::to_string(bitrate) + macros::to_string(macros::PLAYLIST_EXT);
+      std::string output_playlist = std::string(output_dir) + "/hls_" + std::to_string(bitrate) +
+                                    macros::to_string(macros::PLAYLIST_EXT);
       playlist_files.push_back(output_playlist);
 
       if (!encode_variant(input_file, output_playlist.c_str(), bitrate))
@@ -233,7 +233,8 @@ private:
   void create_master_playlist(const std::vector<std::string>& playlists,
                               const std::vector<int>& bitrates, const char* output_dir)
   {
-    std::string   master_playlist = std::string(output_dir) + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+    std::string master_playlist =
+      std::string(output_dir) + "/" + macros::to_string(macros::MASTER_PLAYLIST);
     std::ofstream m3u8(master_playlist);
 
     if (!m3u8)
