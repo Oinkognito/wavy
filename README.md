@@ -24,11 +24,13 @@ make all
 
 ## **ARCHITECTURE**
 
-Read `ARCHITECTURE.md` for more on the intended working model of the project.
+![wavy-arch](https://github.com/nots1dd/wavy/blob/main/assets/wavy-arch.jpeg)
+
+Read [ARCHITECTURE](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md) for more on the intended working model of the project.
 
 ## **API REFERENCES**
 
-Check out `APIREF.md`
+Check out [API](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
 
 ## **SERVER**
 
