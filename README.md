@@ -6,6 +6,7 @@
 2. base-devel (g++ / clang++ work as CXX COMPILERS)
 3. OpenSSL
 4. Boost C++ libs 
+5. libzstd (the Z-Standard lossless compression algorithm library)
 5. CMake and Make (GNU-Make) [Build System]
 
 ## **BUILDING**

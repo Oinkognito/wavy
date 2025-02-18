@@ -8,6 +8,7 @@ hls_*
 docs/
 output*/
 build*/
+payload*/
 .cache/
 *.mp3
 *.wav
