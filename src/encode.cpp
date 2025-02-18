@@ -170,10 +170,12 @@ private:
     // Format segment filename
     std::string segment_filename_format = output_dir + "/hls_" + std::to_string(bitrate) + "_%d.ts";
 
-    av_dict_set(&options, "hls_time", "10", 0);
-    av_dict_set(&options, "hls_list_size", "0", 0);
-    av_dict_set(&options, "hls_flags", "independent_segments", 0);
-    av_dict_set(&options, "hls_segment_filename", segment_filename_format.c_str(), 0);
+    av_dict_set(&options, macros::to_string(macros::CODEC_HLS_TIME_FIELD).c_str(), "10", 0);
+    av_dict_set(&options, macros::to_string(macros::CODEC_HLS_LIST_SIZE_FIELD).c_str(), "0", 0);
+    av_dict_set(&options, macros::to_string(macros::CODEC_HLS_FLAGS_FIELD).c_str(),
+                "independent_segments", 0);
+    av_dict_set(&options, macros::to_string(macros::CODEC_HLS_SEGMENT_FILENAME_FIELD).c_str(),
+                segment_filename_format.c_str(), 0);
 
     // Write header
     if (avformat_write_header(output_ctx, &options) < 0)

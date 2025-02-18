@@ -120,7 +120,9 @@ public:
       return false;
     }
 
+#ifdef DEBUG_RUN
     print_hierarchy();
+#endif
 
     std::string archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
     if (!compress_files(archive_path))

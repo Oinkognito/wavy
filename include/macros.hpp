@@ -5,19 +5,24 @@
 
 #define TRANSPORT_STREAM_START_BYTE 0x47 // 0x47 (MPEG-TS sync byte)
 
-#define STRING_CONSTANTS(X)                                \
-  X(PLAYLIST_EXT, ".m3u8")                                 \
-  X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                     \
-  X(MASTER_PLAYLIST, "index.m3u8")                         \
-  X(TRANSPORT_STREAM_EXT, ".ts")                           \
-  X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                     \
-  X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")              \
-  X(CONTENT_TYPE_COMPRESSION, "application/gzip")          \
-  X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream") \
-  X(PLAYLIST_STREAM_HEADER, "#EXT-X-STREAM-INF")           \
-  X(SERVER_CERT, "server.crt")                             \
-  X(SERVER_PRIVATE_KEY, "server.key")                      \
-  X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")              \
+#define STRING_CONSTANTS(X)                                   \
+  X(PLAYLIST_EXT, ".m3u8")                                    \
+  X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
+  X(MASTER_PLAYLIST, "index.m3u8")                            \
+  X(TRANSPORT_STREAM_EXT, ".ts")                              \
+  X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
+  X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \
+  X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")                 \
+  X(CODEC_HLS_TIME_FIELD, "hls_time")                         \
+  X(CODEC_HLS_LIST_SIZE_FIELD, "hls_list_size")               \
+  X(CODEC_HLS_SEGMENT_FILENAME_FIELD, "hls_segment_filename") \
+  X(CODEC_HLS_FLAGS_FIELD, "hls_flags")                       \
+  X(CONTENT_TYPE_COMPRESSION, "application/gzip")             \
+  X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream")    \
+  X(PLAYLIST_STREAM_HEADER, "#EXT-X-STREAM-INF")              \
+  X(SERVER_CERT, "server.crt")                                \
+  X(SERVER_PRIVATE_KEY, "server.key")                         \
+  X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")                 \
   X(SERVER_STORAGE_DIR, "/tmp/hls_storage") // this will use /tmp of the server's filesystem
 
 #define PROTOCOL_CONSTANTS(X)                                                              \
