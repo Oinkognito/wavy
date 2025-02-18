@@ -17,7 +17,7 @@ default: all
 # Parameterized configure function
 define configure
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" ..
 endef
 
 # Build all targets
