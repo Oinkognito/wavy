@@ -20,6 +20,8 @@
 #include <sstream>
 #include <vector>
 
+#include "../include/decompression.h"
+
 /*
  * SERVER
  *
@@ -73,9 +75,9 @@ auto validate_ts_file(const std::vector<uint8_t>& data) -> bool
   return !data.empty() && data[0] == 0x47; // MPEG-TS sync byte
 }
 
-auto extract_gzip(const std::string& gzip_path, const std::string& extract_path) -> bool
+auto extract_payload(const std::string& payload_path, const std::string& extract_path) -> bool
 {
-  LOG_INFO << "[Extract] Extracting GZIP file: " << gzip_path;
+  LOG_INFO << "[Extract] Extracting PAYLOAD: " << payload_path;
 
   struct archive*       a   = archive_read_new();
   struct archive*       ext = archive_write_disk_new();
@@ -85,7 +87,7 @@ auto extract_gzip(const std::string& gzip_path, const std::string& extract_path)
   archive_read_support_format_tar(a);
   archive_write_disk_set_options(ext, ARCHIVE_EXTRACT_PERM);
 
-  if (archive_read_open_filename(a, gzip_path.c_str(), 10240) != ARCHIVE_OK)
+  if (archive_read_open_filename(a, payload_path.c_str(), 10240) != ARCHIVE_OK)
   {
     LOG_ERROR << "[Extract] Failed to open archive: " << archive_error_string(a);
     archive_read_free(a);
@@ -122,6 +124,30 @@ auto extract_gzip(const std::string& gzip_path, const std::string& extract_path)
       ofs.close();
 
       valid_files_found = true;
+
+      // If the extracted file is a .zst file, decompress it
+      if (output_file.substr(output_file.find_last_of(".") + 1) == "zst")
+      {
+        LOG_INFO << "[Extract] Decompressing .zst file: " << output_file;
+        if (!ZSTD_decompress_file(output_file.c_str()))
+        {
+          LOG_ERROR << "[Extract] Failed to decompress .zst file: " << output_file;
+          continue;
+        }
+
+        std::string decompressed_filename =
+          output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
+        LOG_INFO << "[Extract] Decompressed file: " << decompressed_filename;
+
+        if (std::remove(output_file.c_str()) == 0)
+        {
+          LOG_INFO << "[Extract] Deleted the original .zst file: " << output_file;
+        }
+        else
+        {
+          LOG_ERROR << "[Extract] Failed to delete .zst file: " << output_file;
+        }
+      }
     }
   }
 
@@ -145,7 +171,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
     macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id;
   fs::create_directories(temp_extract_path);
 
-  if (!extract_gzip(gzip_path, temp_extract_path))
+  if (!extract_payload(gzip_path, temp_extract_path))
   {
     LOG_ERROR << "[Extract] Extraction failed!";
     return false;

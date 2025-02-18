@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../include/compression.h"
 #include "../include/logger.hpp"
 #include "../include/macros.hpp"
 
@@ -48,11 +49,24 @@
  *
  * ----------------------------------------------------------------------------------------------------
  *
- * 2. Why GZIP?
+ * 2. Why Zstd+GZIP?
  *
- * This was chosen as a test to see how the server functionaility setup.
- * Once we do more research and find a more efficient compression algorithm for data transfer
- * (that ideally does not need any extra dependencies) we will switch to that.
+ * This was the best in terms of lossless algorithms and had a great tradeoff between effiency,
+ * and fast compression + decompression times with MINIMAL dependencies.
+ *
+ * We are using a modified ZStandard algorithm taken from Facebook's ZSTD repository.
+ *
+ * The ZSTD compression is a C source file called into the dispatcher which is externed into this
+ * dispatcher. It is then bundled into a `hls_data.tar.gz` (check macros.hpp)
+ *
+ * Also considering the fact that .ts are binary (octet-stream) data and .m3u8 is plain-text so
+ * compression algorithm like ZSTD is perfect for this.
+ *
+ * Each transport stream on average had their content size reduced by ~30%
+ * Each playlist file on average had their content size reduced by ~70+%
+ *
+ * This gives pretty good results overall, as the overall file size between simple compression using
+ * TAR or GZIP, etc. do not achieve ZSTD+GZIP compression.
  *
  * Possible future for compression algorithms:
  *
@@ -60,7 +74,7 @@
  * -> Opus
  * -> Zstd + tar compression (most likely approach)
  *
- * But doing the above will require additional dependencies in the server.
+ * AAC / OPUS or any other encoding will require additional dependencies in the server.
  *
  * ----------------------------------------------------------------------------------------------------
  *
@@ -243,6 +257,15 @@ private:
 
   auto compress_files(const std::string& archive_path) -> bool
   {
+    /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
+    if (!ZSTD_compressFilesInDirectory(
+          fs::path(directory_).c_str(),
+          macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
+    {
+      LOG_ERROR << "[Dispatcher] Something went wrong with Zstd compression.";
+      return false;
+    }
+
     struct archive* archive = archive_write_new();
     archive_write_add_filter_gzip(archive);
     archive_write_set_format_pax_restricted(archive);
@@ -274,20 +297,31 @@ private:
       return true;
     };
 
-    // Add master playlist
-    add_file_to_archive(fs::path(directory_) / playlist_name_);
+    for (const auto& entry : fs::directory_iterator(fs::path(macros::DISPATCH_ARCHIVE_REL_PATH)))
+    {
+      if (entry.is_regular_file())
+      {
+        if (!add_file_to_archive(entry.path().string()))
+        {
+          LOG_ERROR << "[Dispatcher] Failed to add file: " << entry.path();
+          archive_write_close(archive);
+          archive_write_free(archive);
+          return false;
+        }
+      }
+    }
 
-    // Add reference playlists
-    for (const auto& [playlist_path, _] : reference_playlists_)
-      add_file_to_archive(playlist_path);
+    // Close the archive
+    if (archive_write_close(archive) != ARCHIVE_OK)
+    {
+      LOG_ERROR << "[Dispatcher] Failed to close archive properly";
+      archive_write_free(archive);
+      return false;
+    }
 
-    // Add transport streams
-    for (const auto& ts_path : transport_streams_)
-      add_file_to_archive(ts_path);
-
-    archive_write_close(archive);
     archive_write_free(archive);
-    LOG_INFO << "[Dispatcher] Compression completed: " << archive_path;
+    LOG_INFO << "[Dispatcher] ZSTD compression of " << directory_ << " to " << archive_path
+             << " with final GNU tar job done.";
     return true;
   }
 
