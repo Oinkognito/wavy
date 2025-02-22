@@ -12,3 +12,4 @@ payload*/
 .cache/
 *.mp3
 *.wav
+include/miniaudio.h
