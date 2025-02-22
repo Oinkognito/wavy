@@ -61,6 +61,7 @@ function(add_custom_executable name src_file)
 endfunction()
 
 add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
+target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads)
 add_custom_executable(${DECODER_BIN} ${DECODER_SRC})
 add_custom_executable(${PLAYBACK_BIN} ${PLAYBACK_SRC})
 
