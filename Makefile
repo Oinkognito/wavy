@@ -10,6 +10,7 @@ ENCODER_BIN := hls_segmenter
 DECODER_BIN := hls_decoder
 SERVER_BIN := hls_server
 DISPATCHER_BIN := hls_dispatcher
+PLAYBACK_BIN := hls_playback
 
 # Default target: Build everything
 default: all
@@ -33,6 +34,10 @@ encoder:
 decoder:
 	$(call configure,Decoder Only,Release)
 	@$(MAKE) -C $(BUILD_DIR) $(DECODER_BIN)
+
+playback:
+	$(call configure,Playback Only,Release)
+	@$(MAKE) -C $(BUILD_DIR) $(PLAYBACK_BIN)
 
 server:
 	$(call configure,Server Only,Release)
