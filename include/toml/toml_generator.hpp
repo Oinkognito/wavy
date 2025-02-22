@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../toml.hpp"
+#include "toml.hpp"
 #include <fstream>
 #include <string>
 
