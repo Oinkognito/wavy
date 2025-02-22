@@ -71,7 +71,7 @@ class HLSClientWindow(Gtk.Window):
 
     def run_client(self, index, server_ip):
         try:
-            client_path = "./build/hls_client"
+            client_path = os.path.abspath("./build/hls_client")
             if not os.path.exists(client_path):
                 GLib.idle_add(self.status_label.set_label, "Status: Client binary not found!")
                 return
