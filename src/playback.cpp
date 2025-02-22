@@ -14,7 +14,7 @@ class AudioPlayer
 private:
   ma_device                  device;
   ma_decoder                 decoder;
-  std::vector<unsigned char> mp3Memory; // Hold the MP3 data to keep it valid during playback
+  std::vector<unsigned char> audioMemory; // Hold the Audio data to keep it valid during playback
   bool                       isPlaying;
 
   static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
@@ -38,11 +38,11 @@ private:
 
 public:
   // New constructor that initializes decoder from memory
-  AudioPlayer(const std::vector<unsigned char>& mp3Input) : mp3Memory(mp3Input), isPlaying(false)
+  AudioPlayer(const std::vector<unsigned char>& audioInput) : audioMemory(audioInput), isPlaying(false)
   {
     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
 
-    if (ma_decoder_init_memory(mp3Memory.data(), mp3Memory.size(), &decoderConfig, &decoder) !=
+    if (ma_decoder_init_memory(audioMemory.data(), audioMemory.size(), &decoderConfig, &decoder) !=
         MA_SUCCESS)
     {
       throw std::runtime_error("Failed to initialize decoder from memory");
@@ -88,18 +88,18 @@ public:
 
 int main()
 {
-  // Read MP3 data from standard input
-  std::vector<unsigned char> mp3Data((std::istreambuf_iterator<char>(std::cin)),
+  // Read Audio data from standard input
+  std::vector<unsigned char> audioData((std::istreambuf_iterator<char>(std::cin)),
                                      std::istreambuf_iterator<char>());
-  if (mp3Data.empty())
+  if (audioData.empty())
   {
-    std::cerr << "No MP3 input received from STDIN" << std::endl;
+    std::cerr << "No Audio input received from STDIN" << std::endl;
     return 1;
   }
 
   try
   {
-    AudioPlayer player(mp3Data);
+    AudioPlayer player(audioData);
     player.play();
   }
   catch (const std::exception& e)
