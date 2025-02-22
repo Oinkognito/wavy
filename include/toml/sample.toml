@@ -1,22 +1,34 @@
-[File]
-path = "../../sample2.mp3"
+[audio_parser]
+bitrate = 131
+duration = 233
+file_format = 'mp3'
+file_format_long = 'MP2/3 (MPEG audio layer 2/3)'
+path = '../../sample2.mp3'
 
-[Format]
-audio_type = "mp3 (MP2/3 (MPEG audio layer 2/3))"
-duration = "233"
-parsed_bitrate = "131 kbps"
+[metadata]
+TSRC = 'GBAYE9400058'
+album = 'The Bends'
+album_artist = 'Radiohead'
+artist = 'Radiohead'
+comment = 'https://music.youtube.com/watch?v=jIjTFt6XmFM'
+copyright = '1995 XL Recordings Ltd'
+date = '1995'
+disc = '1/1'
+encoded_by = 'XL Recordings'
+encoder = 'Lavf61.7.100'
+genre = 'Alternative Rock'
+title = '(Nice Dream)'
+track = '6/12'
 
-[Metadata]
-title = "<Song-name>"
-artist = "Radiohead"
-track = "6/12"
-album = "The Bends"
-disc = "1/1"
-copyright = "1995 XL Recordings Ltd"
-genre = "Alternative Rock"
-comment = "https://music.youtube.com/watch?v=jIjTFt6XmFM"
-album_artist = "Radiohead"
-TSRC = "GBAYE9400058"
-encoder = "Lavf61.7.100"
-encoded_by = "XL Recordings"
-date = "1995"
+[stream_0]
+bitrate = 128
+channel_layout = 'stereo'
+channels = 2
+codec = 'mp3'
+sample_format = 'fltp'
+sample_rate = 48000
+type = 'Audio'
+
+[stream_1]
+codec = 'mjpeg'
+type = 'Video'

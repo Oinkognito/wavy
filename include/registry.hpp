@@ -47,35 +47,34 @@ public:
   {
     TomlGenerator tomlGen;
 
-    tomlGen.addTableValue("audio_parser", "file", filePath);
+    tomlGen.addTableValue("audio_parser", "path", filePath);
 
     if (fmt_ctx->iformat)
     {
-      tomlGen.addTableValue("audio_parser", "file.format", std::string(fmt_ctx->iformat->name));
+      tomlGen.addTableValue("audio_parser", "file_format", std::string(fmt_ctx->iformat->name));
       if (fmt_ctx->iformat->long_name)
       {
-        tomlGen.addTableValue("audio_parser", "file.format_long",
+        tomlGen.addTableValue("audio_parser", "file_format_long",
                               std::string(fmt_ctx->iformat->long_name));
       }
     }
 
     if (fmt_ctx->duration != AV_NOPTS_VALUE)
     {
-      tomlGen.addTableValue("audio_parser", "file.duration",
+      tomlGen.addTableValue("audio_parser", "duration",
                             static_cast<int>(fmt_ctx->duration / AV_TIME_BASE));
     }
 
     if (fmt_ctx->bit_rate > 0)
     {
-      tomlGen.addTableValue("audio_parser", "file.bitrate",
-                            static_cast<int>(fmt_ctx->bit_rate / 1000));
+      tomlGen.addTableValue("audio_parser", "bitrate", static_cast<int>(fmt_ctx->bit_rate / 1000));
     }
 
     // Metadata
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
     {
-      tomlGen.addTableValue("audio_parser.metadata", tag->key, std::string(tag->value));
+      tomlGen.addTableValue("metadata", tag->key, std::string(tag->value));
     }
 
     // Streams
@@ -84,7 +83,7 @@ public:
       AVStream*          stream       = fmt_ctx->streams[i];
       AVCodecParameters* codec_params = stream->codecpar;
 
-      std::string streamPath = "audio_parser.stream_" + std::to_string(i);
+      std::string streamPath = "stream_" + std::to_string(i);
 
       if (codec_params->codec_id != AV_CODEC_ID_NONE)
       {

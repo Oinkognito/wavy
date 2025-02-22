@@ -74,10 +74,10 @@ int main(int argc, char* argv[])
     ctx.set_verify_mode(ssl::verify_none); // Disable verification for testing
 
     // Get list of clients
-    std::string clients_response = perform_https_request(ioc, ctx, "/hls/clients");
-    std::istringstream clientStream(clients_response);
+    std::string              clients_response = perform_https_request(ioc, ctx, "/hls/clients");
+    std::istringstream       clientStream(clients_response);
     std::vector<std::string> clientIds;
-    std::string line;
+    std::string              line;
     while (std::getline(clientStream, line))
     {
       if (!line.empty())
