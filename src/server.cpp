@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "../include/decompression.h"
+#include "../include/toml/toml_parser.hpp"
 
 /*
  * SERVER
@@ -185,7 +186,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
 
   int valid_file_count = 0;
 
-  for (fs::directory_entry& file : fs::directory_iterator(temp_extract_path))
+  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path)) // Added const
   {
     std::string          fname = file.path().filename().string();
     std::ifstream        infile(file.path().string(), std::ios::binary);
@@ -313,7 +314,7 @@ private:
     client_list << " Client IDs: " << std::endl;
 
     bool clients_found = false;
-    for (fs::directory_entry& entry : fs::directory_iterator(storage_path))
+    for (const fs::directory_entry& entry : fs::directory_iterator(storage_path)) // Added const
     {
       if (fs::is_directory(entry.status()))
       {
@@ -337,6 +338,40 @@ private:
   {
     if (request_.method() == http::verb::post)
     {
+      // Check if this is a TOML file upload request.
+      // For example, if the request target is "/toml/upload"...
+      std::string target(request_.target().begin(), request_.target().end());
+      if (target == "/toml/upload")
+      {
+        // Remove padding text before parsing
+        std::string body      = request_.body();
+        std::string delimiter = "\r\n\r\n";
+        auto        pos       = body.find(delimiter);
+        if (pos != std::string::npos)
+        {
+          body = body.substr(pos + delimiter.length());
+        }
+
+        // Remove bottom padding text
+        std::string bottom_delimiter = "--------------------------";
+        auto        bottom_pos       = body.find(bottom_delimiter);
+        if (bottom_pos != std::string::npos)
+        {
+          body = body.substr(0, bottom_pos);
+        }
+
+        // Call your TOML parsing function.
+        auto toml_data_opt = parseAudioMetadataFromDataString(body);
+        if (toml_data_opt.path.empty())
+        {
+          LOG_ERROR << "[TOML] Failed to parse TOML data";
+          send_response("HTTP/1.1 400 Bad Request\r\n\r\nTOML parsing failed\r\n");
+          return;
+        }
+
+        send_response("HTTP/1.1 200 OK\r\n\r\nTOML parsed\r\n");
+        return;
+      }
       handle_upload();
     }
     else if (request_.method() == http::verb::get)
