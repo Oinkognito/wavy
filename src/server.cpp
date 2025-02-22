@@ -311,7 +311,6 @@ private:
     }
 
     std::ostringstream client_list;
-    client_list << " Client IDs: " << std::endl;
 
     bool clients_found = false;
     for (const fs::directory_entry& entry : fs::directory_iterator(storage_path)) // Added const
@@ -541,41 +540,42 @@ private:
   void send_response(const std::string& msg)
   {
     auto self(shared_from_this());
-    boost::asio::async_write(
-      socket_, boost::asio::buffer(msg),
-      [this, self, msg](boost::system::error_code ec, std::size_t bytes_transferred)
-      {
-        if (ec)
-        {
-          LOG_ERROR << "[Session] Write error: " << ec.message();
-          socket_.lowest_layer().close();
-          return;
-        }
+    boost::asio::async_write(socket_, boost::asio::buffer(msg),
+                             [this, self, msg_size = msg.size()](boost::system::error_code ec,
+                                                                 std::size_t bytes_transferred)
+                             {
+                               // Always perform shutdown, even on error
+                               auto do_shutdown = [this, self]()
+                               {
+                                 socket_.async_shutdown(
+                                   [this, self](boost::system::error_code shutdown_ec)
+                                   {
+                                     if (shutdown_ec)
+                                     {
+                                       LOG_ERROR << "[Session] Shutdown error: "
+                                                 << shutdown_ec.message();
+                                     }
+                                     socket_.lowest_layer().close();
+                                   });
+                               };
 
-        if (bytes_transferred != msg.size())
-        {
-          LOG_WARNING << "[Session] Not all data was sent. Retrying...";
-          boost::asio::async_write(
-            socket_,
-            boost::asio::buffer(msg.data() + bytes_transferred, msg.size() - bytes_transferred),
-            [this, self](boost::system::error_code ec, std::size_t)
-            {
-              if (ec)
-              {
-                LOG_ERROR << "[Session] Write error during retry: " << ec.message();
-                socket_.lowest_layer().close();
-              }
-              else
-              {
-                socket_.lowest_layer().close(); // Graceful close after successful transmission
-              }
-            });
-          return;
-        }
+                               if (ec)
+                               {
+                                 LOG_ERROR << "[Session] Write error: " << ec.message();
+                                 do_shutdown();
+                                 return;
+                               }
 
-        socket_.lowest_layer().shutdown(tcp::socket::shutdown_send);
-        socket_.lowest_layer().close();
-      });
+                               if (bytes_transferred != msg_size)
+                               {
+                                 LOG_ERROR << "[Session] Incomplete write: " << bytes_transferred
+                                           << " of " << msg_size << " bytes";
+                                 do_shutdown();
+                                 return;
+                               }
+
+                               do_shutdown();
+                             });
   }
 };
 
