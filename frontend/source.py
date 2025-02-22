@@ -205,22 +205,60 @@ class WavyApp(Gtk.Window):
                 self.append_log(f"Failed to delete {file_path}: {e}")
     
     def run_subprocess(self, file, directory, url):
-        # Replace "your_program" with the actual executable/command you want to run.
-        command = ["./build/hls_segmenter", file, directory, file.split(".")[-1]]
-        addr, port = url.rsplit(":", 1)
-        dispatcher = ["./build/hls_dispatcher", addr.split("//", 1)[1], port, directory, "index.m3u8"]
-        print(dispatcher)
-        try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            process2 = subprocess.Popen(dispatcher, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        except Exception as e:
-            self.append_log(f"Failed to start subprocess: {e}")
-            return
-        
-        def read_output():
-            for line in process2.stdout:
-                GObject.idle_add(self.append_log, line.rstrip())
-        GObject.idle_add(read_output)
+        hls_segmenter_path = os.path.abspath("../build/hls_segmenter")
+        hls_dispatcher_path = os.path.abspath("../build/hls_dispatcher")
+
+        command = [hls_segmenter_path, file, directory, file.split(".")[-1]]
+        parsed_url = urlparse(url)
+        addr = parsed_url.hostname
+        port = str(parsed_url.port)
+        dispatcher = [hls_dispatcher_path, addr, port, directory, "index.m3u8"]
+
+        def run_in_sequence():
+            # First run segmenter
+            try:
+                seg_process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=directory  # Run in target directory
+                )
+                
+                # Capture segmenter output
+                for line in iter(seg_process.stdout.readline, ''):
+                    GObject.idle_add(self.append_log, f"[Segmenter] {line.strip()}")
+                
+                seg_process.wait()  # Wait for segmenter to finish
+            except Exception as e:
+                GObject.idle_add(self.append_log, f"[ERROR] Segmenter failed: {str(e)}")
+                return
+
+            # Verify playlist was created
+            playlist_path = os.path.join(directory, "index.m3u8")
+            if not os.path.exists(playlist_path):
+                GObject.idle_add(self.append_log, "[ERROR] Segmenter did not create index.m3u8")
+                return
+
+            # Then run dispatcher
+            try:
+                disp_process = subprocess.Popen(
+                    dispatcher,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=directory  # Run in target directory
+                )
+                
+                # Capture dispatcher output
+                for line in iter(disp_process.stdout.readline, ''):
+                    GObject.idle_add(self.append_log, f"[Dispatcher] {line.strip()}")
+            except Exception as e:
+                GObject.idle_add(self.append_log, f"[ERROR] Dispatcher failed: {str(e)}")
+
+        # Run the entire sequence in a background thread
+        import threading
+        threading.Thread(target=run_in_sequence, daemon=True).start()
     
     def append_log(self, text):
         end_iter = self.log_buffer.get_end_iter()
