@@ -71,7 +71,7 @@ The **Wavy** system consists of the following components:
 <img src="assets/wavy-arch.jpeg" alt="Wavy Architecture" width="400">
 
 For a more detailed explanation, read:  
-➡️ [ARCHITECTURE.md](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md)
+[ARCHITECTURE.md](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md)
 
 ---
 
@@ -84,7 +84,7 @@ Wavy relies on **FFmpeg's core libraries** for processing audio:
 - [`libswresample`](https://ffmpeg.org/libswresample.html) - Audio resampling & format conversion.
 
 For detailed API documentation, see:  
-➡️ [APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
+[APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
 
 ---
 
@@ -104,12 +104,17 @@ Or use the **Makefile shortcut**:
 make server-cert
 ```
 
-> **Note:** Place `server.crt` and `server.key` in the **current working directory** before starting the server.
+> ![NOTE] 
+> 
+> Place `server.crt` and `server.key` in the **current working directory** before starting the server.
+> 
 
-> **Warning:**  
+> ![WARNING] 
+> 
 > This is a **self-signed certificate**.  
 > - Use `-k` flag in **cURL** to bypass SSL validation.
 > - Accept the self-signed certificate when using **VLC/MPV**.
+> 
 
 ---
 
