@@ -3,7 +3,6 @@
 #include "toml.hpp"
 #include <cstdlib>
 #include <filesystem>
-#include <iostream>
 #include <string_view>
 
 using namespace std;
@@ -12,7 +11,7 @@ namespace toml_fs = std::filesystem;
 #define PARENT_AUDIO_PARSER                 "audio_parser"
 #define PARENT_AUDIO_FIELD_BITRATE          "bitrate"
 #define PARENT_AUDIO_FIELD_DURATION         "duration"
-#define PARENT_AUDIO_FIELD_FILE             "path"
+#define PARENT_AUDIO_FIELD_PATH             "path"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT      "file_format"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT_LONG "file_format_long"
 
@@ -94,7 +93,7 @@ auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> AudioMetada
   // Audio Parser Section
   result.bitrate     = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_BITRATE].value_or(-1);
   result.duration    = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_DURATION].value_or(-1);
-  result.path        = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE].value_or(""s);
+  result.path        = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_PATH].value_or(""s);
   result.file_format = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT].value_or(""s);
   result.file_format_long =
     metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT_LONG].value_or(""s);
