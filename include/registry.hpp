@@ -9,6 +9,7 @@ extern "C"
 #include <libavutil/samplefmt.h>
 }
 #include "toml/toml_generator.hpp"
+#include "toml/toml_parser.hpp"
 
 class AudioParser
 {
@@ -47,34 +48,36 @@ public:
   {
     TomlGenerator tomlGen;
 
-    tomlGen.addTableValue("audio_parser", "path", filePath);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_PATH, filePath);
 
     if (fmt_ctx->iformat)
     {
-      tomlGen.addTableValue("audio_parser", "file_format", std::string(fmt_ctx->iformat->name));
+      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT,
+                            std::string(fmt_ctx->iformat->name));
       if (fmt_ctx->iformat->long_name)
       {
-        tomlGen.addTableValue("audio_parser", "file_format_long",
+        tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT_LONG,
                               std::string(fmt_ctx->iformat->long_name));
       }
     }
 
     if (fmt_ctx->duration != AV_NOPTS_VALUE)
     {
-      tomlGen.addTableValue("audio_parser", "duration",
+      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION,
                             static_cast<int>(fmt_ctx->duration / AV_TIME_BASE));
     }
 
     if (fmt_ctx->bit_rate > 0)
     {
-      tomlGen.addTableValue("audio_parser", "bitrate", static_cast<int>(fmt_ctx->bit_rate / 1000));
+      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE,
+                            static_cast<int>(fmt_ctx->bit_rate / 1000));
     }
 
     // Metadata
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
     {
-      tomlGen.addTableValue("metadata", tag->key, std::string(tag->value));
+      tomlGen.addTableValue(PARENT_METADATA, tag->key, std::string(tag->value));
     }
 
     // Streams
@@ -83,47 +86,50 @@ public:
       AVStream*          stream       = fmt_ctx->streams[i];
       AVCodecParameters* codec_params = stream->codecpar;
 
-      std::string streamPath = "stream_" + std::to_string(i);
+      std::string streamPath = (i == 0) ? PARENT_STREAM_0 : PARENT_STREAM_1;
 
       if (codec_params->codec_id != AV_CODEC_ID_NONE)
       {
-        tomlGen.addTableValue(streamPath, "codec",
+        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CODEC,
                               std::string(avcodec_get_name(codec_params->codec_id)));
       }
 
       switch (codec_params->codec_type)
       {
         case AVMEDIA_TYPE_AUDIO:
-          tomlGen.addTableValue(streamPath, "type", "Audio");
+          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Audio");
           break;
         case AVMEDIA_TYPE_VIDEO:
-          tomlGen.addTableValue(streamPath, "type", "Video");
+          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Video");
           break;
         case AVMEDIA_TYPE_SUBTITLE:
-          tomlGen.addTableValue(streamPath, "type", "Subtitle");
+          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Subtitle");
           break;
         default:
-          tomlGen.addTableValue(streamPath, "type", "Unknown");
+          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Unknown");
           break;
       }
 
       if (codec_params->codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        tomlGen.addTableValue(streamPath, "sample_rate", codec_params->sample_rate);
-        tomlGen.addTableValue(streamPath, "channels", codec_params->ch_layout.nb_channels);
-        tomlGen.addTableValue(streamPath, "bitrate",
+        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_SAMPLE_RATE,
+                              codec_params->sample_rate);
+        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CHANNELS,
+                              codec_params->ch_layout.nb_channels);
+        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_BITRATE,
                               static_cast<int>(codec_params->bit_rate / 1000));
 
         if (codec_params->format != AV_SAMPLE_FMT_NONE)
         {
           tomlGen.addTableValue(
-            streamPath, "sample_format",
+            streamPath, PARENT_STREAM_FIELD_SAMPLE_FORMAT,
             std::string(av_get_sample_fmt_name(static_cast<AVSampleFormat>(codec_params->format))));
         }
 
         char ch_layout_str[256];
         av_channel_layout_describe(&codec_params->ch_layout, ch_layout_str, sizeof(ch_layout_str));
-        tomlGen.addTableValue(streamPath, "channel_layout", std::string(ch_layout_str));
+        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CHANNEL_LAYOUT,
+                              std::string(ch_layout_str));
       }
     }
 

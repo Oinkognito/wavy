@@ -127,7 +127,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
       valid_files_found = true;
 
       // If the extracted file is a .zst file, decompress it
-      if (output_file.substr(output_file.find_last_of(".") + 1) == "zst")
+      if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
         LOG_INFO << "[Extract] Decompressing .zst file: " << output_file;
         if (!ZSTD_decompress_file(output_file.c_str()))
@@ -375,7 +375,7 @@ private:
     }
     else if (request_.method() == http::verb::get)
     {
-      if (request_.target() == "/hls/clients") // Request for all client IDs
+      if (request_.target() == macros::SERVER_PATH_HLS_CLIENTS) // Request for all client IDs
       {
         handle_list_clients();
       }

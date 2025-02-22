@@ -79,7 +79,7 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
 
   LOG_INFO << "Fetching client list from server: " << server;
 
-  std::string        clients_response = perform_https_request(ioc, ctx, "/hls/clients", server);
+  std::string        clients_response = perform_https_request(ioc, ctx, macros::to_string(macros::SERVER_PATH_HLS_CLIENTS), server);
   std::istringstream clientStream(clients_response);
   std::vector<std::string> clientIds;
   std::string              line;
@@ -110,7 +110,7 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
   std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";
   std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path, server);
 
-  if (playlist_content.find("#EXT-X-STREAM-INF:") != std::string::npos)
+  if (playlist_content.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
   {
     int                max_bandwidth = 0;
     std::string        selected_playlist;
@@ -118,7 +118,7 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
 
     while (std::getline(iss, line))
     {
-      if (line.find("#EXT-X-STREAM-INF:") != std::string::npos)
+      if (line.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
       {
         size_t pos = line.find("BANDWIDTH=");
         if (pos != std::string::npos)

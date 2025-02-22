@@ -12,6 +12,7 @@
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
   X(MASTER_PLAYLIST, "index.m3u8")                            \
   X(TRANSPORT_STREAM_EXT, ".ts")                              \
+  X(ZSTD_FILE_EXT, "zst")                                     \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
   X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")                 \
@@ -21,7 +22,8 @@
   X(CODEC_HLS_FLAGS_FIELD, "hls_flags")                       \
   X(CONTENT_TYPE_COMPRESSION, "application/gzip")             \
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream")    \
-  X(PLAYLIST_STREAM_HEADER, "#EXT-X-STREAM-INF")              \
+  X(PLAYLIST_VARIANT_TAG, "#EXT-X-STREAM-INF:")               \
+  X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
   X(SERVER_CERT, "server.crt")                                \
   X(SERVER_PRIVATE_KEY, "server.key")                         \
   X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")                 \

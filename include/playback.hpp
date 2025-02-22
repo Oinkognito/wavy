@@ -1,8 +1,5 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
-#include <iostream>
-#include <stdexcept>
-#include <string>
 #include <vector>
 
 #define BUFFER_SIZE 4096

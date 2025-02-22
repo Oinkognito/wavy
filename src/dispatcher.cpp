@@ -174,7 +174,7 @@ private:
     bool        has_stream_inf = false;
     while (std::getline(file, line))
     {
-      if (line.find(macros::PLAYLIST_STREAM_HEADER) != std::string::npos)
+      if (line.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
       {
         has_stream_inf = true;
         if (!std::getline(file, line) || line.empty() ||
