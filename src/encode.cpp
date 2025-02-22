@@ -175,8 +175,9 @@ private:
     size_t      last_slash          = output_playlist_str.find_last_of('/');
     std::string out_dir =
       (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
-    std::string segment_filename_format =
-      out_dir + "/hls_" + (use_flac ? "flac_" : "mp3_") + std::to_string(bitrate) + "_%d.ts";
+      std::string segment_filename_format = out_dir + "/hls_" + 
+      (use_flac ? "flac_" : "mp3_") + std::to_string(bitrate) + "_%d." + 
+      (use_flac ? "m4s" : "ts");  // Use .m4s extension for FLAC/fMP4
 
     // Set HLS options common to both cases
     av_dict_set(&options, macros::to_string(macros::CODEC_HLS_TIME_FIELD).c_str(), "10", 0);
@@ -283,8 +284,8 @@ private:
 
     for (size_t i = 0; i < playlists.size(); i++)
     {
-      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << (bitrates[i] * 1000) << ",CODECS=\""
-           << (use_flac ? "fLaC" : "mp4a.40.2") << "\"\n";
+      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << (bitrates[i] * 1000)
+     << ",CODECS=\"" << (use_flac ? "mp4a.40.2,flac" : "mp4a.40.2") << "\"\n";
       m3u8 << playlists[i].substr(strlen(output_dir) + 1) << "\n";
     }
 
