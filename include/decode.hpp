@@ -55,10 +55,11 @@ public:
    * @param ts_segments Vector of transport stream segments
    * @return true if successful, false otherwise
    */
-  bool decode_ts(const std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
+  bool decode_ts(const std::vector<std::string>& ts_segments,
+                 std::vector<unsigned char>&     output_audio)
   {
-    AVFormatContext* input_ctx  = avformat_alloc_context();
-    AVIOContext*     avio_ctx   = nullptr;
+    AVFormatContext* input_ctx = avformat_alloc_context();
+    AVIOContext*     avio_ctx  = nullptr;
     int              ret;
 
     // Buffer for custom AVIO
@@ -70,8 +71,8 @@ public:
     }
 
     // Create custom AVIOContext
-    avio_ctx = avio_alloc_context(
-      avio_buffer, 4096, 0, (void*)&ts_segments, &custom_read_packet, nullptr, nullptr);
+    avio_ctx = avio_alloc_context(avio_buffer, 4096, 0, (void*)&ts_segments, &custom_read_packet,
+                                  nullptr, nullptr);
     if (!avio_ctx)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO context\n");

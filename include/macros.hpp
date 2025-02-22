@@ -5,6 +5,7 @@
 
 #define TRANSPORT_STREAM_START_BYTE 0x47 // 0x47 (MPEG-TS sync byte)
 #define WAVY_SERVER_PORT_NO         8080
+#define WAVY_SERVER_PORT_NO_STR     "8080"
 
 #define STRING_CONSTANTS(X)                                   \
   X(PLAYLIST_EXT, ".m3u8")                                    \

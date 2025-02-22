@@ -10,36 +10,36 @@
 #include <string>
 #include <vector>
 
+#include "../include/decode.hpp"
+#include "../include/macros.hpp"
+#include "../include/playback.hpp"
+#include "../include/state.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
-#include "../include/state.hpp"
-#include "../include/decode.hpp"
-#include "../include/playback.hpp"
 
 namespace ssl   = boost::asio::ssl;
 namespace beast = boost::beast;
-using namespace boost::interprocess;
-namespace http  = beast::http;
-namespace net   = boost::asio;
-using tcp       = net::ip::tcp;
+namespace http = beast::http;
+namespace net  = boost::asio;
+using tcp      = net::ip::tcp;
 
 // Perform an HTTPS GET request and return the response body as a string.
-auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::string& target)
-  -> std::string
+auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::string& target,
+                           const std::string& server) -> std::string
 {
   tcp::resolver resolver(ioc);
-  auto const    results = resolver.resolve("localhost", "8080");
+  auto const    results = resolver.resolve(server, WAVY_SERVER_PORT_NO_STR);
 
   beast::ssl_stream<tcp::socket> stream(ioc, ctx);
   net::connect(stream.next_layer(), results.begin(), results.end());
   stream.handshake(ssl::stream_base::client);
 
   http::request<http::string_body> req{http::verb::get, target, 11};
-  req.set(http::field::host, "localhost");
+  req.set(http::field::host, server);
   req.set(http::field::user_agent, "WavyClient");
   http::write(stream, req);
 
@@ -55,13 +55,13 @@ auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::s
   return response_data;
 }
 
-auto fetch_transport_segments(int index, GlobalState& gs) -> bool
+auto fetch_transport_segments(int index, GlobalState& gs, const std::string& server) -> bool
 {
   net::io_context ioc;
   ssl::context    ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
 
-  std::string              clients_response = perform_https_request(ioc, ctx, "/hls/clients");
+  std::string              clients_response = perform_https_request(ioc, ctx, "/hls/clients", server);
   std::istringstream       clientStream(clients_response);
   std::vector<std::string> clientIds;
   std::string              line;
@@ -88,7 +88,7 @@ auto fetch_transport_segments(int index, GlobalState& gs) -> bool
   }
 
   std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";
-  std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path);
+  std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path, server);
 
   if (playlist_content.find("#EXT-X-STREAM-INF:") != std::string::npos)
   {
@@ -128,7 +128,7 @@ auto fetch_transport_segments(int index, GlobalState& gs) -> bool
     }
 
     std::string highest_playlist_path = "/hls/" + client_id + "/" + selected_playlist;
-    playlist_content = perform_https_request(ioc, ctx, highest_playlist_path);
+    playlist_content                  = perform_https_request(ioc, ctx, highest_playlist_path, server);
   }
 
   std::istringstream segment_stream(playlist_content);
@@ -136,8 +136,7 @@ auto fetch_transport_segments(int index, GlobalState& gs) -> bool
   {
     if (!line.empty() && line[0] != '#')
     {
-      std::string segment_data =
-        perform_https_request(ioc, ctx, "/hls/" + client_id + "/" + line);
+      std::string segment_data = perform_https_request(ioc, ctx, "/hls/" + client_id + "/" + line, server);
       gs.transport_segments.push_back(std::move(segment_data));
     }
   }
@@ -154,7 +153,7 @@ auto decode_and_play(GlobalState& gs) -> bool
     return false;
   }
 
-  TSDecoder decoder;
+  TSDecoder                  decoder;
   std::vector<unsigned char> decoded_audio;
   if (!decoder.decode_ts(gs.transport_segments, decoded_audio))
   {
@@ -178,16 +177,16 @@ auto decode_and_play(GlobalState& gs) -> bool
 
 auto main(int argc, char* argv[]) -> int
 {
-  if (argc < 2)
+  if (argc < 3)
   {
-    std::cerr << "Usage: " << argv[0] << " <client-index>\n";
+    std::cerr << "Usage: " << argv[0] << " <client-index> <server-ip>\n";
     return EXIT_FAILURE;
   }
 
   int         index = std::stoi(argv[1]);
   GlobalState gs;
 
-  if (!fetch_transport_segments(index, gs))
+  if (!fetch_transport_segments(index, gs, argv[2]))
   {
     return EXIT_FAILURE;
   }
