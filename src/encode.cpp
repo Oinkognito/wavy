@@ -2,7 +2,8 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-
+#include "../include/logger.hpp"
+#include <filesystem>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -30,6 +31,8 @@ extern "C"
  * - Each bitrate has its own HLS playlist.
  * - A **master playlist** (`index.m3u8`) is generated, referencing all variant playlists.
  */
+
+namespace fs = std::filesystem;
 class HLS_Encoder
 {
 public:
@@ -267,6 +270,17 @@ auto main(int argc, char* argv[]) -> int
   }
 
   std::vector<int> bitrates = {64, 128, 256}; // Example bitrates in kbps
+  std::string output_dir = std::string(argv[2]);
+  if (fs::exists(output_dir)) {
+    LOG_INFO << "Output directory exists";
+  } else {
+    if (fs::create_directory(output_dir)) {
+            std::cout << "Directory created successfully: " << output_dir << std::endl;
+        } else {
+            std::cerr << "Failed to create directory: " << output_dir << std::endl;
+        }
+  }
+
 
   HLS_Encoder encoder;
   encoder.create_hls_segments(argv[1], bitrates, argv[2]);
