@@ -13,8 +13,6 @@ A **local networking solution** for **audio streaming and sharing**, supporting 
 - [**Documentation**](#documentation)
 - [**License**](#license)
 
----
-
 ## **Introduction**
 Wavy is a **lightweight** and **efficient** solution for audio streaming within a local network. It is designed to **encode, decode, and dispatch** audio streams seamlessly while ensuring **secure** data transfer via **SSL/TLS encryption**.
 
@@ -24,8 +22,6 @@ It supports:
 - **Adaptive bitrate streaming** using **HLS (HTTP Live Streaming)**.
 - **Metadata extraction** and **TOML-based** configuration.
 - **Transport stream decoding** via **FFmpeg** for real-time audio playback.
-
----
 
 ## **Dependencies**
 To build and run **Wavy**, install the following dependencies:
@@ -40,9 +36,21 @@ To build and run **Wavy**, install the following dependencies:
 | **CMake & Make** | Build system tools |
 | **Libarchive** | Handling `.tar`, `.gz`, `.zst` compressed files |
 
-> **Note:** Ensure that **FFmpeg** is compiled with `libavformat`, `libavcodec`, `libavutil`, and `libswresample`.
-
----
+> [!NOTE] 
+> 
+> Ensure that **FFmpeg** is installed with `libavformat`, `libavcodec`, `libavutil`, and `libswresample`
+> 
+> This is particular critical for Ubuntu / Debian: (FFmpeg and its dev libs are different packages)
+> 
+> ```bash 
+> sudo apt install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev
+> ```
+> 
+> On Arch Linux: 
+> ```bash 
+> sudo pacman -S ffmpeg # should be enough
+> ```
+> 
 
 ## **Building**
 To compile the different components, run:
@@ -56,8 +64,6 @@ make remove      # Cleans up all generated transport streams and playlists
 
 make all         # Builds all components at once
 ```
-
----
 
 ## **Architecture**
 The **Wavy** system consists of the following components:
@@ -73,8 +79,6 @@ The **Wavy** system consists of the following components:
 For a more detailed explanation, read:  
 [ARCHITECTURE.md](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md)
 
----
-
 ## **API References**
 Wavy relies on **FFmpeg's core libraries** for processing audio:
 
@@ -85,8 +89,6 @@ Wavy relies on **FFmpeg's core libraries** for processing audio:
 
 For detailed API documentation, see:  
 [APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
-
----
 
 ## **Server**
 The **Wavy-Server** allows **secure** transport stream handling over HTTPS.
@@ -104,12 +106,12 @@ Or use the **Makefile shortcut**:
 make server-cert
 ```
 
-> ![NOTE] 
+> [!NOTE] 
 > 
 > Place `server.crt` and `server.key` in the **current working directory** before starting the server.
 > 
 
-> ![WARNING] 
+> [!WARNING] 
 > 
 > This is a **self-signed certificate**.  
 > - Use `-k` flag in **cURL** to bypass SSL validation.
@@ -142,8 +144,6 @@ curl -X POST -F "file=@playlist.tar.gz" https://localhost:8443/upload -k
 ```bash
 curl https://localhost:8443/hls/clients -k
 ```
-
----
 
 ## **Documentation**
 ### **Generating Docs**
