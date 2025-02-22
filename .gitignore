@@ -13,3 +13,4 @@ payload*/
 *.mp3
 *.wav
 include/miniaudio.h
+include/toml.hpp
