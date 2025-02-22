@@ -12,5 +12,6 @@ payload*/
 .cache/
 *.mp3
 *.wav
+*.flac
 */**/miniaudio.h
 */**/toml.hpp

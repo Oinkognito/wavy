@@ -15,17 +15,13 @@ if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
 endif()
 
 set(ENCODER_BIN hls_segmenter)
-set(DECODER_BIN hls_decoder)
 set(SERVER_BIN hls_server)
 set(DISPATCHER_BIN hls_dispatcher)
-set(PLAYBACK_BIN hls_playback)
 set(CLIENT_BIN hls_client)
 
 set(ENCODER_SRC src/encode.cpp)
-set(DECODER_SRC src/decode.cpp)
 set(SERVER_SRC src/server.cpp)
 set(DISPATCHER_SRC src/dispatcher.cpp)
-set(PLAYBACK_SRC src/playback.cpp)
 set(CLIENT_SRC src/client_receive.cpp)
 
 find_package(PkgConfig REQUIRED)
@@ -64,14 +60,12 @@ endfunction()
 
 add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
 target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads)
-add_custom_executable(${DECODER_BIN} ${DECODER_SRC})
-add_custom_executable(${PLAYBACK_BIN} ${PLAYBACK_SRC})
 
 
 add_executable(${CLIENT_BIN} ${CLIENT_SRC})
 message(STATUS ">> Client compilation with std-C++20...")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
-target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${FFMPEG_LIBRARIES} ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_executable(${SERVER_BIN} ${SERVER_SRC})
 message(STATUS ">> Server compilation with std-C++20...")
