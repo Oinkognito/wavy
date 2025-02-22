@@ -1,223 +1,227 @@
+#include "../include/macros.hpp"
+#include <fstream>
 #include <iostream>
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/opt.h>
-#include <libswresample/swresample.h>
+#include <vector>
+#include <string>
+#include <regex>
+
+extern "C" {
+    #include <libavcodec/avcodec.h>
+    #include <libavformat/avformat.h>
+    #include <libavutil/opt.h>
+    #include <libavutil/audio_fifo.h>
 }
 
-void convert_to_mp3(const char* input_playlist, const char* output_file)
-{
-  AVFormatContext* input_ctx          = nullptr;
-  AVFormatContext* output_ctx         = nullptr;
-  AVCodecContext*  decoder_ctx        = nullptr;
-  AVCodecContext*  encoder_ctx        = nullptr;
-  AVStream*        input_stream       = nullptr;
-  AVStream*        output_stream      = nullptr;
-  int              audio_stream_index = -1;
-
-  avformat_network_init();
-  av_log_set_level(AV_LOG_DEBUG);
-
-  // Open HLS playlist (.m3u8)
-  if (avformat_open_input(&input_ctx, input_playlist, nullptr, nullptr) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to open input file: %s\n", input_playlist);
-    return;
-  }
-
-  // Retrieve stream info
-  if (avformat_find_stream_info(input_ctx, nullptr) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve stream info\n");
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  // Find the first audio stream
-  for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
-  {
-    if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
-    {
-      audio_stream_index = i;
-      break;
+/**
+ * @class HLS_Decoder
+ * @brief Decodes HLS audio segments for playback
+ * 
+ * The HLS_Decoder class handles reading and decoding HLS playlists and audio segments.
+ * It supports adaptive bitrate streaming by selecting the appropriate quality variant
+ * based on the specified target bitrate.
+ */
+class HLS_Decoder {
+public:
+    HLS_Decoder() {
+        avformat_network_init();
+        av_log_set_level(AV_LOG_DEBUG);
     }
-  }
 
-  if (audio_stream_index == -1)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "No audio stream found\n");
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  input_stream = input_ctx->streams[audio_stream_index];
-
-  // Find decoder for input audio stream
-  const AVCodec* decoder = avcodec_find_decoder(input_stream->codecpar->codec_id);
-  if (!decoder)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Decoder not found\n");
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  decoder_ctx = avcodec_alloc_context3(decoder);
-  if (!decoder_ctx)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to allocate decoder context\n");
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  if (avcodec_parameters_to_context(decoder_ctx, input_stream->codecpar) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to copy decoder parameters\n");
-    avcodec_free_context(&decoder_ctx);
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  if (avcodec_open2(decoder_ctx, decoder, nullptr) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to open decoder\n");
-    avcodec_free_context(&decoder_ctx);
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  // Allocate output format context
-  if (avformat_alloc_output_context2(&output_ctx, nullptr, "mp3", output_file) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to allocate output context\n");
-    avcodec_free_context(&decoder_ctx);
-    avformat_close_input(&input_ctx);
-    return;
-  }
-
-  // Find MP3 encoder
-  const AVCodec* encoder = avcodec_find_encoder(AV_CODEC_ID_MP3);
-  if (!encoder)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "MP3 encoder not found\n");
-    avcodec_free_context(&decoder_ctx);
-    avformat_close_input(&input_ctx);
-    avformat_free_context(output_ctx);
-    return;
-  }
-
-  // Create output audio stream
-  output_stream = avformat_new_stream(output_ctx, encoder);
-  if (!output_stream)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to create output stream\n");
-    avcodec_free_context(&decoder_ctx);
-    avformat_close_input(&input_ctx);
-    avformat_free_context(output_ctx);
-    return;
-  }
-
-  // Allocate encoder context
-  encoder_ctx = avcodec_alloc_context3(encoder);
-  if (!encoder_ctx)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to allocate encoder context\n");
-    return;
-  }
-
-  // Set encoder parameters
-  encoder_ctx->ch_layout   = decoder_ctx->ch_layout;
-  encoder_ctx->sample_rate = decoder_ctx->sample_rate;
-  encoder_ctx->sample_fmt  = AV_SAMPLE_FMT_S16P; // Use the first supported format
-  encoder_ctx->bit_rate    = 192000;
-
-  // Open encoder
-  if (avcodec_open2(encoder_ctx, encoder, nullptr) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to open encoder\n");
-    avcodec_free_context(&encoder_ctx);
-    return;
-  }
-
-  // Copy codec parameters to output stream
-  if (avcodec_parameters_from_context(output_stream->codecpar, encoder_ctx) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Failed to copy encoder parameters\n");
-    return;
-  }
-
-  // Open output file
-  if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
-  {
-    if (avio_open(&output_ctx->pb, output_file, AVIO_FLAG_WRITE) < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to open output file: %s\n", output_file);
-      return;
+    ~HLS_Decoder() {
+        avformat_network_deinit();
     }
-  }
 
-  // Write header
-  if (avformat_write_header(output_ctx, nullptr) < 0)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Error writing header\n");
-    return;
-  }
-
-  AVPacket pkt;
-  while (av_read_frame(input_ctx, &pkt) >= 0)
-  {
-    if (pkt.stream_index == audio_stream_index)
-    {
-      int ret = avcodec_send_packet(decoder_ctx, &pkt);
-      if (ret < 0)
-      {
-        av_log(nullptr, AV_LOG_ERROR, "Error sending packet for decoding: %s\n", av_err2str(ret));
-        break;
-      }
-
-      AVFrame* frame = av_frame_alloc();
-      while (avcodec_receive_frame(decoder_ctx, frame) >= 0)
-      {
-        ret = avcodec_send_frame(encoder_ctx, frame);
-        if (ret < 0)
-        {
-          av_log(nullptr, AV_LOG_ERROR, "Error sending frame for encoding: %s\n", av_err2str(ret));
-          break;
+    /**
+     * @brief Decodes HLS content to raw audio output
+     * @param master_playlist Path to the master .m3u8 playlist
+     * @param output_file Path to save the decoded audio
+     * @param target_bitrate Desired bitrate in kbps (will choose closest available)
+     * @return true if successful, false otherwise
+     */
+    bool decode_hls(const char* master_playlist, const char* output_file, int target_bitrate) {
+        std::string selected_playlist = select_variant_playlist(master_playlist, target_bitrate);
+        if (selected_playlist.empty()) {
+            av_log(nullptr, AV_LOG_ERROR, "Failed to select variant playlist\n");
+            return false;
         }
 
-        AVPacket encoded_pkt;
-        av_init_packet(&encoded_pkt);
-        ret = avcodec_receive_packet(encoder_ctx, &encoded_pkt);
-        if (ret >= 0)
-        {
-          av_interleaved_write_frame(output_ctx, &encoded_pkt);
-          av_packet_unref(&encoded_pkt);
-        }
-      }
-
-      av_frame_free(&frame);
+        return decode_playlist(selected_playlist.c_str(), output_file);
     }
 
-    av_packet_unref(&pkt);
-  }
+private:
+    struct PlaylistInfo {
+        std::string url;
+        int bandwidth;
+    };
 
-  // Write trailer and clean up
-  av_write_trailer(output_ctx);
-  avcodec_free_context(&decoder_ctx);
-  avcodec_free_context(&encoder_ctx);
-  avformat_close_input(&input_ctx);
-  avformat_free_context(output_ctx);
-}
+    /**
+     * @brief Parses master playlist and selects appropriate variant
+     */
+    std::string select_variant_playlist(const char* master_playlist, int target_bitrate) {
+        std::ifstream file(master_playlist);
+        if (!file) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot open master playlist\n");
+            return "";
+        }
 
-auto main(int argc, char* argv[]) -> int
-{
-  if (argc < 3)
-  {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input.m3u8> <output.mp3>\n", argv[0]);
-    return 1;
-  }
+        std::vector<PlaylistInfo> playlists;
+        std::string line;
+        PlaylistInfo current_info;
 
-  convert_to_mp3(argv[1], argv[2]);
-  return 0;
+        while (std::getline(file, line)) {
+            if (line.find("#EXT-X-STREAM-INF:") != std::string::npos) {
+                std::regex bandwidth_regex("BANDWIDTH=(\\d+)");
+                std::smatch matches;
+                if (std::regex_search(line, matches, bandwidth_regex)) {
+                    current_info.bandwidth = std::stoi(matches[1]) / 1000; // Convert to kbps
+                }
+                
+                if (std::getline(file, line)) {
+                    current_info.url = std::string(master_playlist).substr(
+                        0, std::string(master_playlist).find_last_of('/') + 1) + line;
+                    playlists.push_back(current_info);
+                }
+            }
+        }
+
+        // Select closest bitrate
+        int min_diff = INT_MAX;
+        std::string selected_url;
+        
+        for (const auto& playlist : playlists) {
+            int diff = std::abs(playlist.bandwidth - target_bitrate);
+            if (diff < min_diff) {
+                min_diff = diff;
+                selected_url = playlist.url;
+            }
+        }
+
+        return selected_url;
+    }
+
+    /**
+     * @brief Decodes a variant playlist and its segments
+     */
+    bool decode_playlist(const char* playlist_url, const char* output_file) {
+        AVFormatContext* input_ctx = nullptr;
+        AVFormatContext* output_ctx = nullptr;
+        AVAudioFifo* audio_fifo = nullptr;
+        int ret;
+
+        // Open input
+        if ((ret = avformat_open_input(&input_ctx, playlist_url, nullptr, nullptr)) < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot open input playlist\n");
+            return false;
+        }
+
+        // Get stream information
+        if ((ret = avformat_find_stream_info(input_ctx, nullptr)) < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot find stream info\n");
+            avformat_close_input(&input_ctx);
+            return false;
+        }
+
+        // Find audio stream
+        int audio_stream_idx = av_find_best_stream(input_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+        if (audio_stream_idx < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot find audio stream\n");
+            avformat_close_input(&input_ctx);
+            return false;
+        }
+
+        // Create output context
+        if ((ret = avformat_alloc_output_context2(&output_ctx, nullptr, nullptr, output_file)) < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot create output context\n");
+            avformat_close_input(&input_ctx);
+            return false;
+        }
+
+        // Create output stream
+        AVStream* out_stream = avformat_new_stream(output_ctx, nullptr);
+        if (!out_stream) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot create output stream\n");
+            avformat_close_input(&input_ctx);
+            avformat_free_context(output_ctx);
+            return false;
+        }
+
+        // Copy codec parameters
+        avcodec_parameters_copy(out_stream->codecpar, input_ctx->streams[audio_stream_idx]->codecpar);
+
+        // Open output file
+        if ((ret = avio_open(&output_ctx->pb, output_file, AVIO_FLAG_WRITE)) < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot open output file\n");
+            avformat_close_input(&input_ctx);
+            avformat_free_context(output_ctx);
+            return false;
+        }
+
+        // Write header
+        if ((ret = avformat_write_header(output_ctx, nullptr)) < 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot write header\n");
+            avio_closep(&output_ctx->pb);
+            avformat_close_input(&input_ctx);
+            avformat_free_context(output_ctx);
+            return false;
+        }
+
+        // Read and write packets
+        AVPacket packet;
+        while (av_read_frame(input_ctx, &packet) >= 0) {
+            if (packet.stream_index == audio_stream_idx) {
+                packet.stream_index = out_stream->index;
+                
+                // Rescale timestamps
+                packet.pts = av_rescale_q_rnd(packet.pts,
+                    input_ctx->streams[audio_stream_idx]->time_base,
+                    out_stream->time_base,
+                    static_cast<AVRounding>(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+                    
+                packet.dts = av_rescale_q_rnd(packet.dts,
+                    input_ctx->streams[audio_stream_idx]->time_base,
+                    out_stream->time_base,
+                    static_cast<AVRounding>(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+                    
+                packet.duration = av_rescale_q(packet.duration,
+                    input_ctx->streams[audio_stream_idx]->time_base,
+                    out_stream->time_base);
+
+                if ((ret = av_interleaved_write_frame(output_ctx, &packet)) < 0) {
+                    av_log(nullptr, AV_LOG_ERROR, "Cannot write frame\n");
+                    av_packet_unref(&packet);
+                    break;
+                }
+            }
+            av_packet_unref(&packet);
+        }
+
+        // Write trailer
+        av_write_trailer(output_ctx);
+
+        // Cleanup
+        avio_closep(&output_ctx->pb);
+        avformat_close_input(&input_ctx);
+        avformat_free_context(output_ctx);
+
+        return true;
+    }
+};
+
+auto main(int argc, char* argv[]) -> int {
+    if (argc < 4) {
+        av_log(nullptr, AV_LOG_ERROR, 
+            "Usage: %s <master_playlist> <output_file> <target_bitrate_kbps>\n", 
+            argv[0]);
+        return 1;
+    }
+
+    HLS_Decoder decoder;
+    int target_bitrate = std::stoi(argv[3]);
+    
+    if (!decoder.decode_hls(argv[1], argv[2], target_bitrate)) {
+        av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");
+        return 1;
+    }
+
+    return 0;
 }
