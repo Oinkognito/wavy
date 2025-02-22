@@ -11,6 +11,7 @@ DECODER_BIN := hls_decoder
 SERVER_BIN := hls_server
 DISPATCHER_BIN := hls_dispatcher
 PLAYBACK_BIN := hls_playback
+CLIENT_BIN := hls_client
 
 # Default target: Build everything
 default: all
@@ -46,6 +47,10 @@ server:
 dispatcher:
 	$(call configure,Dispatcher Only,Release)
 	@$(MAKE) -C $(BUILD_DIR) $(DISPATCHER_BIN)
+
+client:
+	$(call configure,Client Only,Release)
+	@$(MAKE) -C $(BUILD_DIR) $(CLIENT_BIN)
 
 # Enable verbose build
 verbose:
