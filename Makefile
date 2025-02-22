@@ -1,4 +1,4 @@
-# Makefile wrapper for CMake build system
+# Makefile wrapper for CMake build system of Wavy
 
 # Define the build directory
 BUILD_DIR := build
@@ -13,6 +13,12 @@ DISPATCHER_BIN := hls_dispatcher
 PLAYBACK_BIN := hls_playback
 CLIENT_BIN := hls_client
 
+# Third-party dependencies
+MINIAUDIO_URL := https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h
+TOMLPP_URL := https://github.com/marzer/tomlplusplus/releases/latest/download/toml.hpp
+MINIAUDIO_DEST_DIR := include/
+TOMLPP_DEST_DIR := include/toml/
+
 # Default target: Build everything
 default: all
 
@@ -21,6 +27,11 @@ define configure
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" ..
 endef
+
+# Initialize dependencies
+init:
+	@wget -O $(MINIAUDIO_DEST_DIR)/miniaudio.h $(MINIAUDIO_URL)
+	@wget -O $(TOMLPP_DEST_DIR)/toml.hpp $(TOMLPP_URL)
 
 # Build all targets
 all:
@@ -70,9 +81,9 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 cleanup:
-	@rm *.ts *.m3u8
+	@rm -f *.ts *.m3u8
 
 server-cert:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 
-.PHONY: default all encoder decoder server dispatcher verbose clean
+.PHONY: default all encoder decoder server dispatcher client playback verbose clean cleanup format tidy init server-cert

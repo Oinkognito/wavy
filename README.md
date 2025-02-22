@@ -16,6 +16,18 @@ A **local networking solution** for **audio streaming and sharing**, supporting 
 ## **Introduction**
 Wavy is a **lightweight** and **efficient** solution for audio streaming within a local network. It is designed to **encode, decode, and dispatch** audio streams seamlessly while ensuring **secure** data transfer via **SSL/TLS encryption**.
 
+> [!IMPORTANT]
+> 
+> The Wavy Project currently is only supported for *NIX Operating Systems (on x86-64 architecture).
+> 
+> 
+> Currently supported and tested distributions:
+> 
+> 1. Arch Linux
+> 2. Ubuntu (Debian)
+> 
+> In the future, perhaps Windows / MacOS will be supported.
+
 It supports:
 - **Lossless formats** (FLAC, ALAC, WAV)
 - **Lossy formats** (MP3, AAC, Opus, Vorbis)
@@ -53,6 +65,16 @@ To build and run **Wavy**, install the following dependencies:
 > 
 
 ## **Building**
+
+The Wavy Project uses a simple Makefile to run simple and straightforward functions that acts as a wrapper around the CMake Build System 
+that currently creates and links different binaries that are **NOT** integrated yet!
+
+To initialize the project:
+
+```bash 
+make init
+```
+
 To compile the different components, run:
 
 ```bash
