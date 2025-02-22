@@ -38,7 +38,8 @@ private:
 
 public:
   // New constructor that initializes decoder from memory
-  AudioPlayer(const std::vector<unsigned char>& audioInput) : audioMemory(audioInput), isPlaying(false)
+  AudioPlayer(const std::vector<unsigned char>& audioInput)
+      : audioMemory(audioInput), isPlaying(false)
   {
     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
 
@@ -90,7 +91,7 @@ int main()
 {
   // Read Audio data from standard input
   std::vector<unsigned char> audioData((std::istreambuf_iterator<char>(std::cin)),
-                                     std::istreambuf_iterator<char>());
+                                       std::istreambuf_iterator<char>());
   if (audioData.empty())
   {
     std::cerr << "No Audio input received from STDIN" << std::endl;

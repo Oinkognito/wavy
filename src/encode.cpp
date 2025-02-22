@@ -297,7 +297,8 @@ auto main(int argc, char* argv[]) -> int
 {
   if (argc < 4)
   {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input file> <output directory> <audio format>\n", argv[0]);
+    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input file> <output directory> <audio format>\n",
+           argv[0]);
     return 1;
   }
 
