@@ -150,8 +150,14 @@ auto main(int argc, char* argv[]) -> int
 {
   if (argc < 2)
   {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input_ts_file> [--debug]\n", argv[0]);
+    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input_ts_file or '-' for pipe> [--debug]\n", argv[0]);
     return 1;
+  }
+
+  const char* input_source = argv[1];
+  if (std::string(argv[1]) == "-")
+  {
+    input_source = "pipe:0";
   }
 
   bool debug = (argc > 2 && std::string(argv[2]) == "--debug");
@@ -159,7 +165,7 @@ auto main(int argc, char* argv[]) -> int
 
   TSDecoder decoder;
 
-  if (!decoder.decode_ts(argv[1]))
+  if (!decoder.decode_ts(input_source))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");
     return 1;
