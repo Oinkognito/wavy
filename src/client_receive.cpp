@@ -15,6 +15,9 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <thread>
 
 namespace ssl   = boost::asio::ssl;
 namespace beast = boost::beast;
@@ -67,6 +70,9 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
     int index = std::stoi(argv[1]);
+    // Optional manual playback time argument.
+    bool   has_manual_arg    = (argc >= 3);
+    double manualPlaybackArg = has_manual_arg ? std::stod(argv[2]) : 0.0;
 
     // Initialize SSL context
     net::io_context ioc;
@@ -100,8 +106,7 @@ int main(int argc, char* argv[])
 
     // Request the main index playlist
     std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";
-    std::cout << "Requesting index playlist: " << index_playlist_path << "\n";
-    std::string playlist_content = perform_https_request(ioc, ctx, index_playlist_path);
+    std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path);
 
     // Check if the index playlist contains multiple m3u8 streams
     if (playlist_content.find("#EXT-X-STREAM-INF:") != std::string::npos)
@@ -144,28 +149,58 @@ int main(int argc, char* argv[])
       }
       // Request the highest bitrate playlist
       std::string highest_playlist_path = "/hls/" + client_id + "/" + selected_playlist;
-      std::cout << "Requesting highest bitrate playlist: " << highest_playlist_path << "\n";
-      playlist_content = perform_https_request(ioc, ctx, highest_playlist_path);
+      playlist_content                  = perform_https_request(ioc, ctx, highest_playlist_path);
     }
 
-    // At this point, playlist_content should be a list of transport segments.
-    std::istringstream segment_stream(playlist_content);
-    std::string        segmentLine;
-    while (std::getline(segment_stream, segmentLine))
+    // First, store all valid segments from the playlist.
+    std::vector<std::string> segments;
     {
-      // Skip empty lines and comments
-      if (segmentLine.empty() || segmentLine[0] == '#')
+      std::istringstream segment_stream(playlist_content);
+      std::string        segLine;
+      while (std::getline(segment_stream, segLine))
       {
-        continue;
+        // Skip empty lines and comments
+        if (segLine.empty() || segLine[0] == '#')
+          continue;
+        segments.push_back(segLine);
       }
-      // Log the segment request
-      std::cout << "Streaming segment: " << segmentLine << "\n";
+    }
 
-      // Request the transport stream segment and write it to standard output.
-      std::string segment_data =
-        perform_https_request(ioc, ctx, "/hls/" + client_id + "/" + segmentLine);
-      std::cout.write(segment_data.data(), segment_data.size());
-      std::cout.flush();
+    size_t           segment_index    = 0;
+    constexpr double segment_duration = 10.0; // seconds per segment, adjust if needed
+    constexpr double prefetch_offset =
+      segment_duration / 2.0; // prefetch segments this many seconds early
+
+    // Open the shared memory region once.
+    using namespace boost::interprocess;
+    shared_memory_object shm_obj(open_or_create, "WavyPlaybackTime", read_write);
+    shm_obj.truncate(sizeof(double));
+    mapped_region region(shm_obj, read_write);
+    double*       playback_time_ptr = static_cast<double*>(region.get_address());
+    *playback_time_ptr              = manualPlaybackArg;
+
+    while (segment_index < segments.size())
+    {
+      // Read the current playback time; this value is updated in playback.cpp.
+      double currentPlaybackTime = *playback_time_ptr;
+
+      // Calculate when the segment is scheduled to start.
+      double segmentStartTime = segment_index * segment_duration;
+
+      // If it's time (plus a lead) to fetch the current segment, then request it.
+      if (currentPlaybackTime + prefetch_offset >= segmentStartTime)
+      {
+        std::string segment_data =
+          perform_https_request(ioc, ctx, "/hls/" + client_id + "/" + segments[segment_index]);
+        std::cout.write(segment_data.data(), segment_data.size());
+        std::cout.flush();
+        ++segment_index;
+      }
+      else
+      {
+        // Wait briefly before checking the playback time again.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
     }
     return EXIT_SUCCESS;
   }
