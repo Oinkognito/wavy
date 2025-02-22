@@ -13,10 +13,8 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/stacktrace.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -81,90 +79,80 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 {
   LOG_INFO << "[Extract] Extracting PAYLOAD: " << payload_path;
 
-  struct ArchiveGuard
-  {
-    struct archive* handle;
-    explicit ArchiveGuard(struct archive* a) : handle(a) {}
-    ~ArchiveGuard()
-    {
-      if (handle)
-        archive_free(handle);
-    }
-  };
-
-  ArchiveGuard a(archive_read_new());
-  ArchiveGuard ext(archive_write_disk_new());
-
-  if (!a.handle || !ext.handle)
-  {
-    LOG_ERROR << "[Extract] Failed to create archive objects.";
-    return false;
-  }
-
-  archive_read_support_filter_gzip(a.handle);
-  archive_read_support_format_tar(a.handle);
-  archive_write_disk_set_options(ext.handle, ARCHIVE_EXTRACT_PERM);
-
-  if (archive_read_open_filename(a.handle, payload_path.c_str(), 10240) != ARCHIVE_OK)
-  {
-    LOG_ERROR << "[Extract] Failed to open archive: " << archive_error_string(a.handle);
-    return false;
-  }
-
+  struct archive*       a   = archive_read_new();
+  struct archive*       ext = archive_write_disk_new();
   struct archive_entry* entry;
-  bool                  valid_files_found = false;
 
-  while (archive_read_next_header(a.handle, &entry) == ARCHIVE_OK)
+  archive_read_support_filter_gzip(a);
+  archive_read_support_format_tar(a);
+  archive_write_disk_set_options(ext, ARCHIVE_EXTRACT_PERM);
+
+  if (archive_read_open_filename(a, payload_path.c_str(), 10240) != ARCHIVE_OK)
   {
-    std::filesystem::path filename    = archive_entry_pathname(entry);
-    std::filesystem::path output_file = std::filesystem::path(extract_path) / filename;
+    LOG_ERROR << "[Extract] Failed to open archive: " << archive_error_string(a);
+    archive_read_free(a);
+    archive_write_free(ext);
+    return false;
+  }
 
-    LOG_INFO << "[Extract] Extracting file: " << output_file.string();
+  bool valid_files_found = false;
+
+  while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+  {
+    std::string filename    = archive_entry_pathname(entry);
+    std::string output_file = extract_path + "/" + filename;
+
+    LOG_INFO << "[Extract] Extracting file: " << output_file;
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
-    if (archive_write_header(ext.handle, entry) != ARCHIVE_OK)
+    if (archive_write_header(ext, entry) == ARCHIVE_OK)
     {
-      LOG_ERROR << "[Extract] Failed to write header for: " << output_file.string();
-      continue;
-    }
-
-    std::array<char, 8192> buffer;
-    ssize_t                len;
-    while ((len = archive_read_data(a.handle, buffer.data(), buffer.size())) > 0)
-    {
-      if (archive_write_data(ext.handle, buffer.data(), len) < 0)
+      std::ofstream ofs(output_file, std::ios::binary);
+      if (!ofs)
       {
-        LOG_ERROR << "[Extract] Failed to write data for: " << output_file.string();
-        continue;
-      }
-    }
-
-    valid_files_found = true;
-
-    // If the extracted file is a .zst file, decompress it
-    if (output_file.extension() == ".zst")
-    {
-      LOG_INFO << "[Extract] Decompressing .zst file: " << output_file.string();
-      if (!ZSTD_decompress_file(output_file.string().c_str()))
-      {
-        LOG_ERROR << "[Extract] Failed to decompress .zst file: " << output_file.string();
+        LOG_ERROR << "[Extract] Failed to open file for writing: " << output_file;
         continue;
       }
 
-      std::filesystem::path decompressed_filename = output_file.replace_extension("");
-      LOG_INFO << "[Extract] Decompressed file: " << decompressed_filename.string();
-
-      if (std::filesystem::remove(output_file))
+      char    buffer[8192]; // maybe better off using std::array<>?
+      ssize_t len;
+      while ((len = archive_read_data(a, buffer, sizeof(buffer))) > 0)
       {
-        LOG_INFO << "[Extract] Deleted the original .zst file: " << output_file.string();
+        ofs.write(buffer, len);
       }
-      else
+      ofs.close();
+
+      valid_files_found = true;
+
+      // If the extracted file is a .zst file, decompress it
+      if (output_file.substr(output_file.find_last_of(".") + 1) == "zst")
       {
-        LOG_ERROR << "[Extract] Failed to delete .zst file: " << output_file.string();
+        LOG_INFO << "[Extract] Decompressing .zst file: " << output_file;
+        if (!ZSTD_decompress_file(output_file.c_str()))
+        {
+          LOG_ERROR << "[Extract] Failed to decompress .zst file: " << output_file;
+          continue;
+        }
+
+        std::string decompressed_filename =
+          output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
+        LOG_INFO << "[Extract] Decompressed file: " << decompressed_filename;
+
+        if (std::remove(output_file.c_str()) == 0)
+        {
+          LOG_INFO << "[Extract] Deleted the original .zst file: " << output_file;
+        }
+        else
+        {
+          LOG_ERROR << "[Extract] Failed to delete .zst file: " << output_file;
+        }
       }
     }
   }
+
+  archive_read_free(a);
+  archive_write_free(ext);
 
   return valid_files_found;
 }
@@ -269,11 +257,6 @@ private:
                               if (ec)
                               {
                                 LOG_ERROR << "[Session] SSL handshake failed: " << ec.message();
-
-                                // Log stacktrace
-                                LOG_ERROR << "[Session] Backtrace:\n"
-                                          << boost::stacktrace::stacktrace();
-
                                 return;
                               }
                               LOG_INFO << "[Session] SSL handshake successful";
@@ -434,8 +417,8 @@ private:
    * This means that unless the server's filesystem purposefully removes the hls storage, the
    * client's extracted data will *ALWAYS* be present in the server.
    *
-   * TLDR: Previous server instances of client storage is persistent and can be accessed until
-   * they are removed from server's filesystem.
+   * TLDR: Previous server instances of client storage is persistent and can be accessed until they
+   * are removed from server's filesystem.
    *
    */
   void handle_download()
@@ -613,7 +596,7 @@ auto main() -> int
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
                                      boost::asio::ssl::context::pem);
 
-    HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
+    HLS_Server server(io_context, ssl_context, 8080);
     io_context.run();
   }
   catch (std::exception& e)

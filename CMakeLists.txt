@@ -66,6 +66,8 @@ add_custom_executable(${DECODER_BIN} ${DECODER_SRC})
 add_custom_executable(${PLAYBACK_BIN} ${PLAYBACK_SRC})
 
 add_executable(${SERVER_BIN} ${SERVER_SRC})
+message(STATUS ">> Server compilation with std-C++20...")
+target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_executable(${DISPATCHER_BIN} ${DISPATCHER_SRC})
