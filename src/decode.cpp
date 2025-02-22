@@ -20,15 +20,14 @@ extern "C"
 class TSDecoder
 {
 public:
-  TSDecoder() { av_log_set_level(AV_LOG_DEBUG); }
+  TSDecoder() {}
 
   /**
    * @brief Decodes TS content to raw audio output
    * @param input_file Path to the input .ts file
-   * @param output_file Path to save the decoded audio
    * @return true if successful, false otherwise
    */
-  bool decode_ts(const char* input_file, const char* output_file)
+  bool decode_ts(const char* input_file) // Removed output_file parameter
   {
     AVFormatContext* input_ctx  = nullptr;
     AVFormatContext* output_ctx = nullptr;
@@ -59,7 +58,7 @@ public:
     }
 
     // Create output context
-    if ((ret = avformat_alloc_output_context2(&output_ctx, nullptr, nullptr, output_file)) < 0)
+    if ((ret = avformat_alloc_output_context2(&output_ctx, nullptr, "mp3", nullptr)) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Cannot create output context\n");
       avformat_close_input(&input_ctx);
@@ -79,10 +78,10 @@ public:
     // Copy codec parameters
     avcodec_parameters_copy(out_stream->codecpar, input_ctx->streams[audio_stream_idx]->codecpar);
 
-    // Open output file
-    if ((ret = avio_open(&output_ctx->pb, output_file, AVIO_FLAG_WRITE)) < 0)
+    // Open output (stdout)
+    if ((ret = avio_open(&output_ctx->pb, "pipe:1", AVIO_FLAG_WRITE)) < 0)
     {
-      av_log(nullptr, AV_LOG_ERROR, "Cannot open output file\n");
+      av_log(nullptr, AV_LOG_ERROR, "Cannot open output pipe\n");
       avformat_close_input(&input_ctx);
       avformat_free_context(output_ctx);
       return false;
@@ -98,7 +97,7 @@ public:
       return false;
     }
 
-    // Read and write packets
+    // Read packets and process
     AVPacket packet;
     while (av_read_frame(input_ctx, &packet) >= 0)
     {
@@ -118,11 +117,18 @@ public:
         packet.duration = av_rescale_q(
           packet.duration, input_ctx->streams[audio_stream_idx]->time_base, out_stream->time_base);
 
+        // Write packet to output
         if ((ret = av_interleaved_write_frame(output_ctx, &packet)) < 0)
         {
           av_log(nullptr, AV_LOG_ERROR, "Cannot write frame\n");
           av_packet_unref(&packet);
-          break;
+
+          // Cleanup
+          avio_closep(&output_ctx->pb);
+          avformat_close_input(&input_ctx);
+          avformat_free_context(output_ctx);
+
+          return false;
         }
       }
       av_packet_unref(&packet);
@@ -142,15 +148,18 @@ public:
 
 auto main(int argc, char* argv[]) -> int
 {
-  if (argc < 3)
+  if (argc < 2)
   {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input_ts_file> <output_file>\n", argv[0]);
+    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input_ts_file> [--debug]\n", argv[0]);
     return 1;
   }
 
+  bool debug = (argc > 2 && std::string(argv[2]) == "--debug");
+  av_log_set_level(debug ? AV_LOG_DEBUG : AV_LOG_ERROR);
+
   TSDecoder decoder;
 
-  if (!decoder.decode_ts(argv[1], argv[2]))
+  if (!decoder.decode_ts(argv[1]))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");
     return 1;
