@@ -57,29 +57,46 @@ std::string perform_https_request(net::io_context& ioc, ssl::context& ctx,
   return response_data;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
   try
   {
+    if (argc < 2)
+    {
+      std::cerr << "Usage: " << argv[0] << " <client-index>\n";
+      return EXIT_FAILURE;
+    }
+    int index = std::stoi(argv[1]);
+
     // Initialize SSL context
     net::io_context ioc;
     ssl::context    ctx(ssl::context::tlsv12_client);
     ctx.set_verify_mode(ssl::verify_none); // Disable verification for testing
 
     // Get list of clients
-    // std::string clients_response = perform_https_request(ioc, ctx, "/hls/clients");
-    // std::cout << "Available clients:\n" << clients_response << "\n";
+    std::string clients_response = perform_https_request(ioc, ctx, "/hls/clients");
+    std::istringstream clientStream(clients_response);
+    std::vector<std::string> clientIds;
+    std::string line;
+    while (std::getline(clientStream, line))
+    {
+      if (!line.empty())
+      {
+        clientIds.push_back(line);
+      }
+    }
+    if (index < 0 || index >= static_cast<int>(clientIds.size()))
+    {
+      std::cerr << "Error: Invalid client index.\n";
+      return EXIT_FAILURE;
+    }
+    std::string client_id = clientIds[index];
 
-    // // Get user input
-    // std::cout << "Enter client ID: ";
-    std::string client_id = "a5d31814-ff1b-43da-bf6c-1fe6c1b95898";
-    // std::getline(std::cin, client_id);
-
-    // if (client_id.empty())
-    // {
-    //   std::cerr << "Error: Client ID cannot be empty\n";
-    //   return EXIT_FAILURE;
-    // }
+    if (client_id.empty())
+    {
+      std::cerr << "Error: Client ID cannot be empty\n";
+      return EXIT_FAILURE;
+    }
 
     // Request the main index playlist
     std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";

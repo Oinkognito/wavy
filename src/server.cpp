@@ -311,7 +311,6 @@ private:
     }
 
     std::ostringstream client_list;
-    client_list << " Client IDs: " << std::endl;
 
     bool clients_found = false;
     for (const fs::directory_entry& entry : fs::directory_iterator(storage_path)) // Added const
