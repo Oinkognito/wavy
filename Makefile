@@ -15,7 +15,7 @@ CLIENT_BIN := hls_client
 
 # Third-party dependencies
 MINIAUDIO_URL := https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h
-TOMLPP_URL := https://github.com/marzer/tomlplusplus/releases/latest/download/toml.hpp
+TOMLPP_URL := https://raw.githubusercontent.com/marzer/tomlplusplus/refs/heads/master/toml.hpp
 MINIAUDIO_DEST_DIR := include/
 TOMLPP_DEST_DIR := include/toml/
 
