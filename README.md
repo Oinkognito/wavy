@@ -31,7 +31,7 @@ Wavy is a **lightweight** and **efficient** solution for audio streaming within 
 It supports:
 - **Lossless formats** (FLAC, ALAC, WAV)
 - **Lossy formats** (MP3, AAC, Opus, Vorbis)
-- **Adaptive bitrate streaming** using **HLS (HTTP Live Streaming)**.
+- **Adaptive bitrate streaming** (Soon) using **HLS (HTTP Live Streaming)**.
 - **Metadata extraction** and **TOML-based** configuration.
 - **Transport stream decoding** via **FFmpeg** for real-time audio playback.
 
