@@ -108,6 +108,7 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
 
   LOG_INFO << "Selected client ID: " << client_id;
 
+  // Fetch the Master Playlist (index.m3u8)
   std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";
   std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path, server);
 
@@ -150,6 +151,7 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
 
     LOG_INFO << "Selected highest bitrate playlist: " << selected_playlist;
 
+    // Fetch the variant playlist (which points to .m4s segments)
     std::string highest_playlist_path = "/hls/" + client_id + "/" + selected_playlist;
     playlist_content = perform_https_request(ioc, ctx, highest_playlist_path, server);
   }
@@ -159,10 +161,22 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
   {
     if (!line.empty() && line[0] != '#')
     {
-      std::string segment_data =
-        perform_https_request(ioc, ctx, "/hls/" + client_id + "/" + line, server);
-      gs.transport_segments.push_back(std::move(segment_data));
-      LOG_DEBUG << "Fetched segment: " << line;
+      std::string segment_url = "/hls/" + client_id + "/" + line;
+
+      // Check if the segment is .ts or .m4s
+      if (line.ends_with(macros::TRANSPORT_STREAM_EXT) || line.ends_with(macros::M4S_FILE_EXT))
+      {
+        std::string segment_data = perform_https_request(ioc, ctx, segment_url, server);
+        if (!segment_data.empty())
+        {
+          gs.transport_segments.push_back(std::move(segment_data));
+          LOG_DEBUG << "Fetched segment: " << line;
+        }
+        else
+        {
+          LOG_WARNING << "Failed to fetch segment: " << line;
+        }
+      }
     }
   }
 
@@ -180,9 +194,9 @@ auto decode_and_play(GlobalState& gs) -> bool
 
   LOG_INFO << "Decoding transport stream segments...";
 
-  TSDecoder                  decoder;
+  MediaDecoder               decoder;
   std::vector<unsigned char> decoded_audio;
-  if (!decoder.decode_ts(gs.transport_segments, decoded_audio))
+  if (!decoder.decode(gs.transport_segments, decoded_audio))
   {
     LOG_ERROR << "Decoding failed";
     return false;

@@ -42,21 +42,20 @@ static int custom_read_packet(void* opaque, uint8_t* buf, int buf_size)
 }
 
 /**
- * @class TSDecoder
+ * @class MediaDecoder
  * @brief Decodes transport stream audio for playback from a vector
  */
-class TSDecoder
+class MediaDecoder
 {
 public:
-  TSDecoder() {}
+  MediaDecoder() {}
 
   /**
    * @brief Decodes TS content to raw audio output
    * @param ts_segments Vector of transport stream segments
    * @return true if successful, false otherwise
    */
-  bool decode_ts(const std::vector<std::string>& ts_segments,
-                 std::vector<unsigned char>&     output_audio)
+  bool decode(const std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
   {
     AVFormatContext* input_ctx = avformat_alloc_context();
     AVIOContext*     avio_ctx  = nullptr;
@@ -100,6 +99,33 @@ public:
       return false;
     }
 
+    // Log detected format
+    if (input_ctx->iformat && input_ctx->iformat->name)
+    {
+      av_log(nullptr, AV_LOG_INFO, "Detected format: %s\n", input_ctx->iformat->name);
+    }
+    else
+    {
+      av_log(nullptr, AV_LOG_WARNING, "Could not detect format\n");
+    }
+
+    // Check if input is MPEG-TS or fMP4 (m4s)
+    bool is_mpegts = strcmp(input_ctx->iformat->name, "mpegts") == 0;
+    bool is_m4s    = strstr(input_ctx->iformat->name, "mp4") != nullptr;
+
+    if (is_mpegts)
+    {
+      av_log(nullptr, AV_LOG_INFO, "Input is an MPEG transport stream\n");
+    }
+    else if (is_m4s)
+    {
+      av_log(nullptr, AV_LOG_INFO, "Input is a fragmented MP4 (m4s) file\n");
+    }
+    else
+    {
+      av_log(nullptr, AV_LOG_WARNING, "Unknown or unsupported format detected\n");
+    }
+
     // Find audio stream
     int audio_stream_idx = av_find_best_stream(input_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     if (audio_stream_idx < 0)
@@ -109,8 +135,52 @@ public:
       return false;
     }
 
+    AVStream*          audio_stream = input_ctx->streams[audio_stream_idx];
+    AVCodecParameters* codec_params = audio_stream->codecpar;
+
+    // Check if the codec is FLAC (for fMP4/m4s streams)
+    bool is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
+    if (is_m4s || is_flac)
+    {
+      av_log(nullptr, AV_LOG_INFO, "Detected FLAC encoding in fragmented MP4 (m4s)\n");
+    }
+
+    // Open decoder
+    const AVCodec* codec = avcodec_find_decoder(codec_params->codec_id);
+    if (!codec)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Unsupported codec\n");
+      avformat_close_input(&input_ctx);
+      return false;
+    }
+
+    AVCodecContext* codec_ctx = avcodec_alloc_context3(codec);
+    if (!codec_ctx)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to allocate codec context\n");
+      avformat_close_input(&input_ctx);
+      return false;
+    }
+
+    if ((ret = avcodec_parameters_to_context(codec_ctx, codec_params)) < 0)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to copy codec parameters to context\n");
+      avcodec_free_context(&codec_ctx);
+      avformat_close_input(&input_ctx);
+      return false;
+    }
+
+    if ((ret = avcodec_open2(codec_ctx, codec, nullptr)) < 0)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to open codec\n");
+      avcodec_free_context(&codec_ctx);
+      avformat_close_input(&input_ctx);
+      return false;
+    }
+
     // Extract raw audio data
     AVPacket packet;
+    AVFrame* frame = av_frame_alloc();
     while (av_read_frame(input_ctx, &packet) >= 0)
     {
       if (packet.stream_index == audio_stream_idx)
@@ -121,6 +191,8 @@ public:
     }
 
     // Cleanup
+    av_frame_free(&frame);
+    avcodec_free_context(&codec_ctx);
     avformat_close_input(&input_ctx);
 
     return true;
