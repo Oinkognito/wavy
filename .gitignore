@@ -5,6 +5,7 @@
 hls_*
 *.crt
 *.key
+abr-bin
 docs/
 output*/
 build*/
