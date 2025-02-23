@@ -248,13 +248,13 @@ private:
     // Open input file
     if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)
     {
-      fprintf(stderr, "Error opening input file: %s\n", av_err2str(ret));
+      av_log(nullptr, AV_LOG_ERROR, "Error opening input file.");
       return ret;
     }
 
     if ((ret = avformat_find_stream_info(input_ctx, nullptr)) < 0)
     {
-      fprintf(stderr, "Error finding stream info: %s\n", av_err2str(ret));
+      av_log(nullptr, AV_LOG_ERROR, "Error finding stream info.");
       goto cleanup;
     }
 
