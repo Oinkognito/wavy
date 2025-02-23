@@ -12,6 +12,7 @@
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
   X(MASTER_PLAYLIST, "index.m3u8")                            \
   X(TRANSPORT_STREAM_EXT, ".ts")                              \
+  X(M4S_FILE_EXT, ".m4s")                                     \
   X(ZSTD_FILE_EXT, "zst")                                     \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
   X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \

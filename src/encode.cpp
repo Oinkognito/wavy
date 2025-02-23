@@ -74,7 +74,10 @@ public:
                                     macros::to_string(macros::PLAYLIST_EXT);
       playlist_files.push_back(output_playlist);
 
-      if (!encode_variant(input_file, output_playlist.c_str(), bitrate, use_flac))
+      bool success = use_flac ? encode_flac_variant(input_file, output_playlist.c_str(), bitrate)
+                              : encode_variant(input_file, output_playlist.c_str(), bitrate);
+
+      if (!success)
       {
         av_log(nullptr, AV_LOG_ERROR, "Encoding failed for bitrate: %d\n", bitrate);
         return;
@@ -95,8 +98,7 @@ private:
    *
    * This function extracts the audio stream, sets the encoding bitrate, and writes HLS segments.
    */
-  auto encode_variant(const char* input_file, const char* output_playlist, int bitrate,
-                      bool use_flac) -> bool
+  auto encode_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
   {
     AVFormatContext* input_ctx          = nullptr;
     AVFormatContext* output_ctx         = nullptr;
@@ -164,11 +166,7 @@ private:
       return false;
     }
 
-    // For non-FLAC (or when not forcing FLAC), set the bitrate
-    if (!use_flac)
-    {
-      audio_stream->codecpar->bit_rate = bitrate * 1000; // kbps to bps conversion
-    }
+    audio_stream->codecpar->bit_rate = bitrate * 1000; // kbps to bps conversion
 
     // Prepare segment filename
     std::string output_playlist_str = output_playlist;
@@ -176,7 +174,7 @@ private:
     std::string out_dir =
       (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
     std::string segment_filename_format =
-      out_dir + "/hls_" + (use_flac ? "flac_" : "mp3_") + std::to_string(bitrate) + "_%d.ts";
+      out_dir + "/hls_mp3_" + std::to_string(bitrate) + "_%d.ts";
 
     // Set HLS options common to both cases
     av_dict_set(&options, macros::to_string(macros::CODEC_HLS_TIME_FIELD).c_str(), "10", 0);
@@ -185,24 +183,6 @@ private:
                 "independent_segments", 0);
     av_dict_set(&options, macros::to_string(macros::CODEC_HLS_SEGMENT_FILENAME_FIELD).c_str(),
                 segment_filename_format.c_str(), 0);
-
-    // FLAC-specific settings: apply these BEFORE writing header.
-    if (use_flac)
-    {
-      // Set codec to FLAC and update codec parameters.
-      audio_stream->codecpar->codec_id              = AV_CODEC_ID_FLAC;
-      audio_stream->codecpar->codec_tag             = 0;
-      audio_stream->codecpar->bits_per_coded_sample = 16;
-
-      // Set a standard stereo channel layout.
-      AVChannelLayout stereo_layout = AV_CHANNEL_LAYOUT_STEREO;
-      av_channel_layout_copy(&audio_stream->codecpar->ch_layout, &stereo_layout);
-
-      av_dict_set_int(&options, "flac_stream_info_prefix", 1, 0);
-
-      // Use fragmented MP4 segments since TS does not support FLAC.
-      av_dict_set(&options, "hls_segment_type", "fmp4", 0);
-    }
 
     // Write header (after all options and codec parameter changes)
     if (avformat_write_header(output_ctx, &options) < 0)
@@ -250,6 +230,147 @@ private:
     }
 
     return true;
+  }
+
+  auto encode_flac_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
+  {
+    AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
+    AVStream *       in_stream = nullptr, *out_stream = nullptr;
+    AVPacket*        pkt = nullptr;
+    int              ret, audio_stream_idx = -1;
+    std::string      output_playlist_str = output_playlist;
+    size_t           last_slash          = output_playlist_str.find_last_of('/');
+    std::string      out_dir =
+      (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
+    std::string segment_filename_format =
+      out_dir + "/hls_flac_" + std::to_string(bitrate) + "_%d.m4s";
+
+    // Open input file
+    if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)
+    {
+      fprintf(stderr, "Error opening input file: %s\n", av_err2str(ret));
+      return ret;
+    }
+
+    if ((ret = avformat_find_stream_info(input_ctx, nullptr)) < 0)
+    {
+      fprintf(stderr, "Error finding stream info: %s\n", av_err2str(ret));
+      goto cleanup;
+    }
+
+    // Find audio stream
+    for (int i = 0; i < input_ctx->nb_streams; i++)
+    {
+      if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      {
+        audio_stream_idx = i;
+        break;
+      }
+    }
+
+    if (audio_stream_idx == -1)
+    {
+      fprintf(stderr, "No audio stream found\n");
+      ret = AVERROR(EINVAL);
+      goto cleanup;
+    }
+
+    // Create output context
+    avformat_alloc_output_context2(&output_ctx, nullptr, "hls", output_playlist);
+    if (!output_ctx)
+    {
+      fprintf(stderr, "Error creating output context\n");
+      ret = AVERROR_UNKNOWN;
+      goto cleanup;
+    }
+
+    // Set HLS muxer options
+    av_opt_set(output_ctx->priv_data, "hls_segment_type", "fmp4", 0);
+    av_opt_set(output_ctx->priv_data, "hls_playlist_type", "vod", 0);
+    av_opt_set(output_ctx->priv_data,
+               macros::to_string(macros::CODEC_HLS_SEGMENT_FILENAME_FIELD).c_str(),
+               segment_filename_format.c_str(), 0);
+    av_opt_set(output_ctx->priv_data, "master_pl_name",
+               macros::to_string(macros::MASTER_PLAYLIST).c_str(), 0);
+
+    // Create output stream
+    out_stream = avformat_new_stream(output_ctx, nullptr);
+    if (!out_stream)
+    {
+      fprintf(stderr, "Error creating output stream\n");
+      ret = AVERROR_UNKNOWN;
+      goto cleanup;
+    }
+
+    // Copy codec parameters
+    in_stream = input_ctx->streams[audio_stream_idx];
+    if ((ret = avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar)) < 0)
+    {
+      fprintf(stderr, "Error copying codec parameters: %s\n", av_err2str(ret));
+      goto cleanup;
+    }
+
+    // Open output file
+    if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
+    {
+      if ((ret = avio_open(&output_ctx->pb, output_ctx->url, AVIO_FLAG_WRITE)) < 0)
+      {
+        fprintf(stderr, "Error opening output file: %s\n", av_err2str(ret));
+        goto cleanup;
+      }
+    }
+
+    // Write header
+    if ((ret = avformat_write_header(output_ctx, nullptr)) < 0)
+    {
+      fprintf(stderr, "Error writing header: %s\n", av_err2str(ret));
+      goto cleanup;
+    }
+
+    // Allocate packet
+    pkt = av_packet_alloc();
+    if (!pkt)
+    {
+      fprintf(stderr, "Error allocating packet\n");
+      ret = AVERROR(ENOMEM);
+      goto cleanup;
+    }
+
+    while (av_read_frame(input_ctx, pkt) >= 0)
+    {
+      if (pkt->stream_index == audio_stream_idx)
+      {
+        // Rescale timestamps
+        pkt->pts      = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base,
+                                         AV_ROUND_NEAR_INF);
+        pkt->dts      = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base,
+                                         AV_ROUND_NEAR_INF);
+        pkt->duration = av_rescale_q(pkt->duration, in_stream->time_base, out_stream->time_base);
+        pkt->pos      = -1;
+        pkt->stream_index = 0;
+
+        if ((ret = av_interleaved_write_frame(output_ctx, pkt)) < 0)
+        {
+          fprintf(stderr, "Error writing packet: %s\n", av_err2str(ret));
+          break;
+        }
+      }
+      av_packet_unref(pkt);
+    }
+
+    // Write trailer
+    av_write_trailer(output_ctx);
+
+  cleanup:
+    if (pkt)
+      av_packet_free(&pkt);
+    if (output_ctx && !(output_ctx->oformat->flags & AVFMT_NOFILE))
+      avio_closep(&output_ctx->pb);
+    if (output_ctx)
+      avformat_free_context(output_ctx);
+    if (input_ctx)
+      avformat_close_input(&input_ctx);
+    return ret < 0 ? false : true;
   }
 
   /**

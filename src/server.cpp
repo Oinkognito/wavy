@@ -63,7 +63,9 @@ using boost::asio::ip::tcp;
 
 auto is_valid_extension(const std::string& filename) -> bool
 {
-  return filename.ends_with(macros::PLAYLIST_EXT) || filename.ends_with(".ts");
+  return filename.ends_with(macros::PLAYLIST_EXT) ||
+         filename.ends_with(macros::TRANSPORT_STREAM_EXT) ||
+         filename.ends_with(macros::M4S_FILE_EXT);
 }
 
 auto validate_m3u8_format(const std::string& content) -> bool
@@ -73,7 +75,52 @@ auto validate_m3u8_format(const std::string& content) -> bool
 
 auto validate_ts_file(const std::vector<uint8_t>& data) -> bool
 {
-  return !data.empty() && data[0] == 0x47; // MPEG-TS sync byte
+  return !data.empty() && data[0] == TRANSPORT_STREAM_START_BYTE; // MPEG-TS sync byte
+}
+
+auto validate_m4s(const std::string& m4s_path) -> bool
+{
+  std::ifstream file(m4s_path, std::ios::binary);
+  if (!file.is_open())
+  {
+    LOG_ERROR << "[Validate] Failed to open .m4s file: " << m4s_path;
+    return false;
+  }
+
+  // Read the first 12 bytes (enough to check for 'ftyp' and a major brand)
+  std::vector<uint8_t> header(12);
+  file.read(reinterpret_cast<char*>(header.data()), header.size());
+
+  if (file.gcount() < 12)
+  {
+    LOG_ERROR << "[Validate] .m4s file too small: " << m4s_path;
+    return false;
+  }
+
+  // First 4 bytes: Box size (big-endian)
+  uint32_t box_size = boost::endian::big_to_native(*reinterpret_cast<uint32_t*>(header.data()));
+
+  // Next 4 bytes: Box type (should be 'ftyp')
+  std::string box_type(reinterpret_cast<char*>(header.data() + 4), 4);
+
+  if (box_type != "ftyp")
+  {
+    LOG_ERROR << "[Validate] Missing 'ftyp' header in .m4s: " << m4s_path;
+    return false;
+  }
+
+  // Ensure the file contains 'moof' (Movie Fragment) and 'mdat' (Media Data)
+  file.seekg(0, std::ios::beg);
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+  if (content.find("moof") == std::string::npos || content.find("mdat") == std::string::npos)
+  {
+    LOG_ERROR << "[Validate] Invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
+    return false;
+  }
+
+  LOG_INFO << "[Validate] Valid .m4s segment: " << m4s_path;
+  return true;
 }
 
 auto extract_payload(const std::string& payload_path, const std::string& extract_path) -> bool
@@ -186,7 +233,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
 
   int valid_file_count = 0;
 
-  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path)) // Added const
+  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path))
   {
     std::string          fname = file.path().filename().string();
     std::ifstream        infile(file.path().string(), std::ios::binary);
@@ -201,13 +248,20 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
         continue;
       }
     }
-    else if (fname.ends_with(".ts"))
+    else if (fname.ends_with(macros::TRANSPORT_STREAM_EXT))
     {
       if (!validate_ts_file(data))
       {
         LOG_WARNING << "[Extract] Invalid TS file, removing: " << fname;
         fs::remove(file.path());
         continue;
+      }
+    }
+    else if (fname.ends_with(macros::M4S_FILE_EXT))
+    {
+      if (!validate_m4s(file.path().string())) // Validate .m4s
+      {
+        LOG_WARNING << "[Extract] Possibly invalid M4S segment: " << fname;
       }
     }
     else
@@ -270,7 +324,7 @@ private:
     auto self(shared_from_this());
 
     auto parser = std::make_shared<http::request_parser<http::string_body>>();
-    parser->body_limit(100 * 1024 * 1024); // for now 100MiB is alright, when lossless codecs come
+    parser->body_limit(150 * 1024 * 1024); // for now 100MiB is alright, when lossless codecs come
                                            // in the picture we will have to think about it.
 
     http::async_read(

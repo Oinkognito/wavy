@@ -202,6 +202,9 @@ private:
 
   auto verify_references() -> bool
   {
+    std::vector<std::string> mp4_segments_;
+    std::vector<std::string> transport_streams_;
+
     for (auto& [playlist_path, segments] : reference_playlists_)
     {
       std::ifstream file(playlist_path);
@@ -212,36 +215,77 @@ private:
       }
 
       std::string line;
+      enum class PlaylistFormat
+      {
+        UNKNOWN,
+        TRANSPORT_STREAM,
+        FMP4
+      };
+      PlaylistFormat playlist_format = PlaylistFormat::UNKNOWN;
+
       while (std::getline(file, line))
       {
+        std::string segment_path = fs::path(directory_) / line;
+
         if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
-          std::string ts_path = fs::path(directory_) / line;
+          if (playlist_format == PlaylistFormat::FMP4)
+          {
+            LOG_ERROR << "[Dispatcher] Inconsistent playlist format in: " << playlist_path
+                      << " (Cannot mix .ts and .m4s segments)";
+            return false;
+          }
+          playlist_format = PlaylistFormat::TRANSPORT_STREAM;
 
-          std::ifstream ts_file(ts_path, std::ios::binary);
+          std::ifstream ts_file(segment_path, std::ios::binary);
           if (!ts_file.is_open())
           {
-            LOG_ERROR << "[Dispatcher] Failed to open transport stream: " << ts_path;
+            LOG_ERROR << "[Dispatcher] Failed to open transport stream: " << segment_path;
             return false;
           }
 
           char sync_byte;
-          ts_file.read(&sync_byte, 1);                  // Read the first byte
-          if (sync_byte != TRANSPORT_STREAM_START_BYTE) // sanity check for transport stream
-                                                        // references in playlist files
+          ts_file.read(&sync_byte, 1);
+          if (sync_byte != TRANSPORT_STREAM_START_BYTE)
           {
-            LOG_ERROR << "[Dispatcher] Invalid transport stream: " << ts_path
+            LOG_ERROR << "[Dispatcher] Invalid transport stream: " << segment_path
                       << " (Missing 0x47 sync byte)";
             return false;
           }
 
-          segments.push_back(ts_path);
-          transport_streams_.push_back(ts_path);
-          LOG_INFO << "[Dispatcher] Found valid transport stream: " << ts_path;
+          segments.push_back(segment_path);
+          transport_streams_.push_back(segment_path);
+          LOG_INFO << "[Dispatcher] Found valid transport stream: " << segment_path;
+        }
+        else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
+        {
+          if (playlist_format == PlaylistFormat::TRANSPORT_STREAM)
+          {
+            LOG_ERROR << "[Dispatcher] Inconsistent playlist format in: " << playlist_path
+                      << " (Cannot mix .ts and .m4s segments)";
+            return false;
+          }
+          playlist_format = PlaylistFormat::FMP4;
+
+          std::ifstream m4s_file(segment_path, std::ios::binary);
+          if (!m4s_file.is_open())
+          {
+            LOG_ERROR << "[Dispatcher] Failed to open .m4s file: " << segment_path;
+            return false;
+          }
+
+          if (!validate_m4s(segment_path))
+          {
+            LOG_WARNING << "[Dispatcher] M4S segment check failed: " << segment_path;
+          }
+
+          mp4_segments_.push_back(segment_path);
+          LOG_INFO << "[Dispatcher] Found valid .m4s segment: " << segment_path;
         }
       }
     }
 
+    // Ensure all verified segments exist in the filesystem
     for (const auto& ts : transport_streams_)
     {
       if (!fs::exists(ts))
@@ -251,7 +295,39 @@ private:
       }
     }
 
-    LOG_INFO << "[Dispatcher] All referenced playlists and transport streams verified.";
+    for (const auto& m4s : mp4_segments_)
+    {
+      if (!fs::exists(m4s))
+      {
+        LOG_ERROR << "[Dispatcher] Missing .m4s segment: " << m4s;
+        return false;
+      }
+    }
+
+    LOG_INFO
+      << "[Dispatcher] All referenced playlists and their respective segment types verified.";
+    return true;
+  }
+
+  auto validate_m4s(const std::string& m4s_path) -> bool
+  {
+    std::ifstream file(m4s_path, std::ios::binary);
+    if (!file.is_open())
+    {
+      LOG_ERROR << "[Dispatcher] Failed to open .m4s file: " << m4s_path;
+      return false;
+    }
+
+    char header[8] = {0};
+    file.read(header, 8); // Read the first 8 bytes
+
+    if (std::string(header, 4) != "ftyp" && std::string(header, 4) != "moof")
+    {
+      LOG_ERROR << "[Dispatcher] Invalid .m4s file: " << m4s_path << " (Missing ftyp or moof box)";
+      return false;
+    }
+
+    LOG_INFO << "[Dispatcher] Valid .m4s file: " << m4s_path;
     return true;
   }
 

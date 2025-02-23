@@ -79,8 +79,9 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
 
   LOG_INFO << "Fetching client list from server: " << server;
 
-  std::string        clients_response = perform_https_request(ioc, ctx, macros::to_string(macros::SERVER_PATH_HLS_CLIENTS), server);
-  std::istringstream clientStream(clients_response);
+  std::string clients_response =
+    perform_https_request(ioc, ctx, macros::to_string(macros::SERVER_PATH_HLS_CLIENTS), server);
+  std::istringstream       clientStream(clients_response);
   std::vector<std::string> clientIds;
   std::string              line;
 
