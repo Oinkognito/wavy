@@ -248,13 +248,13 @@ private:
     // Open input file
     if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)
     {
-      av_log(nullptr, AV_LOG_ERROR, "Error opening input file.");
+      av_log(nullptr, AV_LOG_ERROR, "Error opening input file.\n");
       return ret;
     }
 
     if ((ret = avformat_find_stream_info(input_ctx, nullptr)) < 0)
     {
-      av_log(nullptr, AV_LOG_ERROR, "Error finding stream info.");
+      av_log(nullptr, AV_LOG_ERROR, "Error finding stream info.\n");
       goto cleanup;
     }
 
@@ -270,7 +270,7 @@ private:
 
     if (audio_stream_idx == -1)
     {
-      fprintf(stderr, "No audio stream found\n");
+      av_log(nullptr, AV_LOG_ERROR, "No audio stream found.\n");
       ret = AVERROR(EINVAL);
       goto cleanup;
     }
@@ -306,7 +306,7 @@ private:
     in_stream = input_ctx->streams[audio_stream_idx];
     if ((ret = avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar)) < 0)
     {
-      fprintf(stderr, "Error copying codec parameters: %s\n", av_err2str(ret));
+      av_log(nullptr, AV_LOG_ERROR, "Error copying codec parameters.\n");
       goto cleanup;
     }
 
@@ -315,7 +315,7 @@ private:
     {
       if ((ret = avio_open(&output_ctx->pb, output_ctx->url, AVIO_FLAG_WRITE)) < 0)
       {
-        fprintf(stderr, "Error opening output file: %s\n", av_err2str(ret));
+        av_log(nullptr, AV_LOG_ERROR, "Error opening output file.\n");
         goto cleanup;
       }
     }
@@ -323,7 +323,7 @@ private:
     // Write header
     if ((ret = avformat_write_header(output_ctx, nullptr)) < 0)
     {
-      fprintf(stderr, "Error writing header: %s\n", av_err2str(ret));
+      av_log(nullptr, AV_LOG_ERROR, "Error writing header.\n");
       goto cleanup;
     }
 
@@ -331,7 +331,7 @@ private:
     pkt = av_packet_alloc();
     if (!pkt)
     {
-      fprintf(stderr, "Error allocating packet\n");
+      av_log(nullptr, AV_LOG_ERROR, "Error allocating packet\n");
       ret = AVERROR(ENOMEM);
       goto cleanup;
     }
@@ -351,7 +351,7 @@ private:
 
         if ((ret = av_interleaved_write_frame(output_ctx, pkt)) < 0)
         {
-          fprintf(stderr, "Error writing packet: %s\n", av_err2str(ret));
+          av_log(nullptr, AV_LOG_ERROR, "Error writing packet.\n");
           break;
         }
       }
@@ -433,11 +433,11 @@ auto main(int argc, char* argv[]) -> int
   {
     if (fs::create_directory(output_dir))
     {
-      std::cout << "Directory created successfully: " << output_dir << std::endl;
+      LOG_INFO << "-- Directory created successfully: " << output_dir << std::endl;
     }
     else
     {
-      std::cerr << "Failed to create directory: " << output_dir << std::endl;
+      LOG_ERROR << "Failed to create directory: " << output_dir << std::endl;
     }
   }
 
