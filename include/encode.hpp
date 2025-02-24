@@ -43,10 +43,7 @@ public:
    *
    * This constructor initializes the FFmpeg network stack and sets the log level for debugging.
    */
-  HLS_Encoder()
-  {
-    avformat_network_init();
-  }
+  HLS_Encoder() { avformat_network_init(); }
 
   /**
    * @brief Cleans up resources and deinitializes FFmpeg network stack.

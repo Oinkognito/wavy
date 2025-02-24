@@ -93,7 +93,7 @@ extern "C"
     }
 
     fclose(outFile);
-    printf("Successfully decompressed: %s -> %s\n", fname, outputFilename);
+    /*printf("Successfully decompressed: %s -> %s\n", fname, outputFilename);*/
 
     // Clean up and free memory
     free(rBuff);

@@ -12,6 +12,7 @@
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
   X(MASTER_PLAYLIST, "index.m3u8")                            \
   X(TRANSPORT_STREAM_EXT, ".ts")                              \
+  X(MP4_FILE_EXT, ".mp4")                                     \
   X(M4S_FILE_EXT, ".m4s")                                     \
   X(ZSTD_FILE_EXT, "zst")                                     \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \

@@ -26,6 +26,10 @@ extern "C"
 #endif
 
 #define HEADER_FUNCTION static UNUSED_ATTR
+  
+  constexpr double bytes_to_mib(std::size_t bytes) {
+    return static_cast<double>(bytes) / (1024 * 1024);
+  }
 
   /*
    * Define the returned error code from utility functions.
