@@ -410,15 +410,18 @@ private:
     }
 
     m3u8.close();
+    if (use_flac) LOG_INFO << "Created HLS segments for FLAC with references written to: " << macros::to_string(macros::MASTER_PLAYLIST);
+    else LOG_INFO << "Created HLS segments for LOSSY with references written to master playlist: " << macros::to_string(macros::MASTER_PLAYLIST);
   }
 };
 
 auto main(int argc, char* argv[]) -> int
 {
+  logger::init_logging();
+
   if (argc < 4)
   {
-    av_log(nullptr, AV_LOG_ERROR, "Usage: %s <input file> <output directory> <audio format>\n",
-           argv[0]);
+    LOG_ERROR << "Usage: " << argv[0] << "<input file> <output directory> <audio format>";
     return 1;
   }
 
@@ -427,22 +430,25 @@ auto main(int argc, char* argv[]) -> int
   std::string      output_dir = std::string(argv[2]);
   if (fs::exists(output_dir))
   {
-    LOG_INFO << "Output directory exists";
+      LOG_WARNING << "Output directory exists, rewriting...";
+      fs::remove_all(output_dir);
+      /* Also remove the payload path as well */
+      fs::remove_all(macros::DISPATCH_ARCHIVE_REL_PATH);
+  }
+
+  if (fs::create_directory(output_dir))
+  {
+    LOG_INFO << "Directory created successfully: " << output_dir << std::endl;
   }
   else
   {
-    if (fs::create_directory(output_dir))
-    {
-      LOG_INFO << "-- Directory created successfully: " << output_dir << std::endl;
-    }
-    else
-    {
-      LOG_ERROR << "Failed to create directory: " << output_dir << std::endl;
-    }
+    LOG_ERROR << "Failed to create directory: " << output_dir << std::endl;
   }
+  
 
   HLS_Encoder encoder;
   encoder.create_hls_segments(argv[1], bitrates, argv[2], use_flac);
-
+  LOG_INFO << "Encoding seems to be complete.";
+    
   return 0;
 }
