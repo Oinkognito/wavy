@@ -209,7 +209,8 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
   return valid_files_found;
 }
 
-auto extract_and_validate(const std::string& gzip_path, const std::string& client_id) -> bool
+auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
+                          const std::string& ip_id) -> bool
 {
   LOG_INFO << "[Extract] Validating and extracting GZIP file: " << gzip_path;
 
@@ -220,7 +221,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
   }
 
   std::string temp_extract_path =
-    macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id;
+    macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
   fs::create_directories(temp_extract_path);
 
   if (!extract_payload(gzip_path, temp_extract_path))
@@ -232,7 +233,8 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
   LOG_INFO << "[Extract] Extraction complete, validating files...";
 
   // Move valid files to storage
-  std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id;
+  std::string storage_path =
+    macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_id + "/" + audio_id;
   fs::create_directories(storage_path);
 
   int valid_file_count = 0;
@@ -298,7 +300,10 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
 class HLS_Session : public std::enable_shared_from_this<HLS_Session>
 {
 public:
-  explicit HLS_Session(boost::asio::ssl::stream<tcp::socket> socket) : socket_(std::move(socket)) {}
+  explicit HLS_Session(boost::asio::ssl::stream<tcp::socket> socket, const std::string ip)
+      : socket_(std::move(socket)), ip_id_(std::move(ip))
+  {
+  }
 
   void start()
   {
@@ -310,6 +315,7 @@ private:
   boost::asio::ssl::stream<tcp::socket> socket_;
   beast::flat_buffer                    buffer_;
   http::request<http::string_body>      request_;
+  std::string                           ip_id_;
 
   void do_handshake()
   {
@@ -325,6 +331,23 @@ private:
                               LOG_INFO << "[Session] SSL handshake successful";
                               do_read();
                             });
+  }
+
+  void resolve_ip()
+  {
+    try
+    {
+      ip_id_ = socket_.lowest_layer().remote_endpoint().address().to_string();
+      LOG_INFO << "[Session] Resolved IP: " << ip_id_;
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR << "[Session] Failed to resolve IP: " << e.what();
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      return;
+    }
+
+    do_read();
   }
 
   void do_read()
@@ -361,39 +384,56 @@ private:
     socket_.next_layer().set_option(option);
   }
 
-  void handle_list_clients()
+  void handle_list_ips()
   {
-    LOG_INFO << "[List Clients] Handling client listing request";
+    LOG_INFO << "[List IPs] Handling IP listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
     {
-      LOG_ERROR << "[List Clients] Storage directory not found: " << storage_path;
+      LOG_ERROR << "[List IPs] Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
-    std::ostringstream client_list;
+    std::ostringstream response_stream;
+    bool               entries_found = false;
 
-    bool clients_found = false;
-    for (const fs::directory_entry& entry : fs::directory_iterator(storage_path)) // Added const
+    for (const fs::directory_entry& ip_entry : fs::directory_iterator(storage_path))
     {
-      if (fs::is_directory(entry.status()))
+      if (fs::is_directory(ip_entry.status()))
       {
-        client_list << entry.path().filename().string() << "\n";
-        clients_found = true;
+        std::string ip_id = ip_entry.path().filename().string();
+        response_stream << ip_id << ":\n"; // IP-ID Header
+
+        bool audio_found = false;
+        for (const fs::directory_entry& audio_entry : fs::directory_iterator(ip_entry.path()))
+        {
+          if (fs::is_directory(audio_entry.status()))
+          {
+            response_stream << "  - " << audio_entry.path().filename().string() << "\n"; // Audio-ID
+            audio_found = true;
+          }
+        }
+
+        if (!audio_found)
+        {
+          response_stream << "  (No audio IDs found)\n";
+        }
+
+        entries_found = true;
       }
     }
 
-    if (!clients_found)
+    if (!entries_found)
     {
-      LOG_WARNING << "[List Clients] No clients found in storage";
+      LOG_WARNING << "[List IPs] No IPs or Audio-IDs found in storage";
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
 
-    // Return the list of client IDs
-    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + client_list.str());
+    // Return the list of IP-IDs and their respective Audio-IDs
+    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
   }
 
   void process_request()
@@ -440,7 +480,7 @@ private:
     {
       if (request_.target() == macros::SERVER_PATH_HLS_CLIENTS) // Request for all client IDs
       {
-        handle_list_clients();
+        handle_list_ips();
       }
       else
       {
@@ -457,8 +497,8 @@ private:
   {
     LOG_INFO << "[Upload] Handling GZIP file upload";
 
-    std::string client_id = boost::uuids::to_string(boost::uuids::random_generator()());
-    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + client_id +
+    std::string audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
+    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
                             macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
     fs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
@@ -490,9 +530,9 @@ private:
 
     LOG_INFO << "[Upload] File successfully written: " << gzip_path;
 
-    if (extract_and_validate(gzip_path, client_id))
+    if (extract_and_validate(gzip_path, audio_id, ip_id_))
     {
-      send_response("HTTP/1.1 200 OK\r\nClient-ID: " + client_id + "\r\n\r\n");
+      send_response("HTTP/1.1 200 OK\r\nClient-ID: " + audio_id + "\r\n\r\n");
     }
     else
     {
@@ -520,7 +560,7 @@ private:
    */
   void handle_download()
   {
-    // Parse request target (expected: /hls/<client_id>/<filename>)
+    // Parse request target (expected: /hls/<audio_id>/<filename>)
     std::string              target(request_.target().begin(), request_.target().end());
     std::vector<std::string> parts;
     std::istringstream       iss(target);
@@ -534,19 +574,20 @@ private:
       }
     }
 
-    if (parts.size() < 3 || parts[0] != "hls")
+    if (parts.size() < 4 || parts[0] != "hls")
     {
       LOG_ERROR << "[Download] Invalid request path: " << target;
       send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
 
-    std::string client_id = parts[1];
-    std::string filename  = parts[2];
+    std::string ip_addr  = parts[1];
+    std::string audio_id = parts[2];
+    std::string filename = parts[3];
 
     // Construct the file path
-    std::string file_path =
-      macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + client_id + "/" + filename;
+    std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
+                            audio_id + "/" + filename;
 
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
     {
@@ -651,12 +692,15 @@ public:
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context)
   {
     LOG_INFO << "[Server] Starting HLS server on port " << port;
+    load_ip_audio_map();
     start_accept();
   }
 
 private:
-  tcp::acceptor              acceptor_;
-  boost::asio::ssl::context& ssl_context_;
+  tcp::acceptor                                             acceptor_;
+  boost::asio::ssl::context&                                ssl_context_;
+  std::unordered_map<std::string, std::vector<std::string>> ip_audio_map_;
+  std::mutex                                                ip_audio_map_mutex_;
 
   void start_accept()
   {
@@ -669,12 +713,43 @@ private:
           return;
         }
 
-        LOG_INFO << "[Server] Accepted new connection";
+        std::string ip = socket.remote_endpoint().address().to_string();
+        LOG_INFO << "[Server] Accepted new connection from " << ip;
+
         auto session = std::make_shared<HLS_Session>(
-          boost::asio::ssl::stream<tcp::socket>(std::move(socket), ssl_context_));
+          boost::asio::ssl::stream<tcp::socket>(std::move(socket), ssl_context_), ip);
         session->start();
         start_accept();
       });
+  }
+
+  void load_ip_audio_map()
+  {
+    std::ifstream infile("ip_audio_map.txt");
+    std::string   ip, audio_id;
+    while (infile >> ip >> audio_id)
+    {
+      ip_audio_map_[ip].push_back(audio_id);
+    }
+  }
+
+  void save_ip_audio_map()
+  {
+    std::ofstream outfile("ip_audio_map.txt");
+    for (const auto& pair : ip_audio_map_)
+    {
+      for (const std::string& audio_id : pair.second)
+      {
+        outfile << pair.first << " " << audio_id << "\n";
+      }
+    }
+  }
+
+  void add_audio_for_ip(const std::string& ip, const std::string& audio_id)
+  {
+    std::lock_guard<std::mutex> lock(ip_audio_map_mutex_);
+    ip_audio_map_[ip].push_back(audio_id);
+    save_ip_audio_map();
   }
 };
 

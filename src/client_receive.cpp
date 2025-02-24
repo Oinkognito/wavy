@@ -71,52 +71,30 @@ auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::s
   }
 }
 
-auto fetch_transport_segments(int index, GlobalState& gs, const std::string& server) -> bool
+auto fetch_transport_segments(const std::string& ip_id, const std::string& audio_id,
+                              GlobalState& gs, const std::string& server) -> bool
 {
   net::io_context ioc;
   ssl::context    ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
 
-  LOG_INFO << "Fetching client list from server: " << server;
+  LOG_INFO << "Fetching playlist for IP-ID: " << ip_id << ", Audio ID: " << audio_id;
 
-  std::string clients_response =
-    perform_https_request(ioc, ctx, macros::to_string(macros::SERVER_PATH_HLS_CLIENTS), server);
-  std::istringstream       clientStream(clients_response);
-  std::vector<std::string> clientIds;
-  std::string              line;
+  std::string playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/index.m3u8";
+  std::string playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
 
-  while (std::getline(clientStream, line))
+  if (playlist_content.empty())
   {
-    if (!line.empty())
-    {
-      clientIds.push_back(line);
-    }
-  }
-
-  if (index < 0 || index >= static_cast<int>(clientIds.size()))
-  {
-    LOG_ERROR << "Invalid client index: " << index;
+    LOG_ERROR << "Failed to fetch playlist for " << ip_id << "/" << audio_id;
     return false;
   }
-
-  std::string client_id = clientIds[index];
-  if (client_id.empty())
-  {
-    LOG_ERROR << "Client ID cannot be empty";
-    return false;
-  }
-
-  LOG_INFO << "Selected client ID: " << client_id;
-
-  // Fetch the Master Playlist (index.m3u8)
-  std::string index_playlist_path = "/hls/" + client_id + "/index.m3u8";
-  std::string playlist_content    = perform_https_request(ioc, ctx, index_playlist_path, server);
 
   if (playlist_content.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
   {
     int                max_bandwidth = 0;
     std::string        selected_playlist;
     std::istringstream iss(playlist_content);
+    std::string        line;
 
     while (std::getline(iss, line))
     {
@@ -152,16 +130,18 @@ auto fetch_transport_segments(int index, GlobalState& gs, const std::string& ser
     LOG_INFO << "Selected highest bitrate playlist: " << selected_playlist;
 
     // Fetch the variant playlist (which points to .m4s segments)
-    std::string highest_playlist_path = "/hls/" + client_id + "/" + selected_playlist;
-    playlist_content = perform_https_request(ioc, ctx, highest_playlist_path, server);
+    playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/" + selected_playlist;
+    playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
   }
 
   std::istringstream segment_stream(playlist_content);
+  std::string        line;
+
   while (std::getline(segment_stream, line))
   {
     if (!line.empty() && line[0] != '#')
     {
-      std::string segment_url = "/hls/" + client_id + "/" + line;
+      std::string segment_url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
 
       // Check if the segment is .ts or .m4s
       if (line.ends_with(macros::TRANSPORT_STREAM_EXT) || line.ends_with(macros::M4S_FILE_EXT))
@@ -221,16 +201,19 @@ auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
 
-  if (argc < 3)
+  if (argc < 4)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <client-index> <server-ip>";
+    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <audio-id> <server-ip>";
     return EXIT_FAILURE;
   }
 
-  int         index = std::stoi(argv[1]);
+  std::string ip_id    = argv[1];
+  std::string audio_id = argv[2];
+  std::string server   = argv[3];
+
   GlobalState gs;
 
-  if (!fetch_transport_segments(index, gs, argv[2]))
+  if (!fetch_transport_segments(ip_id, audio_id, gs, server))
   {
     return EXIT_FAILURE;
   }
