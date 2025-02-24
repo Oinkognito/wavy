@@ -115,6 +115,32 @@ For detailed API documentation, see:
 ## **Server**
 The **Wavy-Server** allows **secure** transport stream handling over HTTPS.
 
+The Server Storage Organization is indexed below: 
+
+```text 
+hls_storage/
+├── 192.168.1.10/                                    # IP Address 192.168.1.10 (example)
+│   ├── 1435f431-a69a-4027-8661-44c31cd11ef6/        # Randomly generated audio id
+│   │   ├── index.m3u8
+│   │   ├── hls_mp3_64.m3u8                          # HLS MP3 encoded playlist (64-bit)
+│   │   ├── hls_mp3_64_0.ts                          # First transport stream of hls_mp3_64 playlist                
+│   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+│   │   ├── metadata.toml                            # Metadata and other song information
+│   ├── e5fdeca5-57c8-47b4-b9c6-60492ddf11ae/
+│   │   ├── index.m3u8
+│   │   ├── hls_flac_64.m3u8                         # HLS FLAC encoded playlist (64-bit)
+│   │   ├── hls_flac_64_0.ts                         # First transport stream of hls_mp3_64 playlist 
+│   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+│   │   ├── metadata.toml                            # Metadata and other song information
+│    
+```
+
+The server does not delete these indices after the server dies. The server allows for **PERSISTENT STORAGE**.
+
+This makes it so that every owner can index multiple audio files under a clean directory structure that is logical to query and playback.
+
+So the capability of the server totally depends on **YOUR** filesystem. This gives you full power to manage your server library to the fullest.
+
 ### **Generating SSL Certificates**
 To generate a **self-signed certificate**, run:
 
