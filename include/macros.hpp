@@ -15,6 +15,7 @@
   X(MP4_FILE_EXT, ".mp4")                                     \
   X(M4S_FILE_EXT, ".m4s")                                     \
   X(ZSTD_FILE_EXT, "zst")                                     \
+  X(FLAC_CODEC, "CODECS=\"fLaC\"")                            \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
   X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")                 \

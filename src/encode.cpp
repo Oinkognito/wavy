@@ -23,7 +23,7 @@ auto main(int argc, char* argv[]) -> int
 
   if (debug_mode)
   {
-    LOG_INFO << "Debug mode enabled: FFmpeg will output verbose logs.";
+    LOG_INFO << "-- Debug mode enabled: AV_LOG will output verbose logs.";
     av_log_set_level(AV_LOG_DEBUG);
   }
   else

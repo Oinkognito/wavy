@@ -129,13 +129,14 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
 
     LOG_INFO << "Selected highest bitrate playlist: " << selected_playlist;
 
-    // Fetch the variant playlist (which points to .m4s segments)
     playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/" + selected_playlist;
     playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
   }
 
   std::istringstream segment_stream(playlist_content);
   std::string        line;
+  std::string        init_mp4_data;
+  bool               has_m4s_segments = false;
 
   while (std::getline(segment_stream, line))
   {
@@ -143,13 +144,52 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
     {
       std::string segment_url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
 
-      // Check if the segment is .ts or .m4s
+      if (line.ends_with(macros::M4S_FILE_EXT))
+      {
+        has_m4s_segments = true;
+      }
+    }
+  }
+
+  if (has_m4s_segments)
+  {
+    std::string init_mp4_url = "/hls/" + ip_id + "/" + audio_id + "/init.mp4";
+    init_mp4_data            = perform_https_request(ioc, ctx, init_mp4_url, server);
+
+    if (init_mp4_data.empty())
+    {
+      LOG_ERROR << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
+      return false;
+    }
+
+    LOG_INFO << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
+  }
+
+  // Re-parse playlist for segments
+  segment_stream.clear();
+  segment_stream.seekg(0, std::ios::beg);
+
+  while (std::getline(segment_stream, line))
+  {
+    if (!line.empty() && line[0] != '#')
+    {
+      std::string segment_url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+
       if (line.ends_with(macros::TRANSPORT_STREAM_EXT) || line.ends_with(macros::M4S_FILE_EXT))
       {
         std::string segment_data = perform_https_request(ioc, ctx, segment_url, server);
         if (!segment_data.empty())
         {
-          gs.transport_segments.push_back(std::move(segment_data));
+          if (line.ends_with(macros::M4S_FILE_EXT))
+          {
+            std::string full_segment = init_mp4_data + segment_data;
+            gs.transport_segments.push_back(std::move(full_segment));
+          }
+          else
+          {
+            gs.transport_segments.push_back(std::move(segment_data));
+          }
+
           LOG_DEBUG << "Fetched segment: " << line;
         }
         else
