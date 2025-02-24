@@ -100,6 +100,13 @@ namespace ssl   = boost::asio::ssl;
 namespace fs    = std::filesystem;
 using tcp       = net::ip::tcp;
 
+enum class PlaylistFormat
+{
+  UNKNOWN,
+  TRANSPORT_STREAM,
+  FMP4
+};
+
 class Dispatcher
 {
 public:
@@ -120,6 +127,15 @@ public:
 
   auto process_and_upload() -> bool
   {
+    if (fs::exists(macros::DISPATCH_ARCHIVE_REL_PATH))
+    {
+      LOG_DEBUG << "[Dispatcher] Payload already exists, checking for "
+                << macros::DISPATCH_ARCHIVE_NAME << "...";
+      std::string archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
+      if (fs::exists(archive_path))
+        return upload_to_server(archive_path);
+    }
+
     std::string master_playlist_path = fs::path(directory_) / playlist_name_;
 
     if (!verify_master_playlist(master_playlist_path))
@@ -138,8 +154,16 @@ public:
     print_hierarchy();
 #endif
 
-    std::string archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
-    if (!compress_files(archive_path))
+    std::string archive_path  = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
+    bool        applyZSTDComp = true;
+    if (playlist_format == PlaylistFormat::FMP4)
+    {
+      LOG_DEBUG << "[Dispatcher] Found FMP4 files, no point in compressing them. Skipping ZSTD "
+                   "compression job";
+      applyZSTDComp = false;
+    }
+
+    if (!compress_files(archive_path, applyZSTDComp))
     {
       LOG_ERROR << "[Dispatcher] Compression failed.";
       return false;
@@ -150,6 +174,7 @@ public:
 
 private:
   net::io_context                context_;
+  PlaylistFormat                 playlist_format = PlaylistFormat::UNKNOWN;
   ssl::context                   ssl_ctx_;
   tcp::resolver                  resolver_;
   beast::ssl_stream<tcp::socket> stream_;
@@ -215,13 +240,6 @@ private:
       }
 
       std::string line;
-      enum class PlaylistFormat
-      {
-        UNKNOWN,
-        TRANSPORT_STREAM,
-        FMP4
-      };
-      PlaylistFormat playlist_format = PlaylistFormat::UNKNOWN;
 
       while (std::getline(file, line))
       {
@@ -323,7 +341,6 @@ private:
 
     if (std::string(header, 4) != "ftyp" && std::string(header, 4) != "moof")
     {
-      LOG_ERROR << "[Dispatcher] Invalid .m4s file: " << m4s_path << " (Missing ftyp or moof box)";
       return false;
     }
 
@@ -331,24 +348,29 @@ private:
     return true;
   }
 
-  auto compress_files(const std::string& archive_path) -> bool
+  auto compress_files(const std::string& output_archive_path, const bool applyZSTDComp) -> bool
   {
+    LOG_DEBUG << "[Dispatcher] Beginning Compression Job in: " << output_archive_path << " from "
+              << fs::absolute(directory_);
     /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
-    if (!ZSTD_compressFilesInDirectory(
-          fs::path(directory_).c_str(),
-          macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
+    if (applyZSTDComp)
     {
-      LOG_ERROR << "[Dispatcher] Something went wrong with Zstd compression.";
-      return false;
+      if (!ZSTD_compressFilesInDirectory(
+            fs::path(directory_).c_str(),
+            macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
+      {
+        LOG_ERROR << "[Dispatcher] Something went wrong with Zstd compression.";
+        return false;
+      }
     }
 
     struct archive* archive = archive_write_new();
     archive_write_add_filter_gzip(archive);
     archive_write_set_format_pax_restricted(archive);
 
-    if (archive_write_open_filename(archive, archive_path.c_str()) != ARCHIVE_OK)
+    if (archive_write_open_filename(archive, output_archive_path.c_str()) != ARCHIVE_OK)
     {
-      LOG_ERROR << "[Dispatcher] Failed to create archive: " << archive_path;
+      LOG_ERROR << "[Dispatcher] Failed to create archive: " << output_archive_path;
       return false;
     }
 
@@ -373,7 +395,18 @@ private:
       return true;
     };
 
-    for (const auto& entry : fs::directory_iterator(fs::path(macros::DISPATCH_ARCHIVE_REL_PATH)))
+    /* Payload directory is only created if we compress each stream segment into
+     * ZSTD files.
+     *
+     * Since MP4 and M4S files have minimal viability for compression, we just ignore
+     * that operation, meaning the payload target is now just directory_ variable.
+     */
+    fs::path payloadTarget =
+      applyZSTDComp ? fs::path(macros::DISPATCH_ARCHIVE_REL_PATH) : fs::path(directory_);
+
+    LOG_DEBUG << "[Dispatcher] Making payload target: " << payloadTarget;
+
+    for (const auto& entry : fs::directory_iterator(payloadTarget))
     {
       if (entry.is_regular_file())
       {
@@ -396,7 +429,7 @@ private:
     }
 
     archive_write_free(archive);
-    LOG_INFO << "[Dispatcher] ZSTD compression of " << directory_ << " to " << archive_path
+    LOG_INFO << "[Dispatcher] ZSTD compression of " << directory_ << " to " << output_archive_path
              << " with final GNU tar job done.";
     return true;
   }
@@ -411,6 +444,19 @@ private:
 
       send_http_request("POST", archive_path);
 
+      // **Proper SSL stream shutdown**
+      boost::system::error_code ec;
+      stream_.shutdown(ec);
+      if (ec == boost::asio::error::eof)
+      {
+        // Expected, means server closed the connection cleanly
+        ec.clear();
+      }
+      else if (ec)
+      {
+        LOG_ERROR << "[Dispatcher] SSL shutdown failed: " << ec.message();
+      }
+
       LOG_INFO << "[Dispatcher] Upload process completed successfully.";
       return true;
     }
@@ -423,36 +469,49 @@ private:
 
   void send_http_request(const std::string& method, const std::string& archive_path)
   {
-    std::ifstream file(archive_path, std::ios::binary);
-    std::string   content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    beast::error_code                         ec;
+    boost::beast::http::file_body::value_type body;
+    body.open(archive_path.c_str(), beast::file_mode::scan, ec);
+    if (ec)
+    {
+      LOG_ERROR << "[Dispatcher] Failed to open archive file: " << archive_path;
+      return;
+    }
 
-    http::request<http::string_body> req{http::verb::post, "/", 11};
+    http::request<http::file_body> req{http::string_to_verb(method), "/", 11};
     req.set(http::field::host, server_);
-    req.set(http::field::content_type, macros::CONTENT_TYPE_COMPRESSION);
-    req.set(http::field::content_disposition,
-            "attachment; filename=\"" + fs::path(archive_path).filename().string() + "\"");
-    req.body() = content;
+    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    req.set(http::field::content_type, "application/gzip");
+    req.body() = std::move(body);
     req.prepare_payload();
 
-    try
+    http::write(stream_, req, ec);
+    if (ec)
     {
-      http::write(stream_, req);
-      beast::flat_buffer                buffer;
-      http::response<http::string_body> res;
-      http::read(stream_, buffer, res);
-
-      if (res.result() != http::status::ok)
-      {
-        LOG_ERROR << "[Dispatcher] Server error: " << res.result_int();
-      }
-      else
-      {
-        LOG_INFO << "[Dispatcher] Successfully uploaded archive.";
-      }
+      LOG_ERROR << "[Dispatcher] Failed to send request: " << ec.message();
+      return;
     }
-    catch (const std::exception& e)
+
+    // Read response from server
+    beast::flat_buffer                buffer;
+    http::response<http::string_body> res;
+    http::read(stream_, buffer, res, ec);
+
+    if (ec)
     {
-      LOG_ERROR << "[Dispatcher] HTTP request failed: " << e.what();
+      LOG_ERROR << "[Dispatcher] Failed to read response: " << ec.message();
+      return;
+    }
+
+    // Extract and log Client-ID separately
+    auto client_id_it = res.find("Client-ID");
+    if (client_id_it != res.end())
+    {
+      LOG_INFO << "[Server] Parsed Client-ID: " << client_id_it->value();
+    }
+    else
+    {
+      LOG_WARNING << "[Server] Client-ID not found in response headers.";
     }
   }
 

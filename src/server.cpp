@@ -176,24 +176,28 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
       // If the extracted file is a .zst file, decompress it
       if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
-        LOG_INFO << "[Extract] Decompressing .zst file: " << output_file;
+        LOG_INFO << "[ZSTD] Decompressing .zst file: "
+                 << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         if (!ZSTD_decompress_file(output_file.c_str()))
         {
-          LOG_ERROR << "[Extract] Failed to decompress .zst file: " << output_file;
+          LOG_ERROR << "[ZSTD] Failed to decompress .zst file: " << output_file;
           continue;
         }
 
         std::string decompressed_filename =
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
-        LOG_INFO << "[Extract] Decompressed file: " << decompressed_filename;
+        LOG_INFO << "[Extract] Decompressed file: "
+                 << fs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR);
 
         if (std::remove(output_file.c_str()) == 0)
         {
-          LOG_INFO << "[Extract] Deleted the original .zst file: " << output_file;
+          LOG_INFO << "[ZSTD] Deleted the original .zst file: "
+                   << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         }
         else
         {
-          LOG_ERROR << "[Extract] Failed to delete .zst file: " << output_file;
+          LOG_ERROR << "[ZSTD] Failed to delete .zst file: "
+                    << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         }
       }
     }
@@ -263,6 +267,10 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& clien
       {
         LOG_WARNING << "[Extract] Possibly invalid M4S segment: " << fname;
       }
+    }
+    else if (fname.ends_with(macros::MP4_FILE_EXT))
+    {
+      LOG_DEBUG << "[Extract] Found MP4 file: " << fname;
     }
     else
     {
@@ -341,8 +349,9 @@ private:
           }
           return;
         }
-
-        LOG_INFO << "[Session] Received " << bytes_transferred << " bytes";
+        /* bytes_to_mib is a C FFI from common.h */
+        LOG_INFO << "[Session] Received " << bytes_to_mib(bytes_transferred) << " MiB ("
+                 << bytes_transferred << ") bytes";
         request_ = parser->release();
         process_request();
       });
@@ -593,6 +602,7 @@ private:
 
   void send_response(const std::string& msg)
   {
+    LOG_DEBUG << "[Debug] Attempting to send " << msg;
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(msg),
                              [this, self, msg_size = msg.size()](boost::system::error_code ec,
