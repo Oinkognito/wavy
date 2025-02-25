@@ -1,7 +1,7 @@
 #pragma once
 
-#include "macros.hpp"
 #include "logger.hpp"
+#include "macros.hpp"
 #include <iostream>
 #include <vector>
 
@@ -35,20 +35,21 @@ auto write_transport_segments_to_file(const std::vector<std::string>& transport_
 }
 
 auto write_transport_segments_to_file(const std::vector<unsigned char>& transport_segment,
-                                      const std::string& filename) -> bool
+                                      const std::string&                filename) -> bool
 {
-    std::ofstream output_file(filename, std::ios::binary);
-    if (!output_file)
-    {
-        LOG_ERROR << "Failed to open output file: " << filename << std::endl;
-        return false;
-    }
+  std::ofstream output_file(filename, std::ios::binary);
+  if (!output_file)
+  {
+    LOG_ERROR << "Failed to open output file: " << filename << std::endl;
+    return false;
+  }
 
-    output_file.write(reinterpret_cast<const char*>(transport_segment.data()), transport_segment.size());
+  output_file.write(reinterpret_cast<const char*>(transport_segment.data()),
+                    transport_segment.size());
 
-    output_file.close();
-    LOG_INFO << "Successfully wrote transport stream to " << filename << std::endl;
-    return true;
+  output_file.close();
+  LOG_INFO << "Successfully wrote transport stream to " << filename << std::endl;
+  return true;
 }
 
 // Custom AVIO read function

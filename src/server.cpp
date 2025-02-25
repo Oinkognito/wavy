@@ -18,6 +18,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include <vector>
 
 #include "../include/decompression.h"
@@ -691,16 +694,24 @@ public:
              short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context)
   {
+    ensure_single_instance();
     LOG_INFO << "[Server] Starting HLS server on port " << port;
-    load_ip_audio_map();
     start_accept();
   }
 
+  ~HLS_Server()
+  {
+    if (lock_fd_ != -1)
+    {
+      close(lock_fd_);
+      unlink(macros::to_string(macros::SERVER_LOCK_FILE).c_str()); // Remove the lock file
+    }
+  }
+
 private:
-  tcp::acceptor                                             acceptor_;
-  boost::asio::ssl::context&                                ssl_context_;
-  std::unordered_map<std::string, std::vector<std::string>> ip_audio_map_;
-  std::mutex                                                ip_audio_map_mutex_;
+  tcp::acceptor              acceptor_;
+  boost::asio::ssl::context& ssl_context_;
+  int                        lock_fd_ = -1;
 
   void start_accept()
   {
@@ -723,33 +734,26 @@ private:
       });
   }
 
-  void load_ip_audio_map()
+  void ensure_single_instance()
   {
-    std::ifstream infile("ip_audio_map.txt");
-    std::string   ip, audio_id;
-    while (infile >> ip >> audio_id)
-    {
-      ip_audio_map_[ip].push_back(audio_id);
-    }
-  }
+    struct sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    std::strncpy(addr.sun_path, macros::to_string(macros::SERVER_LOCK_FILE).c_str(),
+                 sizeof(addr.sun_path) - 1);
 
-  void save_ip_audio_map()
-  {
-    std::ofstream outfile("ip_audio_map.txt");
-    for (const auto& pair : ip_audio_map_)
+    lock_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (lock_fd_ == -1)
     {
-      for (const std::string& audio_id : pair.second)
-      {
-        outfile << pair.first << " " << audio_id << "\n";
-      }
+      throw std::runtime_error("[Server] Failed to create UNIX socket for locking");
     }
-  }
 
-  void add_audio_for_ip(const std::string& ip, const std::string& audio_id)
-  {
-    std::lock_guard<std::mutex> lock(ip_audio_map_mutex_);
-    ip_audio_map_[ip].push_back(audio_id);
-    save_ip_audio_map();
+    if (bind(lock_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1)
+    {
+      close(lock_fd_);
+      throw std::runtime_error("[Server] Another instance is already running!");
+    }
+
+    LOG_INFO << "[Server] Lock acquired: " << macros::SERVER_LOCK_FILE;
   }
 };
 
@@ -770,7 +774,7 @@ auto main() -> int
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
                                      boost::asio::ssl::context::pem);
 
-    HLS_Server server(io_context, ssl_context, 8080);
+    HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();
   }
   catch (std::exception& e)

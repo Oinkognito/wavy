@@ -27,6 +27,7 @@
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream")    \
   X(PLAYLIST_VARIANT_TAG, "#EXT-X-STREAM-INF:")               \
   X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
+  X(SERVER_LOCK_FILE, "/tmp/hls_server.lock")                 \
   X(SERVER_CERT, "server.crt")                                \
   X(SERVER_PRIVATE_KEY, "server.key")                         \
   X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")                 \
