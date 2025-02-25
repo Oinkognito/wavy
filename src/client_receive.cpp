@@ -3,6 +3,7 @@
 #endif
 
 #include <cstdlib>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -71,8 +72,28 @@ auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::s
   }
 }
 
+bool write_transport_segments_to_file(const std::vector<std::string>& transport_segments,
+                                      const std::string&              filename)
+{
+  std::ofstream output_file(filename, std::ios::binary);
+  if (!output_file)
+  {
+    LOG_ERROR << "Failed to open output file: " << filename;
+    return false;
+  }
+
+  for (const auto& segment : transport_segments)
+  {
+    output_file.write(segment.data(), segment.size());
+  }
+
+  output_file.close();
+  LOG_INFO << "Successfully wrote transport streams to " << filename;
+  return true;
+}
+
 auto fetch_transport_segments(const std::string& ip_id, const std::string& audio_id,
-                              GlobalState& gs, const std::string& server) -> bool
+                              GlobalState& gs, const std::string& server, bool& flac_found) -> bool
 {
   net::io_context ioc;
   ssl::context    ctx(ssl::context::tlsv12_client);
@@ -133,17 +154,16 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
     playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
   }
 
-  std::istringstream segment_stream(playlist_content);
-  std::string        line;
-  std::string        init_mp4_data;
-  bool               has_m4s_segments = false;
+  std::istringstream       segment_stream(playlist_content);
+  std::string              line;
+  std::string              init_mp4_data;
+  bool                     has_m4s_segments = false;
+  std::vector<std::string> m4s_segments;
 
   while (std::getline(segment_stream, line))
   {
     if (!line.empty() && line[0] != '#')
     {
-      std::string segment_url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
-
       if (line.ends_with(macros::M4S_FILE_EXT))
       {
         has_m4s_segments = true;
@@ -163,6 +183,7 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
     }
 
     LOG_INFO << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
+    flac_found = true;
   }
 
   // Re-parse playlist for segments
@@ -182,8 +203,7 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
         {
           if (line.ends_with(macros::M4S_FILE_EXT))
           {
-            std::string full_segment = init_mp4_data + segment_data;
-            gs.transport_segments.push_back(std::move(full_segment));
+            m4s_segments.push_back(std::move(segment_data));
           }
           else
           {
@@ -200,11 +220,38 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
     }
   }
 
+  // Prepend init.mp4 ONCE before all .m4s segments
+  if (!m4s_segments.empty())
+  {
+    gs.transport_segments.push_back(std::move(init_mp4_data));
+    gs.transport_segments.insert(gs.transport_segments.end(),
+                                 std::make_move_iterator(m4s_segments.begin()),
+                                 std::make_move_iterator(m4s_segments.end()));
+  }
+  /************************************************************************************
+   *
+   * @NOTE
+   *
+   * To check the final file received from the server.
+   *
+   * if (!write_transport_segments_to_file(gs.transport_segments, "audio.raw"))
+   * {
+   *  LOG_ERROR << "Error writing transport segments to file";
+   *  return false;
+   * }
+   ***********************************************************************************/
+
+  /*if (!write_transport_segments_to_file(gs.transport_segments, "audio.raw"))*/
+  /*{*/
+  /*  LOG_ERROR << "Error writing transport segments to file";*/
+  /*  return false;*/
+  /*}*/
+
   LOG_INFO << "Stored " << gs.transport_segments.size() << " transport segments.";
   return true;
 }
 
-auto decode_and_play(GlobalState& gs) -> bool
+auto decode_and_play(GlobalState& gs, bool& flac_found) -> bool
 {
   if (gs.transport_segments.empty())
   {
@@ -247,18 +294,19 @@ auto main(int argc, char* argv[]) -> int
     return EXIT_FAILURE;
   }
 
-  std::string ip_id    = argv[1];
-  std::string audio_id = argv[2];
-  std::string server   = argv[3];
+  std::string ip_id      = argv[1];
+  std::string audio_id   = argv[2];
+  std::string server     = argv[3];
+  bool        flac_found = false;
 
   GlobalState gs;
 
-  if (!fetch_transport_segments(ip_id, audio_id, gs, server))
+  if (!fetch_transport_segments(ip_id, audio_id, gs, server, flac_found))
   {
     return EXIT_FAILURE;
   }
 
-  if (!decode_and_play(gs))
+  if (!decode_and_play(gs, flac_found))
   {
     return EXIT_FAILURE;
   }
