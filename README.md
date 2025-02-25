@@ -87,6 +87,18 @@ make remove      # Cleans up all generated transport streams and playlists
 make all         # Builds all components at once
 ```
 
+> [!NOTE]
+> 
+> If you want to use any extra flags:
+> 
+> ```bash
+> make all EXTRA_FLAGS="-DUSE_MOLD=ON"
+> ```
+> 
+> This will try to use [mold](https://github.com/rui314/mold) as the linker for the project.
+> You can try different flags but it is recommended that you do not. It is not necessary.
+> 
+
 ## **Architecture**
 The **Wavy** system consists of the following components:
 
@@ -140,6 +152,12 @@ The server does not delete these indices after the server dies. The server allow
 This makes it so that every owner can index multiple audio files under a clean directory structure that is logical to query and playback.
 
 So the capability of the server totally depends on **YOUR** filesystem. This gives you full power to manage your server library to the fullest.
+
+### **Flexibility**
+
+The architecture is designed in a way to make it more flexible in the future.
+
+The server's importance in the overall flow of operations is always kept at a minimum, to ensure that if we were to implement a P2P solution for this someday, the transition and implementation would lead to no heads being bashed into a wall.
 
 ### **Generating SSL Certificates**
 To generate a **self-signed certificate**, run:

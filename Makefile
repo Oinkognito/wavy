@@ -19,13 +19,16 @@ TOMLPP_URL := https://raw.githubusercontent.com/marzer/tomlplusplus/refs/heads/m
 MINIAUDIO_DEST_DIR := include/
 TOMLPP_DEST_DIR := include/toml/
 
+# Allow extra flags for CMake
+EXTRA_CMAKE_FLAGS ?=
+
 # Default target: Build everything
 default: all
 
-# Parameterized configure function
+# Parameterized configure function with optional extra flags
 define configure
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" "$(EXTRA_CMAKE_FLAGS)" ..
 endef
 
 # Initialize dependencies

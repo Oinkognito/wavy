@@ -14,6 +14,23 @@ if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
     set(CMAKE_VERBOSE_MAKEFILE ON)
 endif()
 
+# Option to enable mold linker
+option(USE_MOLD "Use mold as the linker" OFF)
+
+if(DEFINED USE_MOLD AND USE_MOLD)
+    message(STATUS "Using mold linker")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=mold -Wl,--stats")
+    set(CMAKE_LINKER mold)
+else()
+    message(STATUS "Using default linker")
+endif()
+
+# Enable diagnostics on compilation and linking
+if (COMPILE_REPORT)
+ message(STATUS "Requested for compile report.")
+ add_compile_options(-ftime-report)
+endif()
+
 set(ENCODER_BIN hls_segmenter)
 set(SERVER_BIN hls_server)
 set(DISPATCHER_BIN hls_dispatcher)
@@ -63,12 +80,12 @@ target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::
 
 
 add_executable(${CLIENT_BIN} ${CLIENT_SRC})
-message(STATUS ">> Client compilation with std-C++20...")
+message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${FFMPEG_LIBRARIES} ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_executable(${SERVER_BIN} ${SERVER_SRC})
-message(STATUS ">> Server compilation with std-C++20...")
+message(STATUS "<< Server compilation with std-C++20... >>")
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
@@ -109,4 +126,6 @@ message(STATUS "│ Boost Libraries         : Boost::log, Boost::system, Boost::
 message(STATUS "│ OpenSSL                 : ${OPENSSL_LIBRARIES}")
 message(STATUS "│ ZSTD                    : ${ZSTD_LIBRARIES}")
 message(STATUS "│ Archive Library         : ${ARCHIVE_LIB}")
+message(STATUS "│ Linker Executable       : ${CMAKE_LINKER}")
+message(STATUS "│ Linker Flags            : ${CMAKE_EXE_LINKER_FLAGS}")
 message(STATUS "└──────────────────────────────────────────────────────────\n")
