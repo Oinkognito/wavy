@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../include/macros.hpp"
+#include "macros.hpp"
+#include "logger.hpp"
 #include <iostream>
 #include <vector>
 
@@ -11,6 +12,43 @@ extern "C"
 #include <libavutil/audio_fifo.h>
 #include <libavutil/mem.h>
 #include <libavutil/opt.h>
+}
+
+auto write_transport_segments_to_file(const std::vector<std::string>& transport_segments,
+                                      const std::string&              filename) -> bool
+{
+  std::ofstream output_file(filename, std::ios::binary);
+  if (!output_file)
+  {
+    LOG_ERROR << "Failed to open output file: " << filename;
+    return false;
+  }
+
+  for (const auto& segment : transport_segments)
+  {
+    output_file.write(segment.data(), segment.size());
+  }
+
+  output_file.close();
+  LOG_INFO << "Successfully wrote transport streams to " << filename;
+  return true;
+}
+
+auto write_transport_segments_to_file(const std::vector<unsigned char>& transport_segment,
+                                      const std::string& filename) -> bool
+{
+    std::ofstream output_file(filename, std::ios::binary);
+    if (!output_file)
+    {
+        LOG_ERROR << "Failed to open output file: " << filename << std::endl;
+        return false;
+    }
+
+    output_file.write(reinterpret_cast<const char*>(transport_segment.data()), transport_segment.size());
+
+    output_file.close();
+    LOG_INFO << "Successfully wrote transport stream to " << filename << std::endl;
+    return true;
 }
 
 // Custom AVIO read function
@@ -188,6 +226,12 @@ public:
         output_audio.insert(output_audio.end(), packet.data, packet.data + packet.size);
       }
       av_packet_unref(&packet);
+    }
+
+    if (!write_transport_segments_to_file(output_audio, "audioo.raw"))
+    {
+      LOG_ERROR << "Error writing transport segments to file";
+      return false;
     }
 
     // Cleanup

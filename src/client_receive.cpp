@@ -72,26 +72,6 @@ auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::s
   }
 }
 
-bool write_transport_segments_to_file(const std::vector<std::string>& transport_segments,
-                                      const std::string&              filename)
-{
-  std::ofstream output_file(filename, std::ios::binary);
-  if (!output_file)
-  {
-    LOG_ERROR << "Failed to open output file: " << filename;
-    return false;
-  }
-
-  for (const auto& segment : transport_segments)
-  {
-    output_file.write(segment.data(), segment.size());
-  }
-
-  output_file.close();
-  LOG_INFO << "Successfully wrote transport streams to " << filename;
-  return true;
-}
-
 auto fetch_transport_segments(const std::string& ip_id, const std::string& audio_id,
                               GlobalState& gs, const std::string& server, bool& flac_found) -> bool
 {
