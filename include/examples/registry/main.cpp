@@ -1,4 +1,4 @@
-#include "../registry.hpp"
+#include "../../registry.hpp"
 #include <iostream>
 
 auto main(int argc, char* argv[]) -> int

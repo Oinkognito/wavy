@@ -1,4 +1,4 @@
-#include "../compression.h"
+#include "../../compression.h"
 #include <dirent.h> // For working with directories
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +36,8 @@
  *
  * @IMPORTANT
  *
- * The TAR compression is to just bundle all zst files into one, there is really no more compression that is possible.
+ * The TAR compression is to just bundle all zst files into one, there is really no more compression
+ * that is possible.
  *
  * @OBSERVATION:
  *
