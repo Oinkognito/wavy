@@ -3,9 +3,10 @@
 #include <string>
 #include <string_view>
 
-#define TRANSPORT_STREAM_START_BYTE 0x47 // 0x47 (MPEG-TS sync byte)
-#define WAVY_SERVER_PORT_NO         8080
-#define WAVY_SERVER_PORT_NO_STR     "8080"
+#define TRANSPORT_STREAM_START_BYTE  0x47 // 0x47 (MPEG-TS sync byte)
+#define WAVY_SERVER_PORT_NO          8080
+#define WAVY_SERVER_AUDIO_SIZE_LIMIT 200 // in MiBs
+#define WAVY_SERVER_PORT_NO_STR      "8080"
 
 #define STRING_CONSTANTS(X)                                   \
   X(PLAYLIST_EXT, ".m3u8")                                    \
@@ -28,6 +29,7 @@
   X(PLAYLIST_VARIANT_TAG, "#EXT-X-STREAM-INF:")               \
   X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
   X(SERVER_LOCK_FILE, "/tmp/hls_server.lock")                 \
+  X(NETWORK_TEXT_DELIM, "\r\n\r\n")                           \
   X(SERVER_CERT, "server.crt")                                \
   X(SERVER_PRIVATE_KEY, "server.key")                         \
   X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")                 \

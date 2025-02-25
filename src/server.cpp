@@ -7,6 +7,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/signal_set.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/beast.hpp>
 #include <boost/filesystem.hpp>
@@ -358,8 +359,9 @@ private:
     auto self(shared_from_this());
 
     auto parser = std::make_shared<http::request_parser<http::string_body>>();
-    parser->body_limit(150 * 1024 * 1024); // for now 100MiB is alright, when lossless codecs come
-                                           // in the picture we will have to think about it.
+    parser->body_limit(WAVY_SERVER_AUDIO_SIZE_LIMIT * 1024 *
+                       1024); // for now 200MiB is alright, when lossless codecs come
+                              // in the picture we will have to think about it.
 
     http::async_read(
       socket_, buffer_, *parser,
@@ -449,12 +451,11 @@ private:
       if (target == "/toml/upload")
       {
         // Remove padding text before parsing
-        std::string body      = request_.body();
-        std::string delimiter = "\r\n\r\n";
-        auto        pos       = body.find(delimiter);
+        std::string body = request_.body();
+        auto        pos  = body.find(macros::NETWORK_TEXT_DELIM);
         if (pos != std::string::npos)
         {
-          body = body.substr(pos + delimiter.length());
+          body = body.substr(pos + macros::NETWORK_TEXT_DELIM.length());
         }
 
         // Remove bottom padding text
@@ -470,7 +471,7 @@ private:
         if (toml_data_opt.path.empty())
         {
           LOG_ERROR << "[TOML] Failed to parse TOML data";
-          send_response("HTTP/1.1 400 Bad Request\r\n\r\nTOML parsing failed\r\n");
+          send_response(macros::to_string(macros::SERVER_ERROR_400));
           return;
         }
 
@@ -625,7 +626,7 @@ private:
     auto response = std::make_shared<http::response<http::string_body>>();
     response->version(request_.version());
     response->result(http::status::ok);
-    response->set(http::field::server, "Wavy-Server");
+    response->set(http::field::server, "Wavy Server");
     response->set(http::field::content_type, content_type);
     response->body() = std::move(file_content);
     response->prepare_payload();
@@ -692,25 +693,29 @@ class HLS_Server
 public:
   HLS_Server(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
              short port)
-      : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context)
+      : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context),
+        signals_(io_context, SIGINT, SIGTERM, SIGHUP)
   {
     ensure_single_instance();
     LOG_INFO << "[Server] Starting HLS server on port " << port;
+
+    signals_.async_wait(
+      [this](boost::system::error_code /*ec*/, int /*signo*/)
+      {
+        LOG_INFO << "[Server] Termination signal received. Cleaning up...";
+        cleanup();
+        std::exit(0);
+      });
+
     start_accept();
   }
 
-  ~HLS_Server()
-  {
-    if (lock_fd_ != -1)
-    {
-      close(lock_fd_);
-      unlink(macros::to_string(macros::SERVER_LOCK_FILE).c_str()); // Remove the lock file
-    }
-  }
+  ~HLS_Server() { cleanup(); }
 
 private:
   tcp::acceptor              acceptor_;
   boost::asio::ssl::context& ssl_context_;
+  boost::asio::signal_set    signals_;
   int                        lock_fd_ = -1;
 
   void start_accept()
@@ -754,6 +759,17 @@ private:
     }
 
     LOG_INFO << "[Server] Lock acquired: " << macros::SERVER_LOCK_FILE;
+  }
+
+  void cleanup()
+  {
+    if (lock_fd_ != -1)
+    {
+      close(lock_fd_);
+      unlink(macros::to_string(macros::SERVER_LOCK_FILE).c_str());
+      LOG_INFO << "[Server] Lock file removed: " << macros::SERVER_LOCK_FILE;
+      lock_fd_ = -1;
+    }
   }
 };
 
