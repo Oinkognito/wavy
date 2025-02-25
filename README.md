@@ -46,6 +46,7 @@ To build and run **Wavy**, install the following dependencies:
 | **Boost** | Asynchronous networking & utility functions |
 | **libzstd** | Lossless compression (Zstandard) |
 | **CMake & Make** | Build system tools |
+| **Pkg-Config** | Build system tools helper |
 | **Libarchive** | Handling `.tar`, `.gz`, `.zst` compressed files |
 
 > [!NOTE] 
@@ -191,19 +192,19 @@ make server-cert
 Once compiled, start the server:
 
 ```bash
-./build/hls_server
+make run-server
 ```
 
 It will:
 1. Accept secure `.m3u8` & `.ts` uploads.  
 2. Assign **UUIDs** to clients for session tracking.  
-3. Serve stored playlists via `GET /hls/<client_id>/<filename>`.
+3. Serve stored playlists via `GET /hls/<ip-id>/<client_id>/<filename>`.
 
 ### **Uploading a Playlist**
 To upload a **compressed HLS playlist**:
 
 ```bash
-curl -X POST -F "file=@playlist.tar.gz" https://localhost:8443/upload -k
+curl -X POST -F "file=@playlist.tar.gz" https://localhost:8080/upload -k
 ```
 
 ### **Fetching a Client List**
@@ -219,6 +220,11 @@ Install **Doxygen**, then run:
 doxygen .Doxyfile
 xdg-open docs/html/index.html  # Opens the documentation in a browser
 ```
+
+## **Credits**
+
+1. **TOML++**:  Header-only TOML config file parser and serializer for C++17.  [TOML++ (tomlplusplus)](https://github.com/marzer/tomlplusplus)
+2. **Miniaudio**:  Audio playback and capture library written in C, in a single source file. [Miniaudio](https://github.com/mackron/miniaudio)
 
 ## **License**
 The **Wavy Project** is licensed under the **BSD-3-Clause License**.  
