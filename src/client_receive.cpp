@@ -3,7 +3,6 @@
 #endif
 
 #include <cstdlib>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -221,11 +220,11 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
    * }
    ***********************************************************************************/
 
-  /*if (!write_transport_segments_to_file(gs.transport_segments, "audio.raw"))*/
-  /*{*/
-  /*  LOG_ERROR << "Error writing transport segments to file";*/
-  /*  return false;*/
-  /*}*/
+  if (!DBG_WriteTransportSegmentsToFile(gs.transport_segments, "audio.raw"))
+  {
+    LOG_ERROR << "Error writing transport segments to file";
+    return false;
+  }
 
   LOG_INFO << "Stored " << gs.transport_segments.size() << " transport segments.";
   return true;

@@ -1,5 +1,14 @@
 #include "../include/encode.hpp"
 
+/*
+ * @NOTE:
+ *
+ * It is recommended by the FFmpeg Developers to use av_log()
+ * instead of stdout hence if `--debug` is invoked, it will
+ * provide with verbose AV LOGS regarding the HLS encoding process.
+ *
+ */
+
 auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
@@ -31,6 +40,28 @@ auto main(int argc, char* argv[]) -> int
     av_log_set_level(AV_LOG_ERROR); // Only critical errors
   }
 
+  /*
+   * @NOTE
+   *
+   * Lossy audio permanently loses data. So let us say that a MP3 file has
+   * a bitrate of 190kpbs, encoding it to any bitrate > 190 kbps will NOT
+   * affect the decoded audio stream. In fact, it could technically make it worse.
+   *
+   * The bitrates vector will undergo a thorough refactor after ABR implementation.
+   *
+   * But this is to be noted that lossy audio can only be segmented into:
+   *
+   * BITRATES < BITRATE(AUDIOFILE)
+   *
+   * $Example:
+   *
+   * Audio file (MPEG-TS HLS segmented) -> 190 kbps bitrate.
+   *
+   * Possible bitrates vector could look like:
+   *
+   * `std::vector<int> bitrates = { 64, 128, 190 }`
+   *
+   */
   std::vector<int> bitrates   = {64, 128, 256}; // Example bitrates in kbps
   bool             use_flac   = (strcmp(argv[3], "flac") == 0);
   std::string      output_dir = std::string(argv[2]);

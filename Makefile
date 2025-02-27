@@ -6,7 +6,7 @@ CMAKE := cmake
 MAKE := make
 
 # Targets
-ENCODER_BIN := hls_segmenter
+ENCODER_BIN := hls_encoder
 DECODER_BIN := hls_decoder
 SERVER_BIN := hls_server
 DISPATCHER_BIN := hls_dispatcher
@@ -88,6 +88,12 @@ cleanup:
 
 run-server:
 	./$(BUILD_DIR)/$(SERVER_BIN)
+
+run-encoder:
+	./$(BUILD_DIR)/$(ENCODER_BIN) $(ARGS)
+
+dispatch:
+	./$(BUILD_DIR)/$(DISPATCHER_BIN) $(ARGS)
 
 server-cert:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes

@@ -17,8 +17,8 @@ private:
   bool                       isPlaying;
   ma_device                  device;
 
-  static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
-                           ma_uint32 frameCount)
+  static void lossyDataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
+                                ma_uint32 frameCount)
   {
     auto* player = (AudioPlayer*)pDevice->pUserData;
     auto* output = (float*)pOutput;
@@ -30,6 +30,28 @@ private:
     {
       ma_silence_pcm_frames(output + (framesRead * CHANNELS), frameCount - framesRead,
                             ma_format_f32, CHANNELS);
+      player->isPlaying = false;
+    }
+  }
+
+  static void flacDataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
+                               ma_uint32 frameCount)
+  {
+    static size_t offset      = 0;
+    auto*         player      = (AudioPlayer*)pDevice->pUserData;
+    size_t        bytesToCopy = frameCount * CHANNELS * 2; // Assuming 16-bit FLAC
+
+    if (offset + bytesToCopy > player->audioMemory.size())
+    {
+      bytesToCopy = player->audioMemory.size() - offset;
+    }
+
+    std::memcpy(pOutput, &player->audioMemory[offset], bytesToCopy);
+    offset += bytesToCopy;
+
+    if (offset >= player->audioMemory.size())
+    {
+      ma_device_stop(pDevice);
       player->isPlaying = false;
     }
   }
@@ -76,8 +98,19 @@ public:
     config.playback.format   = ma_format_f32;
     config.playback.channels = CHANNELS;
     config.sampleRate        = SAMPLE_RATE;
-    config.dataCallback      = dataCallback;
     config.pUserData         = this;
+
+    // Detect format and assign the correct callback
+    if (decoder.outputFormat == ma_format_f32)
+    {
+      LOG_INFO << "Using MP3 callback.";
+      config.dataCallback = lossyDataCallback;
+    }
+    else
+    {
+      LOG_INFO << "Using FLAC callback.";
+      config.dataCallback = flacDataCallback;
+    }
 
     if (ma_device_init(nullptr, &config, &device) != MA_SUCCESS)
     {

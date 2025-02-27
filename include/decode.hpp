@@ -2,6 +2,7 @@
 
 #include "logger.hpp"
 #include "macros.hpp"
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -14,7 +15,7 @@ extern "C"
 #include <libavutil/opt.h>
 }
 
-auto write_transport_segments_to_file(const std::vector<std::string>& transport_segments,
+auto DBG_WriteTransportSegmentsToFile(const std::vector<std::string>& transport_segments,
                                       const std::string&              filename) -> bool
 {
   std::ofstream output_file(filename, std::ios::binary);
@@ -34,7 +35,7 @@ auto write_transport_segments_to_file(const std::vector<std::string>& transport_
   return true;
 }
 
-auto write_transport_segments_to_file(const std::vector<unsigned char>& transport_segment,
+auto DBG_WriteTransportSegmentsToFile(const std::vector<unsigned char>& transport_segment,
                                       const std::string&                filename) -> bool
 {
   std::ofstream output_file(filename, std::ios::binary);
@@ -89,6 +90,32 @@ class MediaDecoder
 public:
   MediaDecoder() {}
 
+  bool is_lossless_codec(AVCodecID codec_id)
+  {
+    return (codec_id == AV_CODEC_ID_FLAC || codec_id == AV_CODEC_ID_ALAC ||
+            codec_id == AV_CODEC_ID_WAVPACK);
+  }
+
+  void print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams,
+                            int audioStreamIndex)
+  {
+    LOG_DEBUG << "[Decoder] Audio File Metadata:";
+    LOG_DEBUG << "[Decoder] Codec: " << avcodec_get_name(codecParams->codec_id);
+    LOG_DEBUG << "[Decoder] Bitrate: " << codecParams->bit_rate / 1000 << " kbps";
+    LOG_DEBUG << "[Decoder] Sample Rate: " << codecParams->sample_rate << " Hz";
+    LOG_DEBUG << "[Decoder] Channels: " << codecParams->ch_layout.nb_channels;
+    LOG_DEBUG << "[Decoder] Format: " << formatCtx->iformat->long_name;
+
+    if (is_lossless_codec(codecParams->codec_id))
+    {
+      LOG_DEBUG << "[Decoder] This is a lossless codec";
+    }
+    else
+    {
+      LOG_DEBUG << "[Decoder] This is a lossy codec";
+    }
+  }
+
   /**
    * @brief Decodes TS content to raw audio output
    * @param ts_segments Vector of transport stream segments
@@ -96,6 +123,7 @@ public:
    */
   bool decode(const std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
   {
+    avformat_network_init();
     AVFormatContext* input_ctx = avformat_alloc_context();
     AVIOContext*     avio_ctx  = nullptr;
     int              ret;
@@ -141,7 +169,7 @@ public:
     // Log detected format
     if (input_ctx->iformat && input_ctx->iformat->name)
     {
-      av_log(nullptr, AV_LOG_INFO, "Detected format: %s\n", input_ctx->iformat->name);
+      av_log(nullptr, AV_LOG_DEBUG, "Detected format: %s\n", input_ctx->iformat->name);
     }
     else
     {
@@ -154,11 +182,11 @@ public:
 
     if (is_mpegts)
     {
-      av_log(nullptr, AV_LOG_INFO, "Input is an MPEG transport stream\n");
+      av_log(nullptr, AV_LOG_DEBUG, "Input is an MPEG transport stream\n");
     }
     else if (is_m4s)
     {
-      av_log(nullptr, AV_LOG_INFO, "Input is a fragmented MP4 (m4s) file\n");
+      av_log(nullptr, AV_LOG_DEBUG, "Input is a fragmented MP4 (m4s) file\n");
     }
     else
     {
@@ -217,19 +245,37 @@ public:
       return false;
     }
 
-    // Extract raw audio data
-    AVPacket packet;
-    AVFrame* frame = av_frame_alloc();
-    while (av_read_frame(input_ctx, &packet) >= 0)
-    {
-      if (packet.stream_index == audio_stream_idx)
-      {
-        output_audio.insert(output_audio.end(), packet.data, packet.data + packet.size);
-      }
-      av_packet_unref(&packet);
-    }
+    print_audio_metadata(input_ctx, codec_params, audio_stream_idx);
 
-    if (!write_transport_segments_to_file(output_audio, "audioo.raw"))
+    // Extract raw audio data
+    AVPacket* packet = av_packet_alloc();
+    AVFrame*  frame  = av_frame_alloc();
+    while (av_read_frame(input_ctx, packet) >= 0)
+    {
+      if (packet->stream_index == audio_stream_idx)
+      {
+        if (!is_flac)
+        {
+          output_audio.insert(output_audio.end(), packet->data, packet->data + packet->size);
+        }
+        else
+        {
+          if (avcodec_send_packet(codec_ctx, packet) == 0)
+          {
+            while (avcodec_receive_frame(codec_ctx, frame) == 0)
+            {
+              size_t dataSize =
+                frame->nb_samples * codec_ctx->ch_layout.nb_channels * 2; // 16-bit PCM
+              output_audio.insert(output_audio.end(), frame->data[0], frame->data[0] + dataSize);
+            }
+          }
+        }
+      }
+      av_packet_unref(packet);
+    }
+    
+    // FOR DEBUG PURPOSES
+    if (!DBG_WriteTransportSegmentsToFile(output_audio, "final.pcm"))
     {
       LOG_ERROR << "Error writing transport segments to file";
       return false;
@@ -237,6 +283,7 @@ public:
 
     // Cleanup
     av_frame_free(&frame);
+    av_packet_free(&packet);
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&input_ctx);
 
@@ -244,25 +291,3 @@ public:
   }
 };
 
-/*auto main() -> int*/
-/*{*/
-/*  GlobalState gs;*/
-/**/
-/*  std::vector<std::string> ts_segments = gs.transport_segments; */
-/**/
-/*  if (ts_segments.empty())*/
-/*  {*/
-/*    av_log(nullptr, AV_LOG_ERROR, "No transport stream segments provided\n");*/
-/*    return 1;*/
-/*  }*/
-/**/
-/*  TSDecoder decoder;*/
-/**/
-/*  if (!decoder.decode_ts(ts_segments))*/
-/*  {*/
-/*    av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");*/
-/*    return 1;*/
-/*  }*/
-/**/
-/*  return 0;*/
-/*}*/

@@ -31,7 +31,7 @@ if (COMPILE_REPORT)
  add_compile_options(-ftime-report)
 endif()
 
-set(ENCODER_BIN hls_segmenter)
+set(ENCODER_BIN hls_encoder)
 set(SERVER_BIN hls_server)
 set(DISPATCHER_BIN hls_dispatcher)
 set(CLIENT_BIN hls_client)
