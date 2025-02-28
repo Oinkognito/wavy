@@ -9,6 +9,14 @@
 #define SAMPLE_RATE 44100
 #define CHANNELS    2
 
+/*****************************************************************
+ * @NOTE:
+ *
+ * MP3 -> No issues
+ * FLAC -> s16, s24, s32
+ *
+ *****************************************************************/
+
 class AudioPlayer
 {
 private:
@@ -99,7 +107,7 @@ public:
       // Estimate duration from raw file size if decoding format is known
       size_t bytesPerSample = (decoder.outputFormat == ma_format_s16)   ? 2
                               : (decoder.outputFormat == ma_format_s24) ? 3
-                              : (decoder.outputFormat == ma_format_f32) ? 4
+                              : (decoder.outputFormat == ma_format_s32) ? 4
                                                                         : 0;
 
       if (bytesPerSample > 0 && decoder.outputChannels > 0)
@@ -124,6 +132,11 @@ public:
     config.sampleRate = decoder.outputSampleRate > 0 ? decoder.outputSampleRate : SAMPLE_RATE;
 
     // Dynamically determine format based on decoder's output format
+    LOG_DEBUG << "[Decoder] " << decoder.outputFormat;
+    LOG_DEBUG << "ma_format_s16: " << ma_format_s16;
+    LOG_DEBUG << "ma_format_s24: " << ma_format_s24;
+    LOG_DEBUG << "ma_format_s32: " << ma_format_s32;
+    LOG_DEBUG << "ma_format_f32: " << ma_format_f32;
     switch (decoder.outputFormat)
     {
       case ma_format_s16:
@@ -132,16 +145,24 @@ public:
         config.playback.format = ma_format_s16;
         break;
 
-      case ma_format_f32:
-        LOG_INFO << "Using MP3 (floating-point) callback.";
-        config.dataCallback    = lossyDataCallback;
-        config.playback.format = ma_format_f32;
-        break;
-
       case ma_format_s24:
         LOG_INFO << "Using FLAC (24-bit) callback.";
         config.dataCallback    = flacDataCallback;
         config.playback.format = ma_format_s24;
+        break;
+
+      case ma_format_f32:
+        if (flac_stream)
+        {
+          LOG_INFO << "Using FLAC (32-bit) callback.";
+          config.dataCallback = flacDataCallback;
+        }
+        else
+        {
+          LOG_INFO << "Using MP3 (floating-point) callback.";
+          config.dataCallback = lossyDataCallback;
+        }
+        config.playback.format = ma_format_f32;
         break;
 
       default:

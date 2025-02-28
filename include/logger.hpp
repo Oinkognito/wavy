@@ -26,6 +26,33 @@
  *
  */
 
+// Force ANSI Colors (Ignoring Terminal Themes)
+#define RESET  "\033[0m\033[39m\033[49m" // Reset all styles and colors
+#define BOLD   "\033[1m"                 // Bold text
+#define RED    "\033[38;5;124m"          // Gruvbox Red (#cc241d)
+#define GREEN  "\033[38;5;142m"          // Gruvbox Green (#98971a)
+#define YELLOW "\033[38;5;214m"          // Gruvbox Yellow (#d79921)
+#define BLUE   "\033[38;5;109m"          // Gruvbox Blue (#458588)
+#define CYAN   "\033[38;5;108m"          // Gruvbox Aqua/Cyan (#689d6a)
+#define WHITE  "\033[38;5;223m"          // Gruvbox FG1 (#ebdbb2)
+
+// Define log categories
+#define LOG_CATEGORIES                                   \
+  X(DECODER, BOLD "#DECODER_LOG " RESET)                 \
+  X(ENCODER, BOLD "#ENCODER_LOG " RESET)                 \
+  X(DISPATCH, BOLD "#DISPATCH_LOG " RESET)               \
+  X(SERVER, BOLD "#SERVER_LOG " RESET)                   \
+  X(SERVER_DWNLD, BOLD "#SERVER_DWNLD_LOG " RESET)       \
+  X(SERVER_UPLD, BOLD "#SERVER_UPLD_LOG " RESET)         \
+  X(SERVER_EXTRACT, BOLD "#SERVER_EXTRACT_LOG " RESET)   \
+  X(SERVER_VALIDATE, BOLD "#SERVER_VALIDATE_LOG " RESET) \
+  X(RECEIVER, BOLD "#RECEIVER_LOG " RESET)
+
+// Generate string constants
+#define X(name, str) constexpr const char* name##_LOG = str;
+LOG_CATEGORIES
+#undef X
+
 namespace logger
 {
 
@@ -36,16 +63,6 @@ enum SeverityLevel
   ERROR,
   DEBUG
 };
-
-// Force ANSI Colors (Ignoring Terminal Themes)
-#define RESET  "\033[0m\033[39m\033[49m" // Reset all styles and colors
-#define BOLD   "\033[1m"                 // Bold text
-#define RED    "\033[38;5;124m"          // Gruvbox Red (#cc241d)
-#define GREEN  "\033[38;5;142m"          // Gruvbox Green (#98971a)
-#define YELLOW "\033[38;5;214m"          // Gruvbox Yellow (#d79921)
-#define BLUE   "\033[38;5;109m"          // Gruvbox Blue (#458588)
-#define CYAN   "\033[38;5;108m"          // Gruvbox Aqua/Cyan (#689d6a)
-#define WHITE  "\033[38;5;223m"          // Gruvbox FG1 (#ebdbb2)
 
 inline auto get_current_timestamp() -> std::string
 {

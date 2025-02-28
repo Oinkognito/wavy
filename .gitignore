@@ -14,5 +14,6 @@ payload*/
 *.mp3
 *.wav
 *.flac
+*.m4a
 */**/miniaudio.h
 */**/toml.hpp

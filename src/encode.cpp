@@ -62,9 +62,11 @@ auto main(int argc, char* argv[]) -> int
    * `std::vector<int> bitrates = { 64, 128, 190 }`
    *
    */
-  std::vector<int> bitrates   = {64, 128, 256}; // Example bitrates in kbps
-  bool             use_flac   = (strcmp(argv[3], "flac") == 0);
-  std::string      output_dir = std::string(argv[2]);
+  std::vector<int> bitrates = {64, 128, 256};        // Example bitrates in kbps
+  /* This is a godawful way of doing it will fix. */ //[TODO]: Fix this command line argument
+                                                     // structure
+  bool        use_flac   = (strcmp(argv[3], "flac") == 0);
+  std::string output_dir = std::string(argv[2]);
 
   if (fs::exists(output_dir))
   {

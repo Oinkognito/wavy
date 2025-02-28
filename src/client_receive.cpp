@@ -27,7 +27,7 @@ namespace net   = boost::asio;
 using tcp       = net::ip::tcp;
 
 // Perform an HTTPS GET request and return the response body as a string.
-auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::string& target,
+auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::string_view& target,
                            const std::string& server) -> std::string
 {
   try
@@ -59,14 +59,14 @@ auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::s
     }
     else if (ec)
     {
-      LOG_WARNING << "Stream shutdown error: " << ec.message();
+      LOG_WARNING << RECEIVER_LOG << "Stream shutdown error: " << ec.message();
     }
 
     return response_data;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "HTTPS request failed: " << e.what();
+    LOG_ERROR << RECEIVER_LOG << "HTTPS request failed: " << e.what();
     return "";
   }
 }
@@ -78,14 +78,15 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
   ssl::context    ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
 
-  LOG_INFO << "Fetching playlist for IP-ID: " << ip_id << ", Audio ID: " << audio_id;
+  LOG_INFO << RECEIVER_LOG << "Request Owner: " << ip_id << " for audio-id: " << audio_id;
 
-  std::string playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/index.m3u8";
+  std::string playlist_path =
+    "/hls/" + ip_id + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
   std::string playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
 
   if (playlist_content.empty())
   {
-    LOG_ERROR << "Failed to fetch playlist for " << ip_id << "/" << audio_id;
+    LOG_ERROR << RECEIVER_LOG << "Failed to fetch playlist for " << ip_id << "/" << audio_id;
     return false;
   }
 
@@ -123,11 +124,11 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
 
     if (selected_playlist.empty())
     {
-      LOG_ERROR << "Could not find a valid stream playlist";
+      LOG_ERROR << RECEIVER_LOG << "Could not find a valid stream playlist";
       return false;
     }
 
-    LOG_INFO << "Selected highest bitrate playlist: " << selected_playlist;
+    LOG_INFO << RECEIVER_LOG << "Selected highest bitrate playlist: " << selected_playlist;
 
     playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/" + selected_playlist;
     playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
@@ -157,11 +158,11 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
 
     if (init_mp4_data.empty())
     {
-      LOG_ERROR << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
+      LOG_ERROR << RECEIVER_LOG << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
       return false;
     }
 
-    LOG_INFO << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
+    LOG_INFO << RECEIVER_LOG << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
     flac_found = true;
   }
 
@@ -189,11 +190,11 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
             gs.transport_segments.push_back(std::move(segment_data));
           }
 
-          LOG_DEBUG << "Fetched segment: " << line;
+          LOG_DEBUG << RECEIVER_LOG << "Fetched segment: " << line;
         }
         else
         {
-          LOG_WARNING << "Failed to fetch segment: " << line;
+          LOG_WARNING << RECEIVER_LOG << "Failed to fetch segment: " << line;
         }
       }
     }
@@ -263,21 +264,84 @@ auto decode_and_play(GlobalState& gs, bool& flac_found) -> bool
   return true;
 }
 
+auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
+  -> std::vector<std::string>
+{
+  net::io_context ioc;
+  ssl::context    ctx(ssl::context::tlsv12_client);
+  ctx.set_verify_mode(ssl::verify_none);
+
+  std::string response = perform_https_request(ioc, ctx, macros::SERVER_PATH_HLS_CLIENTS, server);
+
+  std::istringstream       iss(response);
+  std::string              line;
+  std::string              current_ip_id;
+  std::vector<std::string> clients;
+
+  while (std::getline(iss, line))
+  {
+    if (line.empty())
+      continue;
+
+    if (line.find(':') != std::string::npos)
+    {
+      current_ip_id = line.substr(0, line.find(':')); // Extract the IP-ID
+      continue;
+    }
+
+    if (current_ip_id == target_ip_id) // Filter by the provided IP-ID
+    {
+      size_t pos = line.find("- ");
+      if (pos != std::string::npos)
+      {
+        std::string client_id = line.substr(pos + 2); // Extract client ID
+        clients.push_back(client_id);
+      }
+    }
+  }
+
+  return clients;
+}
+
+void print_client_list(const std::vector<std::string>& clients)
+{
+  if (clients.empty())
+  {
+    std::cout << "No clients found.\n";
+    return;
+  }
+
+  std::cout << "Available Clients:\n";
+  for (size_t i = 0; i < clients.size(); ++i)
+  {
+    std::cout << "  [" << i << "] " << clients[i] << "\n";
+  }
+}
+
 auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
 
-  if (argc < 4)
+  if (argc < 3)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <audio-id> <server-ip>";
+    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <index> <server-ip>";
     return EXIT_FAILURE;
   }
 
-  std::string ip_id      = argv[1];
-  std::string audio_id   = argv[2];
-  std::string server     = argv[3];
-  bool        flac_found = false;
+  std::string ip_id  = argv[1];
+  int         index  = std::stoi(argv[2]);
+  std::string server = argv[3];
 
+  std::vector<std::string> clients = fetch_client_list(server, ip_id);
+
+  if (index < 0 || index >= static_cast<int>(clients.size()))
+  {
+    LOG_ERROR << "Invalid index. Available range: 0 to " << clients.size() - 1;
+    return EXIT_FAILURE;
+  }
+
+  std::string audio_id   = clients[index];
+  bool        flac_found = false;
   GlobalState gs;
 
   if (!fetch_transport_segments(ip_id, audio_id, gs, server, flac_found))
@@ -289,13 +353,6 @@ auto main(int argc, char* argv[]) -> int
   {
     return EXIT_FAILURE;
   }
-  /*if (!decode_audio(gs.transport_segments))*/
-  /*{*/
-  /*  std::cerr << "Failed to decode audio\n";*/
-  /*  return 1;*/
-  /*}*/
-  /**/
-  /*play_audio();*/
 
   return EXIT_SUCCESS;
 }

@@ -117,7 +117,7 @@ public:
   {
     if (!fs::exists(directory_))
     {
-      LOG_ERROR << "[Dispatcher] Directory does not exist: " << directory_;
+      LOG_ERROR << DISPATCH_LOG << "Directory does not exist: " << directory_;
       throw std::runtime_error("Directory does not exist: " + directory_);
     }
 
@@ -129,7 +129,7 @@ public:
   {
     if (fs::exists(macros::DISPATCH_ARCHIVE_REL_PATH))
     {
-      LOG_DEBUG << "[Dispatcher] Payload already exists, checking for "
+      LOG_DEBUG << DISPATCH_LOG << "Payload already exists, checking for "
                 << macros::DISPATCH_ARCHIVE_NAME << "...";
       std::string archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
       if (fs::exists(archive_path))
@@ -140,13 +140,13 @@ public:
 
     if (!verify_master_playlist(master_playlist_path))
     {
-      LOG_ERROR << "[Dispatcher] Master playlist verification failed.";
+      LOG_ERROR << DISPATCH_LOG << "Master playlist verification failed.";
       return false;
     }
 
     if (!verify_references())
     {
-      LOG_ERROR << "[Dispatcher] Reference playlists or transport streams are invalid.";
+      LOG_ERROR << DISPATCH_LOG << "Reference playlists or transport streams are invalid.";
       return false;
     }
 
@@ -158,14 +158,15 @@ public:
     bool        applyZSTDComp = true;
     if (playlist_format == PlaylistFormat::FMP4)
     {
-      LOG_DEBUG << "[Dispatcher] Found FMP4 files, no point in compressing them. Skipping ZSTD "
+      LOG_DEBUG << DISPATCH_LOG
+                << "Found FMP4 files, no point in compressing them. Skipping ZSTD "
                    "compression job";
       applyZSTDComp = false;
     }
 
     if (!compress_files(archive_path, applyZSTDComp))
     {
-      LOG_ERROR << "[Dispatcher] Compression failed.";
+      LOG_ERROR << DISPATCH_LOG << "Compression failed.";
       return false;
     }
 
@@ -189,11 +190,11 @@ private:
     std::ifstream file(path);
     if (!file.is_open())
     {
-      LOG_ERROR << "[Dispatcher] Failed to open master playlist: " << path;
+      LOG_ERROR << DISPATCH_LOG << "Failed to open master playlist: " << path;
       return false;
     }
 
-    LOG_INFO << "[Dispatcher] Found master playlist: " << path;
+    LOG_INFO << DISPATCH_LOG << "Found master playlist: " << path;
 
     std::string line;
     bool        has_stream_inf = false;
@@ -205,23 +206,23 @@ private:
         if (!std::getline(file, line) || line.empty() ||
             line.find(macros::PLAYLIST_EXT) == std::string::npos)
         {
-          LOG_ERROR << "[Dispatcher] Invalid reference playlist in master.";
+          LOG_ERROR << DISPATCH_LOG << "Invalid reference playlist in master.";
           return false;
         }
         std::string playlist_path           = fs::path(directory_) / line;
         reference_playlists_[playlist_path] = {}; // Store referenced playlists
-        LOG_INFO << "[Dispatcher] Found reference playlist: " << playlist_path;
+        LOG_INFO << DISPATCH_LOG << "Found reference playlist: " << playlist_path;
       }
     }
 
     if (!has_stream_inf)
     {
-      LOG_WARNING << "[Dispatcher] No valid streams found in master playlist.";
+      LOG_WARNING << DISPATCH_LOG << "No valid streams found in master playlist.";
       return false;
     }
 
     master_playlist_content_ = std::string(std::istreambuf_iterator<char>(file), {});
-    LOG_INFO << "[Dispatcher] Master playlist verified successfully.";
+    LOG_INFO << DISPATCH_LOG << "Master playlist verified successfully.";
     return true;
   }
 
@@ -235,7 +236,7 @@ private:
       std::ifstream file(playlist_path);
       if (!file.is_open())
       {
-        LOG_ERROR << "[Dispatcher] Missing referenced playlist: " << playlist_path;
+        LOG_ERROR << DISPATCH_LOG << "Missing referenced playlist: " << playlist_path;
         return false;
       }
 
@@ -249,7 +250,7 @@ private:
         {
           if (playlist_format == PlaylistFormat::FMP4)
           {
-            LOG_ERROR << "[Dispatcher] Inconsistent playlist format in: " << playlist_path
+            LOG_ERROR << DISPATCH_LOG << "Inconsistent playlist format in: " << playlist_path
                       << " (Cannot mix .ts and .m4s segments)";
             return false;
           }
@@ -258,7 +259,7 @@ private:
           std::ifstream ts_file(segment_path, std::ios::binary);
           if (!ts_file.is_open())
           {
-            LOG_ERROR << "[Dispatcher] Failed to open transport stream: " << segment_path;
+            LOG_ERROR << DISPATCH_LOG << "Failed to open transport stream: " << segment_path;
             return false;
           }
 
@@ -266,20 +267,20 @@ private:
           ts_file.read(&sync_byte, 1);
           if (sync_byte != TRANSPORT_STREAM_START_BYTE)
           {
-            LOG_ERROR << "[Dispatcher] Invalid transport stream: " << segment_path
+            LOG_ERROR << DISPATCH_LOG << "Invalid transport stream: " << segment_path
                       << " (Missing 0x47 sync byte)";
             return false;
           }
 
           segments.push_back(segment_path);
           transport_streams_.push_back(segment_path);
-          LOG_INFO << "[Dispatcher] Found valid transport stream: " << segment_path;
+          LOG_INFO << DISPATCH_LOG << "Found valid transport stream: " << segment_path;
         }
         else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
         {
           if (playlist_format == PlaylistFormat::TRANSPORT_STREAM)
           {
-            LOG_ERROR << "[Dispatcher] Inconsistent playlist format in: " << playlist_path
+            LOG_ERROR << DISPATCH_LOG << "Inconsistent playlist format in: " << playlist_path
                       << " (Cannot mix .ts and .m4s segments)";
             return false;
           }
@@ -288,17 +289,17 @@ private:
           std::ifstream m4s_file(segment_path, std::ios::binary);
           if (!m4s_file.is_open())
           {
-            LOG_ERROR << "[Dispatcher] Failed to open .m4s file: " << segment_path;
+            LOG_ERROR << DISPATCH_LOG << "Failed to open .m4s file: " << segment_path;
             return false;
           }
 
           if (!validate_m4s(segment_path))
           {
-            LOG_WARNING << "[Dispatcher] M4S segment check failed: " << segment_path;
+            LOG_WARNING << DISPATCH_LOG << "M4S segment check failed: " << segment_path;
           }
 
           mp4_segments_.push_back(segment_path);
-          LOG_INFO << "[Dispatcher] Found valid .m4s segment: " << segment_path;
+          LOG_INFO << DISPATCH_LOG << "Found valid .m4s segment: " << segment_path;
         }
       }
     }
@@ -308,7 +309,7 @@ private:
     {
       if (!fs::exists(ts))
       {
-        LOG_ERROR << "[Dispatcher] Missing transport stream: " << ts;
+        LOG_ERROR << DISPATCH_LOG << "Missing transport stream: " << ts;
         return false;
       }
     }
@@ -317,13 +318,13 @@ private:
     {
       if (!fs::exists(m4s))
       {
-        LOG_ERROR << "[Dispatcher] Missing .m4s segment: " << m4s;
+        LOG_ERROR << DISPATCH_LOG << "Missing .m4s segment: " << m4s;
         return false;
       }
     }
 
-    LOG_INFO
-      << "[Dispatcher] All referenced playlists and their respective segment types verified.";
+    LOG_INFO << DISPATCH_LOG
+             << "All referenced playlists and their respective segment types verified.";
     return true;
   }
 
@@ -332,7 +333,7 @@ private:
     std::ifstream file(m4s_path, std::ios::binary);
     if (!file.is_open())
     {
-      LOG_ERROR << "[Dispatcher] Failed to open .m4s file: " << m4s_path;
+      LOG_ERROR << DISPATCH_LOG << "Failed to open .m4s file: " << m4s_path;
       return false;
     }
 
@@ -344,13 +345,13 @@ private:
       return false;
     }
 
-    LOG_INFO << "[Dispatcher] Valid .m4s file: " << m4s_path;
+    LOG_INFO << DISPATCH_LOG << "Valid .m4s file: " << m4s_path;
     return true;
   }
 
   auto compress_files(const std::string& output_archive_path, const bool applyZSTDComp) -> bool
   {
-    LOG_DEBUG << "[Dispatcher] Beginning Compression Job in: " << output_archive_path << " from "
+    LOG_DEBUG << DISPATCH_LOG << "Beginning Compression Job in: " << output_archive_path << " from "
               << fs::absolute(directory_);
     /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
     if (applyZSTDComp)
@@ -359,7 +360,7 @@ private:
             fs::path(directory_).c_str(),
             macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
       {
-        LOG_ERROR << "[Dispatcher] Something went wrong with Zstd compression.";
+        LOG_ERROR << DISPATCH_LOG << "Something went wrong with Zstd compression.";
         return false;
       }
     }
@@ -370,7 +371,7 @@ private:
 
     if (archive_write_open_filename(archive, output_archive_path.c_str()) != ARCHIVE_OK)
     {
-      LOG_ERROR << "[Dispatcher] Failed to create archive: " << output_archive_path;
+      LOG_ERROR << DISPATCH_LOG << "Failed to create archive: " << output_archive_path;
       return false;
     }
 
@@ -379,7 +380,7 @@ private:
       std::ifstream file(file_path, std::ios::binary);
       if (!file)
       {
-        LOG_ERROR << "[Dispatcher] Failed to open file: " << file_path;
+        LOG_ERROR << DISPATCH_LOG << "Failed to open file: " << file_path;
         return false;
       }
 
@@ -404,7 +405,7 @@ private:
     fs::path payloadTarget =
       applyZSTDComp ? fs::path(macros::DISPATCH_ARCHIVE_REL_PATH) : fs::path(directory_);
 
-    LOG_DEBUG << "[Dispatcher] Making payload target: " << payloadTarget;
+    LOG_DEBUG << DISPATCH_LOG << "Making payload target: " << payloadTarget;
 
     for (const auto& entry : fs::directory_iterator(payloadTarget))
     {
@@ -412,7 +413,7 @@ private:
       {
         if (!add_file_to_archive(entry.path().string()))
         {
-          LOG_ERROR << "[Dispatcher] Failed to add file: " << entry.path();
+          LOG_ERROR << DISPATCH_LOG << "Failed to add file: " << entry.path();
           archive_write_close(archive);
           archive_write_free(archive);
           return false;
@@ -423,14 +424,14 @@ private:
     // Close the archive
     if (archive_write_close(archive) != ARCHIVE_OK)
     {
-      LOG_ERROR << "[Dispatcher] Failed to close archive properly";
+      LOG_ERROR << DISPATCH_LOG << "Failed to close archive properly";
       archive_write_free(archive);
       return false;
     }
 
     archive_write_free(archive);
-    LOG_INFO << "[Dispatcher] ZSTD compression of " << directory_ << " to " << output_archive_path
-             << " with final GNU tar job done.";
+    LOG_INFO << DISPATCH_LOG << "ZSTD compression of " << directory_ << " to "
+             << output_archive_path << " with final GNU tar job done.";
     return true;
   }
 
@@ -454,15 +455,15 @@ private:
       }
       else if (ec)
       {
-        LOG_ERROR << "[Dispatcher] SSL shutdown failed: " << ec.message();
+        LOG_ERROR << DISPATCH_LOG << "SSL shutdown failed: " << ec.message();
       }
 
-      LOG_INFO << "[Dispatcher] Upload process completed successfully.";
+      LOG_INFO << DISPATCH_LOG << "Upload process completed successfully.";
       return true;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "[Dispatcher] Upload failed: " << e.what();
+      LOG_ERROR << DISPATCH_LOG << "Upload failed: " << e.what();
       return false;
     }
   }
@@ -474,7 +475,7 @@ private:
     body.open(archive_path.c_str(), beast::file_mode::scan, ec);
     if (ec)
     {
-      LOG_ERROR << "[Dispatcher] Failed to open archive file: " << archive_path;
+      LOG_ERROR << DISPATCH_LOG << "Failed to open archive file: " << archive_path;
       return;
     }
 
@@ -488,7 +489,7 @@ private:
     http::write(stream_, req, ec);
     if (ec)
     {
-      LOG_ERROR << "[Dispatcher] Failed to send request: " << ec.message();
+      LOG_ERROR << DISPATCH_LOG << "Failed to send request: " << ec.message();
       return;
     }
 
@@ -499,7 +500,7 @@ private:
 
     if (ec)
     {
-      LOG_ERROR << "[Dispatcher] Failed to read response: " << ec.message();
+      LOG_ERROR << DISPATCH_LOG << "Failed to read response: " << ec.message();
       return;
     }
 
@@ -507,11 +508,11 @@ private:
     auto client_id_it = res.find("Client-ID");
     if (client_id_it != res.end())
     {
-      LOG_INFO << "[Server] Parsed Client-ID: " << client_id_it->value();
+      LOG_INFO << "Parsed Client-ID: " << client_id_it->value();
     }
     else
     {
-      LOG_WARNING << "[Server] Client-ID not found in response headers.";
+      LOG_WARNING << "Client-ID not found in response headers.";
     }
   }
 
@@ -551,11 +552,11 @@ auto main(int argc, char* argv[]) -> int
     Dispatcher dispatcher(server, port, dir, master_playlist);
     if (!dispatcher.process_and_upload())
     {
-      LOG_ERROR << "[Main] Upload process failed.";
+      LOG_ERROR << DISPATCH_LOG << "Upload process failed.";
       return 1;
     }
 
-    LOG_INFO << "[Main] Upload successful.";
+    LOG_INFO << DISPATCH_LOG << "Upload successful.";
     return 0;
   }
   catch (const std::exception& e)

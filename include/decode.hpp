@@ -99,20 +99,20 @@ public:
   void print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams,
                             int audioStreamIndex)
   {
-    LOG_DEBUG << "[Decoder] Audio File Metadata:";
-    LOG_DEBUG << "[Decoder] Codec: " << avcodec_get_name(codecParams->codec_id);
-    LOG_DEBUG << "[Decoder] Bitrate: " << (double)codecParams->bit_rate / 1000.0 << " kbps";
-    LOG_DEBUG << "[Decoder] Sample Rate: " << codecParams->sample_rate << " Hz";
-    LOG_DEBUG << "[Decoder] Channels: " << codecParams->ch_layout.nb_channels;
-    LOG_DEBUG << "[Decoder] Format: " << formatCtx->iformat->long_name;
+    LOG_DEBUG << DECODER_LOG << "Audio File Metadata:";
+    LOG_DEBUG << DECODER_LOG << "Codec: " << avcodec_get_name(codecParams->codec_id);
+    LOG_DEBUG << DECODER_LOG << "Bitrate: " << (double)codecParams->bit_rate / 1000.0 << " kbps";
+    LOG_DEBUG << DECODER_LOG << "Sample Rate: " << codecParams->sample_rate << " Hz";
+    LOG_DEBUG << DECODER_LOG << "Channels: " << codecParams->ch_layout.nb_channels;
+    LOG_DEBUG << DECODER_LOG << "Format: " << formatCtx->iformat->long_name;
 
     if (is_lossless_codec(codecParams->codec_id))
     {
-      LOG_DEBUG << "[Decoder] This is a lossless codec";
+      LOG_DEBUG << DECODER_LOG << "This is a lossless codec";
     }
     else
     {
-      LOG_DEBUG << "[Decoder] This is a lossy codec";
+      LOG_DEBUG << DECODER_LOG << "This is a lossy codec";
     }
   }
 
@@ -209,7 +209,7 @@ public:
     bool is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
     if (is_m4s && is_flac)
     {
-      LOG_DEBUG << "[Decoder] Detected FLAC encoding in fragmented MP4 (m4s)";
+      LOG_DEBUG << DECODER_LOG << "Detected FLAC encoding in fragmented MP4 (m4s)";
     }
 
     print_audio_metadata(input_ctx, codec_params, audio_stream_idx);
@@ -228,6 +228,14 @@ public:
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate codec context\n");
       avformat_close_input(&input_ctx);
       return false;
+    }
+
+    if (codec_params->extradata_size > 0)
+    {
+      codec_ctx->extradata = static_cast<uint8_t*>(
+        av_malloc(codec_params->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE));
+      memcpy(codec_ctx->extradata, codec_params->extradata, codec_params->extradata_size);
+      codec_ctx->extradata_size = codec_params->extradata_size;
     }
 
     if ((ret = avcodec_parameters_to_context(codec_ctx, codec_params)) < 0)
@@ -266,8 +274,8 @@ public:
           {
             while (avcodec_receive_frame(codec_ctx, frame) == 0)
             {
-              size_t dataSize =
-                frame->nb_samples * codec_ctx->ch_layout.nb_channels * 2; // 16-bit PCM
+              int    sampleSize = av_get_bytes_per_sample(codec_ctx->sample_fmt);
+              size_t dataSize   = frame->nb_samples * codec_ctx->ch_layout.nb_channels * sampleSize;
               output_audio.insert(output_audio.end(), frame->data[0], frame->data[0] + dataSize);
             }
           }

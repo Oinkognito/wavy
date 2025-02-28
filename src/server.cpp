@@ -87,7 +87,7 @@ auto validate_m4s(const std::string& m4s_path) -> bool
   std::ifstream file(m4s_path, std::ios::binary);
   if (!file.is_open())
   {
-    LOG_ERROR << "[Validate] Failed to open .m4s file: " << m4s_path;
+    LOG_ERROR << SERVER_VALIDATE_LOG << "Failed to open .m4s file: " << m4s_path;
     return false;
   }
 
@@ -97,7 +97,7 @@ auto validate_m4s(const std::string& m4s_path) -> bool
 
   if (file.gcount() < 12)
   {
-    LOG_ERROR << "[Validate] .m4s file too small: " << m4s_path;
+    LOG_ERROR << SERVER_VALIDATE_LOG << ".m4s file too small: " << m4s_path;
     return false;
   }
 
@@ -109,7 +109,7 @@ auto validate_m4s(const std::string& m4s_path) -> bool
 
   if (box_type != "ftyp")
   {
-    LOG_ERROR << "[Validate] Missing 'ftyp' header in .m4s: " << m4s_path;
+    LOG_ERROR << SERVER_VALIDATE_LOG << "Missing 'ftyp' header in .m4s: " << m4s_path;
     return false;
   }
 
@@ -119,17 +119,18 @@ auto validate_m4s(const std::string& m4s_path) -> bool
 
   if (content.find("moof") == std::string::npos || content.find("mdat") == std::string::npos)
   {
-    LOG_ERROR << "[Validate] Invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
+    LOG_ERROR << SERVER_VALIDATE_LOG
+              << "Invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
     return false;
   }
 
-  LOG_INFO << "[Validate] Valid .m4s segment: " << m4s_path;
+  LOG_INFO << SERVER_VALIDATE_LOG << "Valid .m4s segment: " << m4s_path;
   return true;
 }
 
 auto extract_payload(const std::string& payload_path, const std::string& extract_path) -> bool
 {
-  LOG_INFO << "[Extract] Extracting PAYLOAD: " << payload_path;
+  LOG_INFO << SERVER_EXTRACT_LOG << "Extracting PAYLOAD: " << payload_path;
 
   struct archive*       a   = archive_read_new();
   struct archive*       ext = archive_write_disk_new();
@@ -141,7 +142,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 
   if (archive_read_open_filename(a, payload_path.c_str(), 10240) != ARCHIVE_OK)
   {
-    LOG_ERROR << "[Extract] Failed to open archive: " << archive_error_string(a);
+    LOG_ERROR << SERVER_EXTRACT_LOG << "Failed to open archive: " << archive_error_string(a);
     archive_read_free(a);
     archive_write_free(ext);
     return false;
@@ -154,7 +155,8 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
     std::string filename    = archive_entry_pathname(entry);
     std::string output_file = extract_path + "/" + filename;
 
-    LOG_INFO << "[Extract] Extracting file: " << output_file;
+    LOG_INFO << SERVER_EXTRACT_LOG
+             << "Extracting file: " << fs::relative(output_file, macros::SERVER_STORAGE_DIR);
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -163,7 +165,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
       std::ofstream ofs(output_file, std::ios::binary);
       if (!ofs)
       {
-        LOG_ERROR << "[Extract] Failed to open file for writing: " << output_file;
+        LOG_ERROR << SERVER_EXTRACT_LOG << "Failed to open file for writing: " << output_file;
         continue;
       }
 
@@ -190,7 +192,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 
         std::string decompressed_filename =
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
-        LOG_INFO << "[Extract] Decompressed file: "
+        LOG_INFO << SERVER_EXTRACT_LOG << "Decompressed file: "
                  << fs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR);
 
         if (std::remove(output_file.c_str()) == 0)
@@ -216,11 +218,11 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
                           const std::string& ip_id) -> bool
 {
-  LOG_INFO << "[Extract] Validating and extracting GZIP file: " << gzip_path;
+  LOG_INFO << SERVER_EXTRACT_LOG << "Validating and extracting GZIP file: " << gzip_path;
 
   if (!fs::exists(gzip_path))
   {
-    LOG_ERROR << "[Extract] File does not exist: " << gzip_path;
+    LOG_ERROR << SERVER_EXTRACT_LOG << "File does not exist: " << gzip_path;
     return false;
   }
 
@@ -230,11 +232,11 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
 
   if (!extract_payload(gzip_path, temp_extract_path))
   {
-    LOG_ERROR << "[Extract] Extraction failed!";
+    LOG_ERROR << SERVER_EXTRACT_LOG << "Extraction failed!";
     return false;
   }
 
-  LOG_INFO << "[Extract] Extraction complete, validating files...";
+  LOG_INFO << SERVER_EXTRACT_LOG << "Extraction complete, validating files...";
 
   // Move valid files to storage
   std::string storage_path =
@@ -253,7 +255,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     {
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
-        LOG_WARNING << "[Extract] Invalid M3U8 file, removing: " << fname;
+        LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid M3U8 file, removing: " << fname;
         fs::remove(file.path());
         continue;
       }
@@ -262,7 +264,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     {
       if (!validate_ts_file(data))
       {
-        LOG_WARNING << "[Extract] Invalid TS file, removing: " << fname;
+        LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid TS file, removing: " << fname;
         fs::remove(file.path());
         continue;
       }
@@ -271,33 +273,33 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     {
       if (!validate_m4s(file.path().string())) // Validate .m4s
       {
-        LOG_WARNING << "[Extract] Possibly invalid M4S segment: " << fname;
+        LOG_WARNING << SERVER_EXTRACT_LOG << "Possibly invalid M4S segment: " << fname;
       }
     }
     else if (fname.ends_with(macros::MP4_FILE_EXT))
     {
-      LOG_DEBUG << "[Extract] Found MP4 file: " << fname;
+      LOG_DEBUG << SERVER_EXTRACT_LOG << "Found MP4 file: " << fname;
     }
     else
     {
-      LOG_WARNING << "[Extract] Skipping unknown file: " << fname;
+      LOG_WARNING << SERVER_EXTRACT_LOG << "Skipping unknown file: " << fname;
       fs::remove(file.path());
       continue;
     }
 
     // Move validated file to storage
     fs::rename(file.path(), storage_path + "/" + fname);
-    LOG_INFO << "[Extract] File stored: " << storage_path + "/" + fname;
+    LOG_INFO << SERVER_EXTRACT_LOG << "File stored in HLS storage: " << fname;
     valid_file_count++;
   }
 
   if (valid_file_count == 0)
   {
-    LOG_ERROR << "[Extract] No valid files remain after validation, extraction failed!";
+    LOG_ERROR << SERVER_EXTRACT_LOG << "No valid files remain after validation, extraction failed!";
     return false;
   }
 
-  LOG_INFO << "[Extract] Extraction and validation successful.";
+  LOG_INFO << SERVER_EXTRACT_LOG << "Extraction and validation successful.";
   return true;
 }
 
@@ -311,7 +313,7 @@ public:
 
   void start()
   {
-    LOG_INFO << "[Session] Starting new session";
+    LOG_INFO << SERVER_LOG << "Starting new session";
     do_handshake();
   }
 
@@ -329,10 +331,10 @@ private:
                             {
                               if (ec)
                               {
-                                LOG_ERROR << "[Session] SSL handshake failed: " << ec.message();
+                                LOG_ERROR << SERVER_LOG << "SSL handshake failed: " << ec.message();
                                 return;
                               }
-                              LOG_INFO << "[Session] SSL handshake successful";
+                              LOG_INFO << SERVER_LOG << "SSL handshake successful";
                               do_read();
                             });
   }
@@ -342,11 +344,11 @@ private:
     try
     {
       ip_id_ = socket_.lowest_layer().remote_endpoint().address().to_string();
-      LOG_INFO << "[Session] Resolved IP: " << ip_id_;
+      LOG_INFO << SERVER_LOG << "Resolved IP: " << ip_id_;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "[Session] Failed to resolve IP: " << e.what();
+      LOG_ERROR << SERVER_LOG << "Failed to resolve IP: " << e.what();
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -369,16 +371,16 @@ private:
       {
         if (ec)
         {
-          LOG_ERROR << "[Session] Read error: " << ec.message();
+          LOG_ERROR << SERVER_LOG << "Read error: " << ec.message();
           if (ec == http::error::body_limit)
           {
-            LOG_ERROR << "[Session] Upload size exceeded the limit!";
+            LOG_ERROR << SERVER_LOG << "Upload size exceeded the limit!";
             send_response(macros::to_string(macros::SERVER_ERROR_413));
           }
           return;
         }
         /* bytes_to_mib is a C FFI from common.h */
-        LOG_INFO << "[Session] Received " << bytes_to_mib(bytes_transferred) << " MiB ("
+        LOG_INFO << SERVER_LOG << "Received " << bytes_to_mib(bytes_transferred) << " MiB ("
                  << bytes_transferred << ") bytes";
         request_ = parser->release();
         process_request();
@@ -499,7 +501,7 @@ private:
 
   void handle_upload()
   {
-    LOG_INFO << "[Upload] Handling GZIP file upload";
+    LOG_INFO << SERVER_UPLD_LOG << "Handling GZIP file upload";
 
     std::string audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
     std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
@@ -509,7 +511,7 @@ private:
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
-      LOG_ERROR << "[Upload] Failed to open output file for writing: " << gzip_path;
+      LOG_ERROR << SERVER_UPLD_LOG << "Failed to open output file for writing: " << gzip_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -518,7 +520,7 @@ private:
 
     if (!output_file.good())
     {
-      LOG_ERROR << "[Upload] Failed to write data to file: " << gzip_path;
+      LOG_ERROR << SERVER_UPLD_LOG << "Failed to write data to file: " << gzip_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -527,12 +529,12 @@ private:
 
     if (!fs::exists(gzip_path) || fs::file_size(gzip_path) == 0)
     {
-      LOG_ERROR << "[Upload] GZIP upload failed: File is empty or missing!";
+      LOG_ERROR << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
       send_response("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
       return;
     }
 
-    LOG_INFO << "[Upload] File successfully written: " << gzip_path;
+    LOG_INFO << SERVER_UPLD_LOG << "File successfully written: " << gzip_path;
 
     if (extract_and_validate(gzip_path, audio_id, ip_id_))
     {
@@ -540,7 +542,7 @@ private:
     }
     else
     {
-      LOG_ERROR << "[Upload] Extraction or validation failed!";
+      LOG_ERROR << SERVER_UPLD_LOG << "Extraction or validation failed!";
       send_response(macros::to_string(macros::SERVER_ERROR_400));
     }
 
@@ -580,7 +582,7 @@ private:
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      LOG_ERROR << "[Download] Invalid request path: " << target;
+      LOG_ERROR << SERVER_DWNLD_LOG << "Invalid request path: " << target;
       send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
@@ -595,7 +597,7 @@ private:
 
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
     {
-      LOG_ERROR << "[Download] File not found: " << file_path;
+      LOG_ERROR << SERVER_DWNLD_LOG << "File not found: " << file_path;
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -603,7 +605,7 @@ private:
     std::ifstream file(file_path, std::ios::binary);
     if (!file)
     {
-      LOG_ERROR << "[Download] Failed to open file: " << file_path;
+      LOG_ERROR << SERVER_DWNLD_LOG << "Failed to open file: " << file_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -637,17 +639,18 @@ private:
                       {
                         if (ec)
                         {
-                          LOG_ERROR << "[Download] Write error: " << ec.message();
+                          LOG_ERROR << SERVER_DWNLD_LOG << "Write error: " << ec.message();
                         }
                         socket_.lowest_layer().close();
                       });
 
-    LOG_INFO << "[Download] Successfully served file: " << file_path;
+    LOG_INFO << SERVER_DWNLD_LOG << "[OWNER:" << ip_addr << "] Served: " << filename << " ("
+             << audio_id << ")";
   }
 
   void send_response(const std::string& msg)
   {
-    LOG_DEBUG << "[Debug] Attempting to send " << msg;
+    LOG_DEBUG << SERVER_LOG << "Attempting to send " << msg;
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(msg),
                              [this, self, msg_size = msg.size()](boost::system::error_code ec,
@@ -661,8 +664,8 @@ private:
                                    {
                                      if (shutdown_ec)
                                      {
-                                       LOG_ERROR << "[Session] Shutdown error: "
-                                                 << shutdown_ec.message();
+                                       LOG_ERROR << SERVER_LOG
+                                                 << "Shutdown error: " << shutdown_ec.message();
                                      }
                                      socket_.lowest_layer().close();
                                    });
@@ -670,15 +673,16 @@ private:
 
                                if (ec)
                                {
-                                 LOG_ERROR << "[Session] Write error: " << ec.message();
+                                 LOG_ERROR << SERVER_LOG << "Write error: " << ec.message();
                                  do_shutdown();
                                  return;
                                }
 
                                if (bytes_transferred != msg_size)
                                {
-                                 LOG_ERROR << "[Session] Incomplete write: " << bytes_transferred
-                                           << " of " << msg_size << " bytes";
+                                 LOG_ERROR << SERVER_LOG
+                                           << "Incomplete write: " << bytes_transferred << " of "
+                                           << msg_size << " bytes";
                                  do_shutdown();
                                  return;
                                }
@@ -697,12 +701,12 @@ public:
         signals_(io_context, SIGINT, SIGTERM, SIGHUP)
   {
     ensure_single_instance();
-    LOG_INFO << "[Server] Starting HLS server on port " << port;
+    LOG_INFO << SERVER_LOG << "Starting HLS server on port " << port;
 
     signals_.async_wait(
       [this](boost::system::error_code /*ec*/, int /*signo*/)
       {
-        LOG_INFO << "[Server] Termination signal received. Cleaning up...";
+        LOG_INFO << SERVER_LOG << "Termination signal received. Cleaning up...";
         cleanup();
         std::exit(0);
       });
@@ -725,12 +729,12 @@ private:
       {
         if (ec)
         {
-          LOG_ERROR << "[Server] Accept failed: " << ec.message();
+          LOG_ERROR << SERVER_LOG << "Accept failed: " << ec.message();
           return;
         }
 
         std::string ip = socket.remote_endpoint().address().to_string();
-        LOG_INFO << "[Server] Accepted new connection from " << ip;
+        LOG_INFO << SERVER_LOG << "Accepted new connection from " << ip;
 
         auto session = std::make_shared<HLS_Session>(
           boost::asio::ssl::stream<tcp::socket>(std::move(socket), ssl_context_), ip);
@@ -749,16 +753,16 @@ private:
     lock_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
     if (lock_fd_ == -1)
     {
-      throw std::runtime_error("[Server] Failed to create UNIX socket for locking");
+      throw std::runtime_error("Failed to create UNIX socket for locking");
     }
 
     if (bind(lock_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
       close(lock_fd_);
-      throw std::runtime_error("[Server] Another instance is already running!");
+      throw std::runtime_error("Another instance is already running!");
     }
 
-    LOG_INFO << "[Server] Lock acquired: " << macros::SERVER_LOCK_FILE;
+    LOG_INFO << SERVER_LOG << "Lock acquired: " << macros::SERVER_LOCK_FILE;
   }
 
   void cleanup()
@@ -767,7 +771,7 @@ private:
     {
       close(lock_fd_);
       unlink(macros::to_string(macros::SERVER_LOCK_FILE).c_str());
-      LOG_INFO << "[Server] Lock file removed: " << macros::SERVER_LOCK_FILE;
+      LOG_INFO << SERVER_LOG << "Lock file removed: " << macros::SERVER_LOCK_FILE;
       lock_fd_ = -1;
     }
   }
@@ -795,7 +799,7 @@ auto main() -> int
   }
   catch (std::exception& e)
   {
-    LOG_ERROR << "[Main] Exception: " << e.what();
+    LOG_ERROR << SERVER_LOG << "Exception: " << e.what();
   }
 
   return 0;
