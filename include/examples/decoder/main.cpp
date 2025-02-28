@@ -15,7 +15,7 @@ auto main() -> int
 
   MediaDecoder               decoder;
   std::vector<unsigned char> decoded_audio;
-  if (!decoder.decode(gs.transport_segments, decoded_audio, false))
+  if (!decoder.decode(gs.transport_segments, decoded_audio))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");
     return 1;

@@ -15,5 +15,6 @@ payload*/
 *.wav
 *.flac
 *.m4a
+*/**/registry-create
 */**/miniaudio.h
 */**/toml.hpp

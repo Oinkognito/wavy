@@ -41,6 +41,24 @@
  * -> Create and expose the client's uploaded content through UUID
  * -> Serve required files to receiver through GET
  *
+ *  Server HLS Storage Organization:
+ *
+ *  hls_storage/
+ *  ├── 192.168.1.10/                                    # AUDIO OWNER IP Address 192.168.1.10 (example)
+ *  │   ├── 1435f431-a69a-4027-8661-44c31cd11ef6/        # Randomly generated audio id
+ *  │   │   ├── index.m3u8
+ *  │   │   ├── hls_mp3_64.m3u8                          # HLS MP3 encoded playlist (64-bit)
+ *  │   │   ├── hls_mp3_64_0.ts                          # First transport stream of hls_mp3_64 playlist                
+ *  │   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+ *  │   │   ├── metadata.toml                            # Metadata and other song information
+ *  │   ├── e5fdeca5-57c8-47b4-b9c6-60492ddf11ae/
+ *  │   │   ├── index.m3u8
+ *  │   │   ├── hls_flac_64.m3u8                         # HLS FLAC encoded playlist (64-bit)
+ *  │   │   ├── hls_flac_64_0.ts                         # First transport stream of hls_mp3_64 playlist 
+ *  │   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+ *  │   │   ├── metadata.toml                            # Metadata and other song information
+ *  │    
+ *
  * Boost libs ensures that every operation (if not then most) in the server occurs asynchronously
  * without any concurrency issues
  *
