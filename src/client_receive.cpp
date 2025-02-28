@@ -251,7 +251,7 @@ auto decode_and_play(GlobalState& gs, bool& flac_found) -> bool
   try
   {
     LOG_INFO << "Starting audio playback...";
-    AudioPlayer player(decoded_audio);
+    AudioPlayer player(decoded_audio, flac_found);
     player.play();
   }
   catch (const std::exception& e)
@@ -289,6 +289,13 @@ auto main(int argc, char* argv[]) -> int
   {
     return EXIT_FAILURE;
   }
+  /*if (!decode_audio(gs.transport_segments))*/
+  /*{*/
+  /*  std::cerr << "Failed to decode audio\n";*/
+  /*  return 1;*/
+  /*}*/
+  /**/
+  /*play_audio();*/
 
   return EXIT_SUCCESS;
 }

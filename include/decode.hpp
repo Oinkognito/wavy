@@ -35,8 +35,8 @@ auto DBG_WriteTransportSegmentsToFile(const std::vector<std::string>& transport_
   return true;
 }
 
-auto DBG_WriteTransportSegmentsToFile(const std::vector<unsigned char>& transport_segment,
-                                      const std::string&                filename) -> bool
+auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_segment,
+                                 const std::string&                filename) -> bool
 {
   std::ofstream output_file(filename, std::ios::binary);
   if (!output_file)
@@ -49,7 +49,7 @@ auto DBG_WriteTransportSegmentsToFile(const std::vector<unsigned char>& transpor
                     transport_segment.size());
 
   output_file.close();
-  LOG_INFO << "Successfully wrote transport stream to " << filename << std::endl;
+  LOG_INFO << "Successfully wrote decoded audio stream to " << filename << std::endl;
   return true;
 }
 
@@ -101,7 +101,7 @@ public:
   {
     LOG_DEBUG << "[Decoder] Audio File Metadata:";
     LOG_DEBUG << "[Decoder] Codec: " << avcodec_get_name(codecParams->codec_id);
-    LOG_DEBUG << "[Decoder] Bitrate: " << codecParams->bit_rate / 1000 << " kbps";
+    LOG_DEBUG << "[Decoder] Bitrate: " << (double)codecParams->bit_rate / 1000.0 << " kbps";
     LOG_DEBUG << "[Decoder] Sample Rate: " << codecParams->sample_rate << " Hz";
     LOG_DEBUG << "[Decoder] Channels: " << codecParams->ch_layout.nb_channels;
     LOG_DEBUG << "[Decoder] Format: " << formatCtx->iformat->long_name;
@@ -121,23 +121,24 @@ public:
    * @param ts_segments Vector of transport stream segments
    * @return true if successful, false otherwise
    */
-  bool decode(const std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
+  bool decode(std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
   {
     avformat_network_init();
     AVFormatContext* input_ctx = avformat_alloc_context();
     AVIOContext*     avio_ctx  = nullptr;
     int              ret;
+    size_t           avio_buf = 32768;
 
     // Buffer for custom AVIO
-    unsigned char* avio_buffer = static_cast<unsigned char*>(av_malloc(4096));
+    unsigned char* avio_buffer = static_cast<unsigned char*>(av_malloc(avio_buf));
     if (!avio_buffer)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO buffer\n");
       return false;
     }
 
-    // Create custom AVIOContext
-    avio_ctx = avio_alloc_context(avio_buffer, 4096, 0, (void*)&ts_segments, &custom_read_packet,
+    // Select appropriate custom reader
+    avio_ctx = avio_alloc_context(avio_buffer, avio_buf, 0, &ts_segments, &custom_read_packet,
                                   nullptr, nullptr);
     if (!avio_ctx)
     {
@@ -166,17 +167,7 @@ public:
       return false;
     }
 
-    // Log detected format
-    if (input_ctx->iformat && input_ctx->iformat->name)
-    {
-      av_log(nullptr, AV_LOG_DEBUG, "Detected format: %s\n", input_ctx->iformat->name);
-    }
-    else
-    {
-      av_log(nullptr, AV_LOG_WARNING, "Could not detect format\n");
-    }
-
-    // Check if input is MPEG-TS or fMP4 (m4s)
+    // Detect format
     bool is_mpegts = strcmp(input_ctx->iformat->name, "mpegts") == 0;
     bool is_m4s    = strstr(input_ctx->iformat->name, "mp4") != nullptr;
 
@@ -194,7 +185,19 @@ public:
     }
 
     // Find audio stream
-    int audio_stream_idx = av_find_best_stream(input_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    int                audio_stream_idx = -1;
+    AVCodecParameters* codec_params     = nullptr;
+
+    for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
+    {
+      if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      {
+        audio_stream_idx = i;
+        codec_params     = input_ctx->streams[i]->codecpar;
+        break;
+      }
+    }
+
     if (audio_stream_idx < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Cannot find audio stream\n");
@@ -202,17 +205,15 @@ public:
       return false;
     }
 
-    AVStream*          audio_stream = input_ctx->streams[audio_stream_idx];
-    AVCodecParameters* codec_params = audio_stream->codecpar;
-
-    // Check if the codec is FLAC (for fMP4/m4s streams)
+    // Check if the codec is FLAC
     bool is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
-    if (is_m4s || is_flac)
+    if (is_m4s && is_flac)
     {
-      av_log(nullptr, AV_LOG_INFO, "Detected FLAC encoding in fragmented MP4 (m4s)\n");
+      LOG_DEBUG << "[Decoder] Detected FLAC encoding in fragmented MP4 (m4s)";
     }
 
-    // Open decoder
+    print_audio_metadata(input_ctx, codec_params, audio_stream_idx);
+
     const AVCodec* codec = avcodec_find_decoder(codec_params->codec_id);
     if (!codec)
     {
@@ -245,21 +246,22 @@ public:
       return false;
     }
 
-    print_audio_metadata(input_ctx, codec_params, audio_stream_idx);
-
     // Extract raw audio data
     AVPacket* packet = av_packet_alloc();
     AVFrame*  frame  = av_frame_alloc();
+
     while (av_read_frame(input_ctx, packet) >= 0)
     {
       if (packet->stream_index == audio_stream_idx)
       {
         if (!is_flac)
         {
+          // Directly append MP3/AAC data
           output_audio.insert(output_audio.end(), packet->data, packet->data + packet->size);
         }
         else
         {
+          // Decode FLAC to PCM
           if (avcodec_send_packet(codec_ctx, packet) == 0)
           {
             while (avcodec_receive_frame(codec_ctx, frame) == 0)
@@ -273,11 +275,11 @@ public:
       }
       av_packet_unref(packet);
     }
-    
-    // FOR DEBUG PURPOSES
-    if (!DBG_WriteTransportSegmentsToFile(output_audio, "final.pcm"))
+
+    // Debugging: Write PCM output
+    if (!DBG_WriteDecodedAudioToFile(output_audio, "final.pcm"))
     {
-      LOG_ERROR << "Error writing transport segments to file";
+      LOG_ERROR << "Error writing decoded stream to file";
       return false;
     }
 
@@ -285,9 +287,15 @@ public:
     av_frame_free(&frame);
     av_packet_free(&packet);
     avcodec_free_context(&codec_ctx);
-    avformat_close_input(&input_ctx);
+    if (input_ctx)
+    {
+      avformat_close_input(&input_ctx);
+    }
+    if (avio_ctx && !(input_ctx && input_ctx->pb == avio_ctx))
+    { // Ensure it's not freed twice
+      avio_context_free(&avio_ctx);
+    }
 
     return true;
   }
 };
-
