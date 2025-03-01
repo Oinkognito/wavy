@@ -93,7 +93,7 @@ make all         # Builds all components at once
 > If you want to use any extra flags:
 > 
 > ```bash
-> make all EXTRA_FLAGS="-DUSE_MOLD=ON"
+> make all EXTRA_CMAKE_FLAGS="-DUSE_MOLD=ON"
 > ```
 > 
 > This will try to use [mold](https://github.com/rui314/mold) as the linker for the project.

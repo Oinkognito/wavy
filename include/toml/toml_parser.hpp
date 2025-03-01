@@ -78,7 +78,7 @@ struct AudioMetadata
 };
 
 // Parses a fraction (e.g., "6/12")
-auto parseFraction(string_view value) -> pair<int, int>
+inline auto parseFraction(string_view value) -> pair<int, int>
 {
   size_t pos = value.find('/');
   if (pos == string::npos)
@@ -86,7 +86,7 @@ auto parseFraction(string_view value) -> pair<int, int>
   return {stoi(string(value.substr(0, pos))), stoi(string(value.substr(pos + 1)))};
 }
 
-auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> AudioMetadata
+inline auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> AudioMetadata
 {
   AudioMetadata result;
 
@@ -118,14 +118,14 @@ auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> AudioMetada
   return result;
 }
 
-auto parseAudioMetadata(const string& filePath) -> AudioMetadata
+inline auto parseAudioMetadata(const string& filePath) -> AudioMetadata
 {
   auto metadata = toml::parse_file(filePath);
   return parseAudioMetadataFromTomlTable(metadata);
 }
 
 // Parse Metadata Directly from a TOML String
-auto parseAudioMetadataFromDataString(const string& dataString) -> AudioMetadata
+inline auto parseAudioMetadataFromDataString(const string& dataString) -> AudioMetadata
 {
   auto metadata = toml::parse(dataString);
   return parseAudioMetadataFromTomlTable(metadata);

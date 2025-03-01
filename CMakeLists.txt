@@ -26,7 +26,7 @@ else()
 endif()
 
 # Enable diagnostics on compilation and linking
-if (COMPILE_REPORT)
+if (DEFINED COMPILE_REPORT AND COMPILE_REPORT)
  message(STATUS "Requested for compile report.")
  add_compile_options(-ftime-report)
 endif()
@@ -37,7 +37,7 @@ set(DISPATCHER_BIN hls_dispatcher)
 set(CLIENT_BIN hls_client)
 
 set(ENCODER_SRC src/encode.cpp)
-set(SERVER_SRC src/server.cpp)
+set(SERVER_SRC src/server.cpp include/server/serverHelper.cpp)
 set(DISPATCHER_SRC src/dispatcher.cpp)
 set(CLIENT_SRC src/client_receive.cpp)
 
@@ -110,6 +110,77 @@ if(DEFINED BUILD_TARGET)
 else()
     set(TARGET_BUILT "All")
 endif()
+
+include(CheckIncludeFiles)
+include(CheckIncludeFileCXX)
+
+set(STANDARD_HEADERS
+    "assert.h"
+    "ctype.h"
+    "errno.h"
+    "fcntl.h"
+    "float.h"
+    "inttypes.h"
+    "limits.h"
+    "math.h"
+    "setjmp.h"
+    "signal.h"
+    "stdarg.h"
+    "stddef.h"
+    "stdio.h"
+    "stdlib.h"
+    "string.h"
+    "time.h"
+    "unistd.h"
+    "stdbool.h"
+)
+
+set(STANDARD_CXX_HEADERS
+    "iostream"
+    "fstream"
+    "sstream"
+    "vector"
+    "array"
+    "string"
+    "map"
+    "unordered_map"
+    "set"
+    "unordered_set"
+    "algorithm"
+    "numeric"
+    "iterator"
+    "memory"
+    "functional"
+    "type_traits"
+    "limits"
+    "cmath"
+    "exception"
+    "stdexcept"
+    "thread"
+    "mutex"
+    "future"
+    "condition_variable"
+    "chrono"
+    "random"
+)
+
+foreach(header ${STANDARD_HEADERS})
+    check_include_files(${header} HAS_${header})
+    if(HAS_${header})
+        message(STATUS "Found C header: ${header}")
+    else()
+        message(WARNING "Missing C header: ${header}")
+    endif()
+endforeach()
+
+foreach(header ${STANDARD_CXX_HEADERS})
+    check_include_file_cxx(${header} HAS_${header})
+    if(HAS_${header})
+        message(STATUS "Found C++ header: ${header}")
+    else()
+        message(WARNING "Missing C++ header: ${header}")
+    endif()
+endforeach()
 
 message(STATUS "\n\n━━━━━━━━━━━━━━━━━ ${PROJECT_NAME} project v${PROJECT_VERSION} ━━━━━━━━━━━━━━━━━\n")
 message(STATUS "┌─ Build Configuration for ${PROJECT_NAME} ────────────────────────")

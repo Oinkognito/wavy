@@ -118,14 +118,12 @@ private:
       return false;
     }
 
-    // Find audio stream and detect if input is FLAC
+    // Find audio stream
     for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
     {
       if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
       {
         audio_stream_index = i;
-        if (input_ctx->streams[i]->codecpar->codec_id == AV_CODEC_ID_FLAC)
-          is_flac = true;
         break;
       }
     }
