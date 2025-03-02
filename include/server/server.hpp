@@ -176,26 +176,28 @@ private:
     socket_.next_layer().set_option(option);
   }
 
-  auto fetch_metadata(const std::string& metadata_path, std::ostringstream& response_stream, const std::string& audio_id) -> bool
+  auto fetch_metadata(const std::string& metadata_path, std::ostringstream& response_stream,
+                      const std::string& audio_id) -> bool
   {
     LOG_DEBUG << "[Fetch Metadata] Processing file: " << metadata_path;
 
     try
     {
-        AudioMetadata metadata = parseAudioMetadata(metadata_path);
-        LOG_DEBUG << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
+      AudioMetadata metadata = parseAudioMetadata(metadata_path);
+      LOG_DEBUG << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
-        response_stream << "  - " << audio_id << "\n";
-        response_stream << "      1. Title: " << metadata.title << "\n";
-        response_stream << "      2. Artist: " << metadata.artist << "\n";
-        response_stream << "      3. Album: " << metadata.album << "\n";
-        response_stream << "      4. Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
-        response_stream << "      5. Codec: " << metadata.audio_stream.codec << "\n";
+      response_stream << "  - " << audio_id << "\n";
+      response_stream << "      1. Title: " << metadata.title << "\n";
+      response_stream << "      2. Artist: " << metadata.artist << "\n";
+      response_stream << "      3. Album: " << metadata.album << "\n";
+      response_stream << "      4. Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
+      response_stream << "      5. Codec: " << metadata.audio_stream.codec << "\n";
     }
     catch (const std::exception& e)
     {
-        LOG_ERROR << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": " << e.what();
-        return false;
+      LOG_ERROR << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": "
+                << e.what();
+      return false;
     }
 
     return true;
@@ -236,7 +238,8 @@ private:
             if (fs::exists(metadata_path))
             {
               LOG_DEBUG << "[List Audio Info] Found metadata file: " << metadata_path;
-              if (fetch_metadata(metadata_path, response_stream, audio_id)) audio_found = true;
+              if (fetch_metadata(metadata_path, response_stream, audio_id))
+                audio_found = true;
             }
             else
             {

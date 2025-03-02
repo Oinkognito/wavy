@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -113,32 +114,37 @@ private:
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
     {
-      if (std::string(tag->key) == PARENT_METADATA_FIELD_TITLE)
-        metadata.title = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ARTIST)
-        metadata.artist = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ALBUM)
-        metadata.album = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_TRACK)
-        metadata.track = parseFraction(tag->value);
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_DISC)
-        metadata.disc = parseFraction(tag->value);
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_COPYRIGHT)
-        metadata.copyright = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_GENRE)
-        metadata.genre = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_COMMENT)
-        metadata.comment = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ALBUM_ARTIST)
-        metadata.album_artist = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_TSRC)
-        metadata.tsrc = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ENCODER)
-        metadata.encoder = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ENCODED_BY)
-        metadata.encoded_by = tag->value;
-      else if (std::string(tag->key) == PARENT_METADATA_FIELD_DATE)
-        metadata.date = tag->value;
+      std::string key   = tag->key;
+      std::string value = tag->value;
+
+      std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+
+      if (key == PARENT_METADATA_FIELD_TITLE)
+        metadata.title = value;
+      else if (key == PARENT_METADATA_FIELD_ARTIST)
+        metadata.artist = value;
+      else if (key == PARENT_METADATA_FIELD_ALBUM)
+        metadata.album = value;
+      else if (key == PARENT_METADATA_FIELD_TRACK)
+        metadata.track = parseFraction(value);
+      else if (key == PARENT_METADATA_FIELD_DISC)
+        metadata.disc = parseFraction(value);
+      else if (key == PARENT_METADATA_FIELD_COPYRIGHT)
+        metadata.copyright = value;
+      else if (key == PARENT_METADATA_FIELD_GENRE)
+        metadata.genre = value;
+      else if (key == PARENT_METADATA_FIELD_COMMENT)
+        metadata.comment = value;
+      else if (key == PARENT_METADATA_FIELD_ALBUM_ARTIST)
+        metadata.album_artist = value;
+      else if (key == PARENT_METADATA_FIELD_TSRC)
+        metadata.tsrc = value;
+      else if (key == PARENT_METADATA_FIELD_ENCODER)
+        metadata.encoder = value;
+      else if (key == PARENT_METADATA_FIELD_ENCODED_BY)
+        metadata.encoded_by = value;
+      else if (key == PARENT_METADATA_FIELD_DATE)
+        metadata.date = value;
     }
 
     // Extract streams
