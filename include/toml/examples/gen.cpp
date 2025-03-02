@@ -1,4 +1,4 @@
-#include "../toml/toml_generator.hpp"
+#include "../toml_generator.hpp"
 #include <iostream>
 
 auto main() -> int

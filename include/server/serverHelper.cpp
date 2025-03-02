@@ -5,7 +5,7 @@ auto is_valid_extension(const std::string& filename) -> bool
 {
   return filename.ends_with(macros::PLAYLIST_EXT) ||
          filename.ends_with(macros::TRANSPORT_STREAM_EXT) ||
-         filename.ends_with(macros::M4S_FILE_EXT);
+         filename.ends_with(macros::M4S_FILE_EXT) || filename.ends_with(macros::TOML_FILE_EXT);
 }
 
 auto validate_m3u8_format(const std::string& content) -> bool
@@ -155,6 +155,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
                           const std::string& ip_id) -> bool
 {
   LOG_INFO << SERVER_EXTRACT_LOG << "Validating and extracting GZIP file: " << gzip_path;
+  int metadataFileCount = 0;
 
   if (!fs::exists(gzip_path))
   {
@@ -215,6 +216,11 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     else if (fname.ends_with(macros::MP4_FILE_EXT))
     {
       LOG_DEBUG << SERVER_EXTRACT_LOG << "Found MP4 file: " << fname;
+    }
+    else if (fname.ends_with(macros::TOML_FILE_EXT) && metadataFileCount == 0)
+    {
+      LOG_DEBUG << SERVER_EXTRACT_LOG << "Found metadata TOML file: " << fname;
+      metadataFileCount++;
     }
     else
     {

@@ -88,17 +88,32 @@ make remove      # Cleans up all generated transport streams and playlists
 make all         # Builds all components at once
 ```
 
-> [!NOTE]
+> [!IMPORTANT]
 > 
-> If you want to use any extra flags:
+> If you want to contribute to Wavy and want compile times 
+> for each binary to be faster, here are a few steps that are recommended:
+> 
+> 1. Use Ninja with the existing build system:
+> 
+> ```bash 
+> make server EXTRA_CMAKE_FLAGS="-DBUILD_NINJA=ON" # add the BUILD_NINJA flag when making a target
+> ```
+> 
+> This should compile with parallelism and should give faster builds.
+> 
+> 2. Use Mold as the linker:
 > 
 > ```bash
-> make all EXTRA_CMAKE_FLAGS="-DUSE_MOLD=ON"
+> make all EXTRA_CMAKE_FLAGS="-DUSE_MOLD=ON" # add USE_MOLD flag when making a target
 > ```
 > 
 > This will try to use [mold](https://github.com/rui314/mold) as the linker for the project.
 > You can try different flags but it is recommended that you do not. It is not necessary.
 > 
+> Mold is significantly smarter and faster than GNU's `ld` and CLANGs `lld` and this should help in 
+> faster build and linking times for the project.
+> 
+
 
 ## **Architecture**
 The **Wavy** system consists of the following components:
@@ -153,6 +168,33 @@ The server does not delete these indices after the server dies. The server allow
 This makes it so that every owner can index multiple audio files under a clean directory structure that is logical to query and playback.
 
 So the capability of the server totally depends on **YOUR** filesystem. This gives you full power to manage your server library to the fullest.
+
+**Current Routes**:
+
+1. `/hls/clients`: Gives a neat hierarchial structure of each Owner-IP-ID with their uploaded audio ids.
+2. `/hls/audio-info/`: Provides a neat hierarchial structure of every Audio ID's provided metadata (from their uploaded metadata.toml)
+
+If you want to get the metadata for a single audio-id, you can always just query it like so:
+
+```bash
+curl -k -X GET https://<server-ip>:8080/<ip-id>/<audio-id>/metadata.toml 
+```
+
+> [!NOTE]
+> 
+> The Server Architecture and Organization is made in such a manner
+> that you will **NEVER** require FFmpeg libraries to be present.
+> 
+> This reduces any dependencies and complications in your server,
+> and overall reduces load of operations.
+> 
+> It will only require the following:
+> 
+> 1. Standard C/C++ libs (should be there already)
+> 2. Boost C++ (preferably above 1.70)
+> 3. OpenSSL 
+> 4. ZSTD 
+> 
 
 ### **Flexibility**
 

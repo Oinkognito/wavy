@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -41,6 +43,8 @@ public:
       return false;
     }
 
+    // Fill the AudioMetadata structure
+    populateMetadata();
     return true;
   }
 
@@ -48,95 +52,142 @@ public:
   {
     TomlGenerator tomlGen;
 
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_PATH, filePath);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_PATH, metadata.path);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT,
+                          metadata.file_format);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT_LONG,
+                          metadata.file_format_long);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION, metadata.duration);
+    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE, metadata.bitrate);
+
+    // Metadata fields
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TITLE, metadata.title);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ARTIST, metadata.artist);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ALBUM, metadata.album);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TRACK,
+                          std::to_string(metadata.track.first) + "/" +
+                            std::to_string(metadata.track.second));
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_DISC,
+                          std::to_string(metadata.disc.first) + "/" +
+                            std::to_string(metadata.disc.second));
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_COPYRIGHT, metadata.copyright);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_GENRE, metadata.genre);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_COMMENT, metadata.comment);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ALBUM_ARTIST,
+                          metadata.album_artist);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TSRC, metadata.tsrc);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ENCODER, metadata.encoder);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ENCODED_BY, metadata.encoded_by);
+    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_DATE, metadata.date);
+
+    // Stream data
+    saveStreamMetadataToToml(tomlGen, metadata.audio_stream, PARENT_STREAM_0);
+    saveStreamMetadataToToml(tomlGen, metadata.video_stream, PARENT_STREAM_1);
+
+    tomlGen.saveToFile(outputFile);
+  }
+
+  auto getMetadata() const -> const AudioMetadata& { return metadata; }
+
+private:
+  std::string      filePath;
+  AVFormatContext* fmt_ctx{};
+  AudioMetadata    metadata;
+
+  void populateMetadata()
+  {
+    metadata.path = filePath;
 
     if (fmt_ctx->iformat)
     {
-      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT,
-                            std::string(fmt_ctx->iformat->name));
-      if (fmt_ctx->iformat->long_name)
-      {
-        tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT_LONG,
-                              std::string(fmt_ctx->iformat->long_name));
-      }
+      metadata.file_format = fmt_ctx->iformat->name ? std::string(fmt_ctx->iformat->name) : "";
+      metadata.file_format_long =
+        fmt_ctx->iformat->long_name ? std::string(fmt_ctx->iformat->long_name) : "";
     }
 
-    if (fmt_ctx->duration != AV_NOPTS_VALUE)
-    {
-      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION,
-                            static_cast<int>(fmt_ctx->duration / AV_TIME_BASE));
-    }
+    metadata.duration =
+      (fmt_ctx->duration != AV_NOPTS_VALUE) ? fmt_ctx->duration / AV_TIME_BASE : -1;
+    metadata.bitrate = (fmt_ctx->bit_rate > 0) ? fmt_ctx->bit_rate / 1000 : -1;
 
-    if (fmt_ctx->bit_rate > 0)
-    {
-      tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE,
-                            static_cast<int>(fmt_ctx->bit_rate / 1000));
-    }
-
-    // Metadata
+    // Extract metadata
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
     {
-      tomlGen.addTableValue(PARENT_METADATA, tag->key, std::string(tag->value));
+      if (std::string(tag->key) == PARENT_METADATA_FIELD_TITLE)
+        metadata.title = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ARTIST)
+        metadata.artist = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ALBUM)
+        metadata.album = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_TRACK)
+        metadata.track = parseFraction(tag->value);
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_DISC)
+        metadata.disc = parseFraction(tag->value);
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_COPYRIGHT)
+        metadata.copyright = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_GENRE)
+        metadata.genre = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_COMMENT)
+        metadata.comment = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ALBUM_ARTIST)
+        metadata.album_artist = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_TSRC)
+        metadata.tsrc = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ENCODER)
+        metadata.encoder = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_ENCODED_BY)
+        metadata.encoded_by = tag->value;
+      else if (std::string(tag->key) == PARENT_METADATA_FIELD_DATE)
+        metadata.date = tag->value;
     }
 
-    // Streams
+    // Extract streams
     for (unsigned i = 0; i < fmt_ctx->nb_streams; i++)
     {
       AVStream*          stream       = fmt_ctx->streams[i];
       AVCodecParameters* codec_params = stream->codecpar;
 
-      std::string streamPath = (i == 0) ? PARENT_STREAM_0 : PARENT_STREAM_1;
+      StreamMetadata streamMetadata;
 
       if (codec_params->codec_id != AV_CODEC_ID_NONE)
-      {
-        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CODEC,
-                              std::string(avcodec_get_name(codec_params->codec_id)));
-      }
+        streamMetadata.codec = avcodec_get_name(codec_params->codec_id);
 
-      switch (codec_params->codec_type)
-      {
-        case AVMEDIA_TYPE_AUDIO:
-          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Audio");
-          break;
-        case AVMEDIA_TYPE_VIDEO:
-          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Video");
-          break;
-        case AVMEDIA_TYPE_SUBTITLE:
-          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Subtitle");
-          break;
-        default:
-          tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_TYPE, "Unknown");
-          break;
-      }
+      streamMetadata.type = (codec_params->codec_type == AVMEDIA_TYPE_AUDIO)   ? "Audio"
+                            : (codec_params->codec_type == AVMEDIA_TYPE_VIDEO) ? "Video"
+                                                                               : "Unknown";
 
       if (codec_params->codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_SAMPLE_RATE,
-                              codec_params->sample_rate);
-        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CHANNELS,
-                              codec_params->ch_layout.nb_channels);
-        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_BITRATE,
-                              static_cast<int>(codec_params->bit_rate / 1000));
+        streamMetadata.sample_rate = codec_params->sample_rate;
+        streamMetadata.channels    = codec_params->ch_layout.nb_channels;
+        streamMetadata.bitrate     = codec_params->bit_rate / 1000;
 
         if (codec_params->format != AV_SAMPLE_FMT_NONE)
-        {
-          tomlGen.addTableValue(
-            streamPath, PARENT_STREAM_FIELD_SAMPLE_FORMAT,
-            std::string(av_get_sample_fmt_name(static_cast<AVSampleFormat>(codec_params->format))));
-        }
+          streamMetadata.sample_format =
+            av_get_sample_fmt_name(static_cast<AVSampleFormat>(codec_params->format));
 
         char ch_layout_str[256];
         av_channel_layout_describe(&codec_params->ch_layout, ch_layout_str, sizeof(ch_layout_str));
-        tomlGen.addTableValue(streamPath, PARENT_STREAM_FIELD_CHANNEL_LAYOUT,
-                              std::string(ch_layout_str));
+        streamMetadata.channel_layout = ch_layout_str;
+
+        metadata.audio_stream = streamMetadata;
+      }
+      else if (codec_params->codec_type == AVMEDIA_TYPE_VIDEO)
+      {
+        metadata.video_stream = streamMetadata;
       }
     }
-
-    tomlGen.saveToFile(outputFile);
   }
 
-private:
-  std::string      filePath;
-  AVFormatContext* fmt_ctx{};
+  static void saveStreamMetadataToToml(TomlGenerator& tomlGen, const StreamMetadata& stream,
+                                       const std::string& parent)
+  {
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CODEC, stream.codec);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_TYPE, stream.type);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_SAMPLE_RATE, stream.sample_rate);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CHANNELS, stream.channels);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_BITRATE, stream.bitrate);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_SAMPLE_FORMAT, stream.sample_format);
+    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CHANNEL_LAYOUT, stream.channel_layout);
+  }
 };

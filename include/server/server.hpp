@@ -176,6 +176,97 @@ private:
     socket_.next_layer().set_option(option);
   }
 
+  auto fetch_metadata(const std::string& metadata_path, std::ostringstream& response_stream, const std::string& audio_id) -> bool
+  {
+    LOG_DEBUG << "[Fetch Metadata] Processing file: " << metadata_path;
+
+    try
+    {
+        AudioMetadata metadata = parseAudioMetadata(metadata_path);
+        LOG_DEBUG << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
+
+        response_stream << "  - " << audio_id << "\n";
+        response_stream << "      1. Title: " << metadata.title << "\n";
+        response_stream << "      2. Artist: " << metadata.artist << "\n";
+        response_stream << "      3. Album: " << metadata.album << "\n";
+        response_stream << "      4. Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
+        response_stream << "      5. Codec: " << metadata.audio_stream.codec << "\n";
+    }
+    catch (const std::exception& e)
+    {
+        LOG_ERROR << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": " << e.what();
+        return false;
+    }
+
+    return true;
+  }
+
+  void handle_list_audio_info()
+  {
+    LOG_INFO << "[List Audio Info] Handling audio metadata listing request";
+
+    std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
+    if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
+    {
+      LOG_ERROR << "[List Audio Info] Storage directory not found: " << storage_path;
+      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      return;
+    }
+
+    std::ostringstream response_stream;
+    bool               entries_found = false;
+
+    for (const fs::directory_entry& ip_entry : fs::directory_iterator(storage_path))
+    {
+      if (fs::is_directory(ip_entry.status()))
+      {
+        std::string ip_id = ip_entry.path().filename().string();
+        LOG_DEBUG << "[List Audio Info] Processing IP-ID: " << ip_id;
+        response_stream << ip_id << ":\n";
+
+        bool audio_found = false;
+        for (const fs::directory_entry& audio_entry : fs::directory_iterator(ip_entry.path()))
+        {
+          if (fs::is_directory(audio_entry.status()))
+          {
+            std::string audio_id = audio_entry.path().filename().string();
+            LOG_DEBUG << "[List Audio Info] Found Audio-ID: " << audio_id;
+
+            std::string metadata_path = audio_entry.path().string() + "/metadata.toml";
+            if (fs::exists(metadata_path))
+            {
+              LOG_DEBUG << "[List Audio Info] Found metadata file: " << metadata_path;
+              if (fetch_metadata(metadata_path, response_stream, audio_id)) audio_found = true;
+            }
+            else
+            {
+              LOG_DEBUG << "[List Audio Info] No metadata file found for Audio-ID: " << audio_id;
+            }
+          }
+        }
+
+        if (!audio_found)
+        {
+          LOG_WARNING << "[List Audio Info] No metadata found for any audio IDs under IP-ID: "
+                      << ip_id;
+          response_stream << "  (No metadata found for any audio IDs)\n";
+        }
+
+        entries_found = true;
+      }
+    }
+
+    if (!entries_found)
+    {
+      LOG_WARNING << "[List Audio Info] No IPs or Audio-IDs with metadata found in storage";
+      send_response(macros::to_string(macros::SERVER_ERROR_404));
+      return;
+    }
+
+    // Return the hierarchical list of IP-IDs, Audio-IDs, and metadata
+    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
+  }
+
   void handle_list_ips()
   {
     LOG_INFO << "[List IPs] Handling IP listing request";
@@ -272,6 +363,10 @@ private:
       if (request_.target() == macros::SERVER_PATH_HLS_CLIENTS) // Request for all client IDs
       {
         handle_list_ips();
+      }
+      else if (request_.target() == macros::SERVER_PATH_AUDIO_INFO)
+      {
+        handle_list_audio_info();
       }
       else
       {

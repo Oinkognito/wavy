@@ -115,6 +115,44 @@ inline auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> Audi
     parseFraction(metadata[PARENT_METADATA][PARENT_METADATA_FIELD_TRACK].value_or(""s));
   result.disc = parseFraction(metadata[PARENT_METADATA][PARENT_METADATA_FIELD_DISC].value_or(""s));
 
+  // Audio Stream Metadata
+  if (metadata.contains(PARENT_STREAM_0))
+  {
+    const auto& audio_stream = metadata[PARENT_STREAM_0].as_table();
+    if (audio_stream)
+    {
+      result.audio_stream.codec   = audio_stream->at(PARENT_STREAM_FIELD_CODEC).value_or(""s);
+      result.audio_stream.type    = audio_stream->at(PARENT_STREAM_FIELD_TYPE).value_or(""s);
+      result.audio_stream.bitrate = audio_stream->at(PARENT_STREAM_FIELD_BITRATE).value_or(-1);
+      result.audio_stream.sample_rate =
+        audio_stream->at(PARENT_STREAM_FIELD_SAMPLE_RATE).value_or(-1);
+      result.audio_stream.channels = audio_stream->at(PARENT_STREAM_FIELD_CHANNELS).value_or(-1);
+      result.audio_stream.channel_layout =
+        audio_stream->at(PARENT_STREAM_FIELD_CHANNEL_LAYOUT).value_or(""s);
+      result.audio_stream.sample_format =
+        audio_stream->at(PARENT_STREAM_FIELD_SAMPLE_FORMAT).value_or(""s);
+    }
+  }
+
+  // Video Stream Metadata
+  if (metadata.contains(PARENT_STREAM_1))
+  {
+    const auto& video_stream = metadata[PARENT_STREAM_1].as_table();
+    if (video_stream)
+    {
+      result.video_stream.codec   = video_stream->at(PARENT_STREAM_FIELD_CODEC).value_or(""s);
+      result.video_stream.type    = video_stream->at(PARENT_STREAM_FIELD_TYPE).value_or(""s);
+      result.video_stream.bitrate = video_stream->at(PARENT_STREAM_FIELD_BITRATE).value_or(-1);
+      result.video_stream.sample_rate =
+        video_stream->at(PARENT_STREAM_FIELD_SAMPLE_RATE).value_or(-1);
+      result.video_stream.channels = video_stream->at(PARENT_STREAM_FIELD_CHANNELS).value_or(-1);
+      result.video_stream.channel_layout =
+        video_stream->at(PARENT_STREAM_FIELD_CHANNEL_LAYOUT).value_or(""s);
+      result.video_stream.sample_format =
+        video_stream->at(PARENT_STREAM_FIELD_SAMPLE_FORMAT).value_or(""s);
+    }
+  }
+
   return result;
 }
 

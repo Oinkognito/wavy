@@ -1,11 +1,22 @@
 cmake_minimum_required(VERSION 3.22)
 
+string(ASCII 27 ESC)
+set(RESET "${ESC}[0m")
+set(GREEN "${ESC}[32m")  # Success messages
+set(YELLOW "${ESC}[33m") # Warning messages
+set(BLUE   "${ESC}[34m")  # Information messages
+
 project(Wavy LANGUAGES CXX VERSION 1.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# CMake's way of finding Boost since Boost C++ 1.70
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release" "Verbose")
@@ -14,11 +25,21 @@ if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
     set(CMAKE_VERBOSE_MAKEFILE ON)
 endif()
 
+option(BUILD_NINJA "Use Ninja to build the project" OFF)
+
+# Check if CMake is using Ninja
+if (DEFINED BUILD_NINJA AND BUILD_NINJA)
+    message(STATUS "Using ${BLUE}Ninja build system${RESET} for fast parallel builds")
+    set(CMAKE_MAKE_PROGRAM ninja)
+else()
+  message(STATUS "Using ${CMAKE_GENERATOR}...")
+endif()
+
 # Option to enable mold linker
 option(USE_MOLD "Use mold as the linker" OFF)
 
 if(DEFINED USE_MOLD AND USE_MOLD)
-    message(STATUS "Using mold linker")
+    message(STATUS "Using ${BLUE}mold linker${RESET}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=mold -Wl,--stats")
     set(CMAKE_LINKER mold)
 else()
@@ -54,12 +75,6 @@ else()
 endif()
 
 find_library(ZSTD_LIB libzstd)
-if(ZSTD_LIB)
-    message(STATUS "Found libzstd library: ${ZSTD_LIB}")
-else()
-    message(WARNING "libzstd library not found")
-endif()
-
 pkg_check_modules(ZSTD REQUIRED libzstd)
 
 if(ZSTD_FOUND)
@@ -84,10 +99,19 @@ message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${FFMPEG_LIBRARIES} ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
-add_executable(${SERVER_BIN} ${SERVER_SRC})
-message(STATUS "<< Server compilation with std-C++20... >>")
+add_library(wavy-server SHARED include/server/serverHelper.cpp)
+
+# Specify include directories
+target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS})
+
+# Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
+target_link_libraries(wavy-server PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+
+# Now, link the shared library to the server executable
+add_executable(${SERVER_BIN} src/server.cpp)
+
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
-target_link_libraries(${SERVER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+target_link_libraries(${SERVER_BIN} PRIVATE  ${ARCHIVE_LIB} ${ZSTD_LIBRARIES} wavy-server)
 
 add_executable(${DISPATCHER_BIN} ${DISPATCHER_SRC})
 target_link_libraries(${DISPATCHER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
@@ -164,21 +188,23 @@ set(STANDARD_CXX_HEADERS
     "random"
 )
 
+message(STATUS "${BLUE}Checking Standard C Headers...${RESET}")
 foreach(header ${STANDARD_HEADERS})
     check_include_files(${header} HAS_${header})
     if(HAS_${header})
-        message(STATUS "Found C header: ${header}")
+      message(STATUS "${GREEN}✔ Found header: ${header}${RESET}")
     else()
-        message(WARNING "Missing C header: ${header}")
+      message(WARNING "${YELLOW}✘ Missing header: ${header}${RESET}")
     endif()
 endforeach()
 
+message(STATUS "${BLUE}Checking Standard C++ Headers...${RESET}")
 foreach(header ${STANDARD_CXX_HEADERS})
     check_include_file_cxx(${header} HAS_${header})
     if(HAS_${header})
-        message(STATUS "Found C++ header: ${header}")
+      message(STATUS "${GREEN}✔ Found header: ${header}${RESET}")
     else()
-        message(WARNING "Missing C++ header: ${header}")
+      message(WARNING "${YELLOW}✘ Missing header: ${header}${RESET}")
     endif()
 endforeach()
 
@@ -186,6 +212,7 @@ message(STATUS "\n\n━━━━━━━━━━━━━━━━━ ${PROJEC
 message(STATUS "┌─ Build Configuration for ${PROJECT_NAME} ────────────────────────")
 message(STATUS "│ Operating System        : ${CMAKE_SYSTEM_NAME}")
 message(STATUS "│ Build Type              : ${CMAKE_BUILD_TYPE}")
+message(STATUS "│ Build System            : ${CMAKE_MAKE_PROGRAM}")
 message(STATUS "│ Target(s)               : ${TARGET_BUILT}")
 message(STATUS "│ CMake Version           : ${CMAKE_VERSION}")
 message(STATUS "│ Compiler                : ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_VERSION}")

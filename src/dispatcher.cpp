@@ -150,6 +150,14 @@ public:
       return false;
     }
 
+    std::string metadata_path = fs::path(directory_) / macros::to_string(macros::METADATA_FILE);
+    if (!fs::exists(metadata_path))
+    {
+      LOG_ERROR << DISPATCH_LOG << "Missing metadata.toml in: " << directory_;
+      return false;
+    }
+    LOG_INFO << DISPATCH_LOG << "Found metadata.toml: " << metadata_path;
+
 #ifdef DEBUG_RUN
     print_hierarchy();
 #endif

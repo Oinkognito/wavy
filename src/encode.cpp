@@ -1,4 +1,5 @@
 #include "../include/encode.hpp"
+#include "../include/registry.hpp"
 
 /*
  * @NOTE:
@@ -70,7 +71,7 @@ auto main(int argc, char* argv[]) -> int
 
   if (fs::exists(output_dir))
   {
-    LOG_WARNING << "Output directory exists, rewriting...";
+    LOG_WARNING << ENCODER_LOG << "Output directory exists, rewriting...";
     fs::remove_all(output_dir);
     fs::remove_all(macros::DISPATCH_ARCHIVE_REL_PATH);
   }
@@ -88,6 +89,18 @@ auto main(int argc, char* argv[]) -> int
   HLS_Encoder encoder;
   encoder.create_hls_segments(argv[1], bitrates, argv[2], use_flac);
   LOG_INFO << "Encoding seems to be complete.";
+
+  AudioParser parser(argv[1]);
+  if (!parser.parse())
+  {
+    std::cerr << "Failed to parse audio file.\n";
+    return 1;
+  }
+
+  std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
+
+  parser.exportToTOML(macros::to_string(outputTOMLFile));
+  LOG_INFO << ENCODER_LOG << "TOML metadata exported to " << outputTOMLFile;
 
   return 0;
 }
