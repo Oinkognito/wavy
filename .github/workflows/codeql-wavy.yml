@@ -34,8 +34,7 @@ jobs:
         
         sudo apt-get update
         sudo apt-get install -y build-essential cmake make ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev libssl-dev libboost-all-dev zstd libarchive-dev
-        wget https://raw.githubusercontent.com/marzer/tomlplusplus/refs/heads/master/toml.hpp -O include/toml/toml.hpp 
-        wget https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h -O include/miniaudio.h
+        make init
         make all
 
     - name: Perform CodeQL Analysis
