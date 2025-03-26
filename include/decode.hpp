@@ -275,7 +275,9 @@ public:
             while (avcodec_receive_frame(codec_ctx, frame) == 0)
             {
               int    sampleSize = av_get_bytes_per_sample(codec_ctx->sample_fmt);
-              size_t dataSize   = frame->nb_samples * codec_ctx->ch_layout.nb_channels * sampleSize;
+              size_t dataSize;
+              WAVY__SAFE_MULTIPLY(frame->nb_samples, codec_ctx->ch_layout.nb_channels, dataSize);
+              WAVY__SAFE_MULTIPLY(dataSize, sampleSize, dataSize);
               output_audio.insert(output_audio.end(), frame->data[0], frame->data[0] + dataSize);
             }
           }

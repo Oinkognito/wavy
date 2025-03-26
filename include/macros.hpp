@@ -8,6 +8,16 @@
 #define WAVY_SERVER_AUDIO_SIZE_LIMIT 200 // in MiBs
 #define WAVY_SERVER_PORT_NO_STR      "8080"
 
+#define WAVY__SAFE_MULTIPLY(a, b, result)                             \
+  do                                                                  \
+  {                                                                   \
+    if ((a) > 0 && (b) > (std::numeric_limits<size_t>::max() / (a)))  \
+    {                                                                 \
+      throw std::overflow_error("Multiplication overflow detected!"); \
+    }                                                                 \
+    (result) = (a) * (b);                                             \
+  } while (0)
+
 #define STRING_CONSTANTS(X)                                   \
   X(PLAYLIST_EXT, ".m3u8")                                    \
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \

@@ -1,3 +1,4 @@
+#include "macros.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 #include "logger.hpp"
 #include "miniaudio.h"
@@ -46,9 +47,11 @@ private:
   static void flacDataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
                                ma_uint32 frameCount)
   {
-    static size_t offset      = 0;
-    auto*         player      = (AudioPlayer*)pDevice->pUserData;
-    size_t        bytesToCopy = frameCount * pDevice->playback.channels * 2; // 16-bit FLAC
+    static size_t offset = 0;
+    auto*         player = (AudioPlayer*)pDevice->pUserData;
+    size_t        bytesToCopy; // 16-bit FLAC
+    WAVY__SAFE_MULTIPLY(frameCount, pDevice->playback.channels, bytesToCopy);
+    WAVY__SAFE_MULTIPLY(bytesToCopy, 2, bytesToCopy);
 
     if (offset + bytesToCopy > player->audioMemory.size())
     {
