@@ -1,0 +1,34 @@
+name: "Building Wavy in Ubuntu (x86-64 arch - GCC)"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies for Wavy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential libflac++-dev libboost-log-dev libboost-system-dev libboost-filesystem-dev libssl-dev \
+          libavformat-dev libavutil-dev libswresample-dev libavcodec-dev \
+            libzstd-dev \
+            cmake make pkg-config \
+            libarchive-dev \
+            libmp3lame-dev
+
+    - name: Build Release Version of Wavy (x86-64 arch) - GCC (with GNU-ld)
+      run: |
+        make

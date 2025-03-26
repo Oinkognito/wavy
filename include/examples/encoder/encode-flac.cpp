@@ -1,3 +1,4 @@
+#include <libavutil/samplefmt.h>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -16,12 +17,11 @@ void print_audio_info(const char* filename, AVFormatContext* format_ctx, AVCodec
   std::cout << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps\n";
   std::cout << "Sample Rate: " << codec_ctx->sample_rate << " Hz\n";
   std::cout << "Channels: " << codec_ctx->ch_layout.nb_channels << "\n";
-  std::cout << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt) << "\n";
   std::cout << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec\n";
   std::cout << "======================\n";
 }
 
-void transcode_mp3(const char* input_filename, const char* output_filename)
+void transcode_audio(const char* input_filename, const char* output_filename, AVCodecID codec_id)
 {
   av_log_set_level(AV_LOG_INFO);
 
@@ -76,7 +76,7 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
     return;
   }
 
-  const AVCodec* out_codec = avcodec_find_encoder(AV_CODEC_ID_MP3);
+  const AVCodec* out_codec = avcodec_find_encoder(codec_id);
   if (!out_codec)
   {
     std::cerr << "Encoder not found\n";
@@ -84,17 +84,19 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
   }
 
   // Initialize output codec context
-  out_codec_ctx                        = avcodec_alloc_context3(out_codec);
-  out_codec_ctx->bit_rate              = 112000; // 128 kbps
-  out_codec_ctx->sample_rate           = in_codec_ctx->sample_rate;
-  out_codec_ctx->ch_layout.nb_channels = av_channel_layout_check(&out_codec_ctx->ch_layout);
-  out_codec_ctx->sample_fmt            = AV_SAMPLE_FMT_FLTP; // MP3 format
-  out_codec_ctx->time_base             = out_codec_ctx->time_base;
+  out_codec_ctx              = avcodec_alloc_context3(out_codec);
+  out_codec_ctx->bit_rate    = (codec_id == AV_CODEC_ID_MP3) ? 192000 : 128000;
+  out_codec_ctx->sample_rate = 44100;
+  out_codec_ctx->sample_fmt  = AV_SAMPLE_FMT_FLTP; // Most common sample format
+  out_codec_ctx->time_base   = {.num = 1, .den = out_codec_ctx->sample_rate};
 
-  // Explicitly set the channel layout for the output codec
-  if (av_channel_layout_copy(&out_codec_ctx->ch_layout, &in_codec_ctx->ch_layout) < 0)
+  if (in_codec_ctx->ch_layout.nb_channels == 1)
   {
-    std::cerr << "Failed to copy input channel layout to output\n";
+    av_channel_layout_default(&out_codec_ctx->ch_layout, 1); // Mono
+  }
+  else
+  {
+    av_channel_layout_default(&out_codec_ctx->ch_layout, 2); // Stereo
   }
 
   if (avcodec_open2(out_codec_ctx, out_codec, nullptr) < 0)
@@ -123,13 +125,11 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
     return;
   }
 
-  // Allocate the SwrContext before setting options
+  // Initialize resampling context
   swr_ctx = swr_alloc();
-  // Set options correctly
   int ret = swr_alloc_set_opts2(&swr_ctx, &out_codec_ctx->ch_layout, out_codec_ctx->sample_fmt,
                                 out_codec_ctx->sample_rate, &in_codec_ctx->ch_layout,
                                 in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate, 0, nullptr);
-  // Finally, initialize the resampling context
   if ((ret = swr_init(swr_ctx)) < 0)
   {
     std::cerr << "Failed to initialize SwrContext: " << av_err2str(ret) << "\n";
@@ -145,6 +145,9 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
   resampled_frame->nb_samples  = out_codec_ctx->frame_size;
   av_frame_get_buffer(resampled_frame, 0);
 
+  int total_frames  = 0;
+  int total_samples = 0;
+
   while (av_read_frame(in_format_ctx, packet) >= 0)
   {
     if (packet->stream_index == audio_stream_index)
@@ -152,17 +155,15 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
       avcodec_send_packet(in_codec_ctx, packet);
       while (avcodec_receive_frame(in_codec_ctx, frame) == 0)
       {
-
-        // Make sure resampled frame is writable
         av_frame_make_writable(resampled_frame);
+        int output_samples =
+          swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
+                      (const uint8_t**)frame->data, frame->nb_samples);
 
-        // Convert samples
-        swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
-                    (const uint8_t**)frame->data, frame->nb_samples);
-
-        // Set correct PTS
         resampled_frame->pts =
           av_rescale_q(frame->pts, in_codec_ctx->time_base, out_codec_ctx->time_base);
+        std::cout << "\rFrame " << total_frames << " | PTS: " << resampled_frame->pts
+                  << " | Samples: " << output_samples << std::flush;
 
         avcodec_send_frame(out_codec_ctx, resampled_frame);
         AVPacket* out_packet = av_packet_alloc();
@@ -177,7 +178,28 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
     av_packet_unref(packet);
   }
 
-  // Flush encoder
+  // **Flush Remaining Frames**
+  avcodec_send_packet(in_codec_ctx, nullptr);
+  while (avcodec_receive_frame(in_codec_ctx, frame) == 0)
+  {
+    av_frame_make_writable(resampled_frame);
+    swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
+                (const uint8_t**)frame->data, frame->nb_samples);
+
+    resampled_frame->pts =
+      av_rescale_q(frame->pts, in_codec_ctx->time_base, out_codec_ctx->time_base);
+
+    avcodec_send_frame(out_codec_ctx, resampled_frame);
+    AVPacket* out_packet = av_packet_alloc();
+    while (avcodec_receive_packet(out_codec_ctx, out_packet) == 0)
+    {
+      av_interleaved_write_frame(out_format_ctx, out_packet);
+      av_packet_unref(out_packet);
+    }
+    av_packet_free(&out_packet);
+  }
+
+  // **Flush the Encoder**
   avcodec_send_frame(out_codec_ctx, nullptr);
   AVPacket* out_packet = av_packet_alloc();
   while (avcodec_receive_packet(out_codec_ctx, out_packet) == 0)
@@ -210,8 +232,15 @@ void transcode_mp3(const char* input_filename, const char* output_filename)
 
 auto main() -> int
 {
-  const char* input_file  = "../../../sample1.mp3";
-  const char* output_file = "output.mp3";
-  transcode_mp3(input_file, output_file);
+  const char* input_file = "../../../sample.flac";
+  const char* output_aac = "output.aac";
+  const char* output_mp3 = "output.mp3";
+
+  std::cout << "Converting to AAC...\n";
+  transcode_audio(input_file, output_aac, AV_CODEC_ID_AAC);
+
+  std::cout << "\nConverting to MP3...\n";
+  transcode_audio(input_file, output_mp3, AV_CODEC_ID_MP3);
+
   return 0;
 }

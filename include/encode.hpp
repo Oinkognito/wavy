@@ -2,7 +2,6 @@
 
 #include "../include/logger.hpp"
 #include "../include/macros.hpp"
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <vector>

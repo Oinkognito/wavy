@@ -12,6 +12,7 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/thread.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
@@ -449,11 +450,16 @@ private:
    */
   void handle_download()
   {
+    // Capture thread ID for debugging
+    auto thread_id = boost::this_thread::get_id();
+
     // Parse request target (expected: /hls/<audio_id>/<filename>)
     std::string              target(request_.target().begin(), request_.target().end());
     std::vector<std::string> parts;
     std::istringstream       iss(target);
     std::string              token;
+
+    LOG_DEBUG << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] Processing request: " << target;
 
     while (std::getline(iss, token, '/'))
     {
@@ -465,7 +471,8 @@ private:
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      LOG_ERROR << SERVER_DWNLD_LOG << "Invalid request path: " << target;
+      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+                << "] Invalid request path: " << target;
       send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
@@ -478,9 +485,12 @@ private:
     std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
                             audio_id + "/" + filename;
 
+    LOG_DEBUG << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] Checking file: " << file_path;
+
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
     {
-      LOG_ERROR << SERVER_DWNLD_LOG << "File not found: " << file_path;
+      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+                << "] File not found: " << file_path;
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -488,7 +498,8 @@ private:
     std::ifstream file(file_path, std::ios::binary);
     if (!file)
     {
-      LOG_ERROR << SERVER_DWNLD_LOG << "Failed to open file: " << file_path;
+      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+                << "] Failed to open file: " << file_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -496,6 +507,10 @@ private:
     std::ostringstream buffer;
     buffer << file.rdbuf();
     std::string file_content = buffer.str();
+
+    LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+             << "] File read complete: " << file_path << " (Size: " << file_content.size()
+             << " bytes)";
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
     if (filename.ends_with(macros::PLAYLIST_EXT))
@@ -507,7 +522,6 @@ private:
       content_type = "video/mp2t";
     }
 
-    // Use a shared_ptr to keep the response alive until async_write completes
     auto response = std::make_shared<http::response<http::string_body>>();
     response->version(request_.version());
     response->result(http::status::ok);
@@ -518,17 +532,23 @@ private:
 
     auto self = shared_from_this(); // Keep session alive
     http::async_write(socket_, *response,
-                      [this, self, response](boost::system::error_code ec, std::size_t)
+                      [this, self, response, thread_id](boost::system::error_code ec, std::size_t)
                       {
                         if (ec)
                         {
-                          LOG_ERROR << SERVER_DWNLD_LOG << "Write error: " << ec.message();
+                          LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+                                    << "] Write error: " << ec.message();
+                        }
+                        else
+                        {
+                          LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id
+                                   << "] Response sent successfully.";
                         }
                         socket_.lowest_layer().close();
                       });
 
-    LOG_INFO << SERVER_DWNLD_LOG << "[OWNER:" << ip_addr << "] Served: " << filename << " ("
-             << audio_id << ")";
+    LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] [OWNER:" << ip_addr
+             << "] Served: " << filename << " (" << audio_id << ")";
   }
 
   void send_response(const std::string& msg)

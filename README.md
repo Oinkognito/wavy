@@ -43,11 +43,18 @@ To build and run **Wavy**, install the following dependencies:
 | **FFmpeg**  | Audio encoding, decoding, and streaming |
 | **Base-devel** | Includes `g++` / `clang++` for C++ compilation |
 | **OpenSSL** | Secure communication using SSL/TLS |
-| **Boost** | Asynchronous networking & utility functions |
+| **Boost C++** | Asynchronous networking & utility functions |
 | **libzstd** | Lossless compression (Zstandard) |
 | **CMake & Make** | Build system tools |
 | **Pkg-Config** | Build system tools helper |
 | **Libarchive** | Handling `.tar`, `.gz`, `.zst` compressed files |
+| **libmp3lame** | MP3 encoding support |
+
+### **Optional Dependencies (for Lossless Support)**
+
+| Dependency  | Purpose |
+|-------------|---------|
+| **FLAC & FLAC++** | FLAC decoding and encoding for lossless streaming |
 
 > [!NOTE] 
 > 
