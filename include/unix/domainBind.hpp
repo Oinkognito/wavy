@@ -7,7 +7,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "../logger.hpp"
+#include "../libwavy-common/logger.hpp"
 
 /*
  * @UnixSocketBind 

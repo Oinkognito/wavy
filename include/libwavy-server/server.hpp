@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../macros.hpp"
+#include "../libwavy-common/macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/asio/ip/tcp.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "logger.hpp"
-#include "macros.hpp"
+#include "libwavy-common/logger.hpp"
+#include "libwavy-common/macros.hpp"
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -54,7 +54,7 @@ auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_seg
 }
 
 // Custom AVIO read function
-static int custom_read_packet(void* opaque, uint8_t* buf, int buf_size)
+static auto custom_read_packet(void* opaque, uint8_t* buf, int buf_size) -> int
 {
   auto*         segments      = static_cast<std::vector<std::string>*>(opaque);
   static size_t segment_index = 0;
@@ -90,7 +90,7 @@ class MediaDecoder
 public:
   MediaDecoder() {}
 
-  bool is_lossless_codec(AVCodecID codec_id)
+  auto is_lossless_codec(AVCodecID codec_id) -> bool
   {
     return (codec_id == AV_CODEC_ID_FLAC || codec_id == AV_CODEC_ID_ALAC ||
             codec_id == AV_CODEC_ID_WAVPACK);
@@ -121,7 +121,8 @@ public:
    * @param ts_segments Vector of transport stream segments
    * @return true if successful, false otherwise
    */
-  bool decode(std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
+  auto decode(std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
+    -> bool
   {
     avformat_network_init();
     AVFormatContext* input_ctx = avformat_alloc_context();
@@ -130,7 +131,7 @@ public:
     size_t           avio_buf = 32768;
 
     // Buffer for custom AVIO
-    unsigned char* avio_buffer = static_cast<unsigned char*>(av_malloc(avio_buf));
+    auto* avio_buffer = static_cast<unsigned char*>(av_malloc(avio_buf));
     if (!avio_buffer)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO buffer\n");

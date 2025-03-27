@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../logger.hpp"
+#include "../../libwavy-common/logger.hpp"
 #include <FLAC++/metadata.h>
 #include <sys/stat.h> // For file size
 

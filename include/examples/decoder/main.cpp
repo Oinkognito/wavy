@@ -1,5 +1,5 @@
 #include "../../decode.hpp"
-#include "../../state.hpp"
+#include "../../libwavy-common/state.hpp"
 
 auto main() -> int
 {

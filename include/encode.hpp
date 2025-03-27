@@ -1,10 +1,8 @@
 #pragma once
 
-#include "../include/logger.hpp"
-#include "../include/macros.hpp"
+#include "libwavy-common/logger.hpp"
+#include "libwavy-common/macros.hpp"
 #include <fstream>
-#include <iostream>
-#include <vector>
 extern "C"
 {
 #include <libavcodec/avcodec.h>

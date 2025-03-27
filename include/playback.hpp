@@ -1,6 +1,6 @@
-#include "macros.hpp"
+#include "libwavy-common/macros.hpp"
 #define MINIAUDIO_IMPLEMENTATION
-#include "logger.hpp"
+#include "libwavy-common/logger.hpp"
 #include "miniaudio.h"
 #include <cstring>
 #include <iomanip> // for std::fixed and std::setprecision

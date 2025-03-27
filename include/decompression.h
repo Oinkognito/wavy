@@ -14,11 +14,10 @@ extern "C"
 {
 #endif
 
-#include "common.h"       // Helper functions, CHECK(), and CHECK_ZSTD()
-#include "zstd-logging.h" // Logging macros
-#include <stdio.h>        // printf, fopen, fwrite
-#include <stdlib.h>       // free, malloc
-#include <zstd.h>         // presumes zstd library is installed
+#include "libwavy-common/common.h" // Helper functions, CHECK(), and CHECK_ZSTD()
+#include <stdio.h>                 // printf, fopen, fwrite
+#include <stdlib.h>                // free, malloc
+#include <zstd.h>                  // presumes zstd library is installed
 
   static bool ZSTD_decompress_file(const char* fname)
   {
