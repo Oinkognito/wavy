@@ -10,17 +10,13 @@
 #include "../logger.hpp"
 
 /*
- * @IPC 
+ * @UnixSocketBind 
  * 
- * The goal is to have a dashboard that can read the logs and see live server
- * events from anywhere in the local network.
- *
  * For now it just binds a UNIX domain socket for the server and cleans up after exit.
- *
  *
  */
 
-class IPCServer
+class UnixSocketBind
 {
 private:
   int         lock_fd_{};
@@ -28,7 +24,7 @@ private:
   std::string socket_path_;
 
 public:
-  IPCServer(std::string socket_path)
+  UnixSocketBind(std::string socket_path)
       : socket_path_(std::move(socket_path)), lock_fd_(-1), server_fd_(-1)
   {
   }
@@ -70,5 +66,5 @@ public:
     }
   }
 
-  ~IPCServer() { cleanup(); }
+  ~UnixSocketBind() { cleanup(); }
 };

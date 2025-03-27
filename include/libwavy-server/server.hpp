@@ -21,8 +21,8 @@
 #include <vector>
 
 #include "../decompression.h"
-#include "../ipc/ipc.hpp"
 #include "../toml/toml_parser.hpp"
+#include "../unix/domainBind.hpp"
 
 /*
  * @SERVER
@@ -600,39 +600,30 @@ public:
              short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context),
         signals_(io_context, SIGINT, SIGTERM, SIGHUP),
-        socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), ipcServer(socketPath),
-        ipc_thread_(&HLS_Server::run_ipc, this) // Start IPC in a separate thread
+        socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), wavySocketBind(socketPath)
   {
-    ipcServer.ensure_single_instance();
+    wavySocketBind.ensure_single_instance();
     LOG_INFO << SERVER_LOG << "Starting HLS server on port " << port;
 
     signals_.async_wait(
       [this](boost::system::error_code /*ec*/, int /*signo*/)
       {
         LOG_INFO << SERVER_LOG << "Termination signal received. Cleaning up...";
-        ipcServer.cleanup();
-        if (ipc_thread_.joinable())
-          ipc_thread_.join();
+        wavySocketBind.cleanup();
         std::exit(0);
       });
 
     start_accept();
   }
 
-  ~HLS_Server()
-  {
-    ipcServer.cleanup();
-    if (ipc_thread_.joinable())
-      ipc_thread_.join();
-  }
+  ~HLS_Server() { wavySocketBind.cleanup(); }
 
 private:
   tcp::acceptor              acceptor_;
   boost::asio::ssl::context& ssl_context_;
   boost::asio::signal_set    signals_;
   std::string                socketPath;
-  IPCServer                  ipcServer;
-  std::thread                ipc_thread_;
+  UnixSocketBind             wavySocketBind;
 
   void start_accept()
   {
@@ -659,7 +650,7 @@ private:
   {
     try
     {
-      ipcServer.ensure_single_instance(); // Run IPC server in its own thread
+      wavySocketBind.ensure_single_instance(); // Run IPC server in its own thread
     }
     catch (const std::exception& e)
     {
