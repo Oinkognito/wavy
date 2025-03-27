@@ -8,10 +8,10 @@
 #include <vector>
 
 #include "../include/decode.hpp"
-#include "../include/logger.hpp"
-#include "../include/macros.hpp"
+#include "../include/libwavy-common/logger.hpp"
+#include "../include/libwavy-common/macros.hpp"
+#include "../include/libwavy-common/state.hpp"
 #include "../include/playback.hpp"
-#include "../include/state.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl/error.hpp>

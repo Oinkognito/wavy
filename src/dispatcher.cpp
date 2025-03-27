@@ -12,8 +12,8 @@
 #include <vector>
 
 #include "../include/compression.h"
-#include "../include/logger.hpp"
-#include "../include/macros.hpp"
+#include "../include/libwavy-common/logger.hpp"
+#include "../include/libwavy-common/macros.hpp"
 
 /*
  * DISPATCHER
