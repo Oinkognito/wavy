@@ -1,3 +1,4 @@
+#include <boost/proto/proto_fwd.hpp>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -7,6 +8,12 @@ extern "C"
 }
 
 #include <iostream>
+
+// Sometimes there is some LAME psymodel.c energy error at runtime
+//
+// `encode_mp3: psymodel.c:576: calc_energy: Assertion `el >= 0' failed.`
+//
+// This may occur for quite a lot of files, I am not sure why this occurs and how to fix it.
 
 void print_audio_info(const char* filename, AVFormatContext* format_ctx, AVCodecContext* codec_ctx,
                       const char* label)
@@ -93,12 +100,14 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     return;
   }
 
+  std::cout << "-- Encoding using libmp3flame (" << AV_CODEC_ID_MP3 << ")" << std::endl;
+
   // Initialize output codec context
   out_codec_ctx                        = avcodec_alloc_context3(out_codec);
-  out_codec_ctx->bit_rate              = given_bitrate; // 128 kbps
+  out_codec_ctx->bit_rate              = given_bitrate;
   out_codec_ctx->sample_rate           = in_codec_ctx->sample_rate;
   out_codec_ctx->ch_layout.nb_channels = av_channel_layout_check(&out_codec_ctx->ch_layout);
-  out_codec_ctx->sample_fmt            = AV_SAMPLE_FMT_FLTP; // MP3 format
+  out_codec_ctx->sample_fmt            = in_codec_ctx->sample_fmt; // MP3 format
   out_codec_ctx->time_base             = out_codec_ctx->time_base;
 
   // Explicitly set the channel layout for the output codec
@@ -106,8 +115,6 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
   {
     std::cerr << "Failed to copy input channel layout to output\n";
   }
-
-  out_codec_ctx->ch_layout.nb_channels = in_codec_ctx->ch_layout.nb_channels;
 
   std::cout << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels << std::endl;
   std::cout << "Output Channels: " << out_codec_ctx->ch_layout.nb_channels << std::endl;
@@ -117,6 +124,8 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     std::cerr << "Could not open output codec\n";
     return;
   }
+
+  std::cout << "-- Opened codec." << std::endl;
 
   AVStream* out_stream = avformat_new_stream(out_format_ctx, nullptr);
   avcodec_parameters_from_context(out_stream->codecpar, out_codec_ctx);
@@ -130,6 +139,7 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
       std::cerr << "Could not open output file\n";
       return;
     }
+    std::cout << "-- Opened output file." << std::endl;
   }
 
   if (avformat_write_header(out_format_ctx, nullptr) < 0)
@@ -137,6 +147,8 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     std::cerr << "Error writing format header\n";
     return;
   }
+
+  std::cout << "-- Able to write format header!" << std::endl;
 
   try
   {
@@ -151,48 +163,123 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     if ((ret = swr_init(swr_ctx)) < 0)
     {
       std::cerr << "Failed to initialize SwrContext: " << av_err2str(ret) << "\n";
+      return;
     }
 
+    std::cout << "--> Initialized SwrContext!" << std::endl;
+
     // Read, resample, and encode
-    AVPacket* packet             = av_packet_alloc();
-    AVFrame*  frame              = av_frame_alloc();
-    AVFrame*  resampled_frame    = av_frame_alloc();
-    resampled_frame->ch_layout   = out_codec_ctx->ch_layout;
+    AVPacket* packet          = av_packet_alloc();
+    AVFrame*  frame           = av_frame_alloc();
+    AVFrame*  resampled_frame = av_frame_alloc();
+
+    if (!packet || !frame || !resampled_frame)
+    {
+      std::cerr << "Failed to allocate AVPacket or AVFrame!" << std::endl;
+    }
+
+    std::cout << "--> Allocated AVPacket and AVFrame.." << std::endl;
+
+    // Ensure out_codec_ctx is initialized
+    if (!out_codec_ctx)
+    {
+      std::cerr << "Output codec context is NULL!" << std::endl;
+      return;
+    }
+
+    std::cout << "-- Output codec context is good.." << std::endl;
+
+    av_channel_layout_copy(&resampled_frame->ch_layout, &out_codec_ctx->ch_layout);
     resampled_frame->format      = out_codec_ctx->sample_fmt;
     resampled_frame->sample_rate = out_codec_ctx->sample_rate;
-    resampled_frame->nb_samples  = out_codec_ctx->frame_size;
-    av_frame_get_buffer(resampled_frame, 0);
+    resampled_frame->nb_samples  = out_codec_ctx->frame_size; // May need correction
+
+    // Allocate buffer for frame
+    ret = av_frame_get_buffer(resampled_frame, 0);
+    if (ret < 0)
+    {
+      std::cerr << "av_frame_get_buffer() failed: " << av_err2str(ret) << std::endl;
+      return;
+    }
+
+    std::cout << "--> Allocated buffer for frame!" << std::endl;
 
     while (av_read_frame(in_format_ctx, packet) >= 0)
     {
+      std::cout << "\r[INFO] Read frame: stream_index=" << packet->stream_index << std::flush;
+
       if (packet->stream_index == audio_stream_index)
       {
-        avcodec_send_packet(in_codec_ctx, packet);
-        while (avcodec_receive_frame(in_codec_ctx, frame) == 0)
+        int ret = avcodec_send_packet(in_codec_ctx, packet);
+        if (ret < 0)
         {
+          std::cerr << "\r[ERROR] Failed to send packet to decoder: " << av_err2str(ret)
+                    << std::flush;
+          av_packet_unref(packet);
+          continue;
+        }
 
-          // Make sure resampled frame is writable
+        while ((ret = avcodec_receive_frame(in_codec_ctx, frame)) == 0)
+        {
+          std::cout << "\r[INFO] Decoded PTS=" << frame->pts << " | samples=" << frame->nb_samples
+                    << " | format=" << av_get_sample_fmt_name(in_codec_ctx->sample_fmt)
+                    << std::flush;
+
           av_frame_make_writable(resampled_frame);
 
-          // Convert samples
-          swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
-                      (const uint8_t**)frame->data, frame->nb_samples);
+          int num_samples = swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
+                                        (const uint8_t**)frame->data, frame->nb_samples);
+          if (num_samples < 0)
+          {
+            std::cerr << "\r[ERROR] swr_convert failed: " << av_err2str(num_samples) << std::flush;
+            continue;
+          }
 
-          // Set correct PTS
+          std::cout << "\r[INFO] Converted samples=" << num_samples << " | format="
+                    << av_get_sample_fmt_name((AVSampleFormat)resampled_frame->format)
+                    << " | PTS=" << frame->best_effort_timestamp << std::flush;
+
           resampled_frame->pts =
             av_rescale_q(frame->pts, in_codec_ctx->time_base, out_codec_ctx->time_base);
 
-          avcodec_send_frame(out_codec_ctx, resampled_frame);
-          AVPacket* out_packet = av_packet_alloc();
-          while (avcodec_receive_packet(out_codec_ctx, out_packet) == 0)
+          ret = avcodec_send_frame(out_codec_ctx, resampled_frame);
+          if (ret < 0)
           {
-            av_interleaved_write_frame(out_format_ctx, out_packet);
+            std::cerr << "\r[ERROR] Failed to send frame to encoder: " << av_err2str(ret)
+                      << std::flush;
+            continue;
+          }
+
+          AVPacket* out_packet = av_packet_alloc();
+          while ((ret = avcodec_receive_packet(out_codec_ctx, out_packet)) == 0)
+          {
+            std::cout << "\r[INFO] Encoded PTS=" << out_packet->pts
+                      << " | Size=" << out_packet->size << std::flush;
+
+            ret = av_interleaved_write_frame(out_format_ctx, out_packet);
+            if (ret < 0)
+            {
+              std::cerr << "\r[ERROR] Failed to write packet: " << av_err2str(ret) << std::flush;
+            }
             av_packet_unref(out_packet);
           }
           av_packet_free(&out_packet);
         }
       }
+      else
+      {
+        std::cout << "\r[INFO] Skipping non-audio packet, stream_index=" << packet->stream_index
+                  << std::flush;
+      }
+
       av_packet_unref(packet);
+    }
+    std::cout << "Finished processing all frames." << std::endl;
+
+    auto* samples = (float*)resampled_frame->data[0];
+    for (int i = 0; i < 10; ++i)
+    {
+      std::cout << "Sample[" << i << "]: " << samples[i] << "\n";
     }
 
     // Flush encoder
