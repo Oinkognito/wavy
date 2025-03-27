@@ -645,16 +645,4 @@ private:
         start_accept();
       });
   }
-
-  void run_ipc()
-  {
-    try
-    {
-      wavySocketBind.ensure_single_instance(); // Run IPC server in its own thread
-    }
-    catch (const std::exception& e)
-    {
-      LOG_ERROR << SERVER_LOG << "IPC Server Error: " << e.what();
-    }
-  }
 };

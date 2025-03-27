@@ -19,8 +19,8 @@
 class UnixSocketBind
 {
 private:
-  int         lock_fd_{};
-  int         server_fd_{};
+  int         lock_fd_;
+  int         server_fd_;
   std::string socket_path_;
 
 public:
@@ -40,11 +40,6 @@ public:
     {
       throw std::runtime_error("Failed to create UNIX socket for locking");
     }
-
-    int opt = 1;
-    setsockopt(lock_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    unlink(socket_path_.c_str());
 
     if (bind(lock_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
