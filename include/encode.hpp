@@ -71,7 +71,7 @@ public:
                                     macros::to_string(macros::PLAYLIST_EXT);
       playlist_files.push_back(output_playlist);
 
-      bool success = use_flac ? encode_flac_variant(input_file, output_playlist.c_str(), bitrate)
+      bool success = use_flac ? encode_flac_variant(input_file, output_playlist.c_str())
                               : encode_variant(input_file, output_playlist.c_str(), bitrate);
 
       if (!success)
@@ -227,7 +227,7 @@ private:
     return true;
   }
 
-  auto encode_flac_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
+  auto encode_flac_variant(const char* input_file, const char* output_playlist) -> bool
   {
     AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
     AVStream *       in_stream = nullptr, *out_stream = nullptr;
@@ -237,8 +237,7 @@ private:
     size_t           last_slash          = output_playlist_str.find_last_of('/');
     std::string      out_dir =
       (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
-    std::string segment_filename_format =
-      out_dir + "/hls_flac_" + std::to_string(bitrate) + "_%d.m4s";
+    std::string segment_filename_format = out_dir + "/hls_flac" + "_%d.m4s";
 
     // Open input file
     if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)

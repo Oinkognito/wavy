@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <fstream>
 #include <iostream>
 #include <string>
 extern "C"
@@ -88,7 +87,7 @@ public:
     tomlGen.saveToFile(outputFile);
   }
 
-  auto getMetadata() const -> const AudioMetadata& { return metadata; }
+  [[nodiscard]] auto getMetadata() const -> const AudioMetadata& { return metadata; }
 
 private:
   std::string      filePath;
