@@ -80,6 +80,7 @@ namespace beast = boost::beast;
 namespace http  = beast::http;
 using boost::asio::ip::tcp;
 
+/* PROTOTYPES DEFINITION FOR VALIDATION IN SERVER */
 auto is_valid_extension(const std::string& filename) -> bool;
 auto validate_m3u8_format(const std::string& content) -> bool;
 auto validate_ts_file(const std::vector<uint8_t>& data) -> bool;
@@ -186,11 +187,12 @@ private:
       LOG_DEBUG << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
       response_stream << "  - " << audio_id << "\n";
-      response_stream << "      1. Title: " << metadata.title << "\n";
-      response_stream << "      2. Artist: " << metadata.artist << "\n";
-      response_stream << "      3. Album: " << metadata.album << "\n";
-      response_stream << "      4. Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
-      response_stream << "      5. Codec: " << metadata.audio_stream.codec << "\n";
+      response_stream << "      1. Title:         " << metadata.title << "\n";
+      response_stream << "      2. Artist:        " << metadata.artist << "\n";
+      response_stream << "      3. Album:         " << metadata.album << "\n";
+      response_stream << "      4. Bitrate:       " << metadata.bitrate << " kbps\n";
+      response_stream << "      5. Audio Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
+      response_stream << "      5. Codec:         " << metadata.audio_stream.codec << "\n";
     }
     catch (const std::exception& e)
     {
