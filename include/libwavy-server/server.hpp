@@ -192,7 +192,7 @@ private:
       response_stream << "      3. Album:         " << metadata.album << "\n";
       response_stream << "      4. Bitrate:       " << metadata.bitrate << " kbps\n";
       response_stream << "      5. Audio Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
-      response_stream << "      5. Codec:         " << metadata.audio_stream.codec << "\n";
+      response_stream << "      6. Codec:         " << metadata.audio_stream.codec << "\n";
     }
     catch (const std::exception& e)
     {

@@ -3,6 +3,7 @@ extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/avassert.h>
 #include <libavutil/opt.h>
 #include <libswresample/swresample.h>
 }
@@ -79,8 +80,15 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
 
   // Initialize input codec context
   in_codec_ctx = avcodec_alloc_context3(in_codec);
+  if (!in_codec_ctx)
+  {
+    fprintf(stderr, "**Could not allocate a decoding context**\n");
+    return;
+  }
   avcodec_parameters_to_context(in_codec_ctx, in_stream->codecpar);
   avcodec_open2(in_codec_ctx, in_codec, nullptr);
+
+  in_codec_ctx->pkt_timebase = in_stream->time_base;
 
   print_audio_info(input_filename, in_format_ctx, in_codec_ctx, "Input File Info");
 
@@ -108,7 +116,7 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
   out_codec_ctx->sample_rate           = in_codec_ctx->sample_rate;
   out_codec_ctx->ch_layout.nb_channels = av_channel_layout_check(&out_codec_ctx->ch_layout);
   out_codec_ctx->sample_fmt            = in_codec_ctx->sample_fmt; // MP3 format
-  out_codec_ctx->time_base             = out_codec_ctx->time_base;
+  out_codec_ctx->time_base             = in_codec_ctx->time_base;
 
   // Explicitly set the channel layout for the output codec
   if (av_channel_layout_copy(&out_codec_ctx->ch_layout, &in_codec_ctx->ch_layout) < 0)
@@ -129,7 +137,9 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
 
   AVStream* out_stream = avformat_new_stream(out_format_ctx, nullptr);
   avcodec_parameters_from_context(out_stream->codecpar, out_codec_ctx);
-  out_stream->time_base = out_codec_ctx->time_base;
+  out_stream->time_base     = out_codec_ctx->time_base;
+  out_stream->time_base.den = in_codec_ctx->sample_rate;
+  out_stream->time_base.num = 1;
 
   // Open output file
   if (!(out_format_ctx->oformat->flags & AVFMT_NOFILE))
@@ -159,6 +169,9 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     int ret = swr_alloc_set_opts2(&swr_ctx, &out_codec_ctx->ch_layout, out_codec_ctx->sample_fmt,
                                   out_codec_ctx->sample_rate, &in_codec_ctx->ch_layout,
                                   in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate, 0, nullptr);
+
+    av_assert0(out_codec_ctx->sample_rate == in_codec_ctx->sample_rate);
+
     // Finally, initialize the resampling context
     if ((ret = swr_init(swr_ctx)) < 0)
     {
