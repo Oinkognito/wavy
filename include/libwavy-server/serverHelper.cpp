@@ -1,4 +1,3 @@
-#include "../toml/toml_parser.hpp"
 #include "server.hpp"
 
 auto is_valid_extension(const std::string& filename) -> bool

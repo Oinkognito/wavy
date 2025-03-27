@@ -58,7 +58,7 @@ set(DISPATCHER_BIN hls_dispatcher)
 set(CLIENT_BIN hls_client)
 
 set(ENCODER_SRC src/encode.cpp)
-set(SERVER_SRC src/server.cpp include/server/serverHelper.cpp)
+set(SERVER_SRC src/server.cpp include/libwavy-server/serverHelper.cpp)
 set(DISPATCHER_SRC src/dispatcher.cpp)
 set(CLIENT_SRC src/client_receive.cpp)
 
@@ -99,7 +99,7 @@ message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${FFMPEG_LIBRARIES} ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
-add_library(wavy-server SHARED include/server/serverHelper.cpp)
+add_library(wavy-server SHARED include/libwavy-server/serverHelper.cpp)
 
 # Specify include directories
 target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS})

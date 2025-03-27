@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <random>
+#include <utility>
 
 namespace net = boost::asio;
 using tcp     = net::ip::tcp;
@@ -19,17 +20,18 @@ struct NetworkStats
 class NetworkDiagnoser
 {
 public:
-  NetworkDiagnoser(net::io_context& ioc, const std::string& server_url)
-      : resolver_(ioc), socket_(ioc), server_url_(server_url)
+  NetworkDiagnoser(net::io_context& ioc, std::string server_url)
+      : resolver_(ioc), socket_(ioc), server_url_(std::move(server_url))
   {
   }
 
-  NetworkStats diagnoseNetworkSpeed()
+  auto diagnoseNetworkSpeed() -> NetworkStats
   {
     std::string host, port, target;
     parseUrl(server_url_, host, port, target);
 
-    NetworkStats stats = {-1, 0.0, 0.0}; // Default invalid values
+    NetworkStats stats = {
+      .latency = -1, .jitter = 0.0, .packet_loss = 0.0}; // Default invalid values
 
     try
     {
@@ -92,7 +94,7 @@ private:
     target = (end == std::string::npos) ? "/" : url.substr(end);
   }
 
-  int calculateAverage(const std::vector<int>& values)
+  auto calculateAverage(const std::vector<int>& values) -> int
   {
     int sum = 0;
     for (int v : values)
@@ -100,7 +102,7 @@ private:
     return values.empty() ? -1 : sum / values.size();
   }
 
-  double calculateJitter(const std::vector<int>& latencies)
+  auto calculateJitter(const std::vector<int>& latencies) -> double
   {
     if (latencies.size() < 2)
       return 0.0;
@@ -113,7 +115,7 @@ private:
     return sum / (latencies.size() - 1);
   }
 
-  double simulatePacketLoss()
+  auto simulatePacketLoss() -> double
   {
     std::random_device               rd;
     std::mt19937                     gen(rd());

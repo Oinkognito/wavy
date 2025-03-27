@@ -2,6 +2,13 @@
 
 A **local networking solution** for **audio streaming and sharing**, supporting **lossless and lossy audio formats** through a unified platform.
 
+> [!IMPORTANT]
+> 
+> Wavy is still under heavy development (**WIP**)
+> 
+> Expect a **LOT** of breaking changes with each commit.
+> 
+
 ## **Table of Contents**
 - [**Introduction**](#introduction)
 - [**Dependencies**](#dependencies)

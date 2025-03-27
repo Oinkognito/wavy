@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../logger.hpp"
 #include "../macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
@@ -18,16 +17,15 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
 #include <vector>
 
 #include "../decompression.h"
+#include "../ipc/ipc.hpp"
 #include "../toml/toml_parser.hpp"
 
 /*
- * SERVER
+ * @SERVER
  *
  * The server's main responsibility the way we see it is:
  *
@@ -601,29 +599,40 @@ public:
   HLS_Server(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
              short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context),
-        signals_(io_context, SIGINT, SIGTERM, SIGHUP)
+        signals_(io_context, SIGINT, SIGTERM, SIGHUP),
+        socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), ipcServer(socketPath),
+        ipc_thread_(&HLS_Server::run_ipc, this) // Start IPC in a separate thread
   {
-    ensure_single_instance();
+    ipcServer.ensure_single_instance();
     LOG_INFO << SERVER_LOG << "Starting HLS server on port " << port;
 
     signals_.async_wait(
       [this](boost::system::error_code /*ec*/, int /*signo*/)
       {
         LOG_INFO << SERVER_LOG << "Termination signal received. Cleaning up...";
-        cleanup();
+        ipcServer.cleanup();
+        if (ipc_thread_.joinable())
+          ipc_thread_.join();
         std::exit(0);
       });
 
     start_accept();
   }
 
-  ~HLS_Server() { cleanup(); }
+  ~HLS_Server()
+  {
+    ipcServer.cleanup();
+    if (ipc_thread_.joinable())
+      ipc_thread_.join();
+  }
 
 private:
   tcp::acceptor              acceptor_;
   boost::asio::ssl::context& ssl_context_;
   boost::asio::signal_set    signals_;
-  int                        lock_fd_ = -1;
+  std::string                socketPath;
+  IPCServer                  ipcServer;
+  std::thread                ipc_thread_;
 
   void start_accept()
   {
@@ -646,36 +655,15 @@ private:
       });
   }
 
-  void ensure_single_instance()
+  void run_ipc()
   {
-    struct sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    std::strncpy(addr.sun_path, macros::to_string(macros::SERVER_LOCK_FILE).c_str(),
-                 sizeof(addr.sun_path) - 1);
-
-    lock_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (lock_fd_ == -1)
+    try
     {
-      throw std::runtime_error("Failed to create UNIX socket for locking");
+      ipcServer.ensure_single_instance(); // Run IPC server in its own thread
     }
-
-    if (bind(lock_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1)
+    catch (const std::exception& e)
     {
-      close(lock_fd_);
-      throw std::runtime_error("Another instance is already running!");
-    }
-
-    LOG_INFO << SERVER_LOG << "Lock acquired: " << macros::SERVER_LOCK_FILE;
-  }
-
-  void cleanup()
-  {
-    if (lock_fd_ != -1)
-    {
-      close(lock_fd_);
-      unlink(macros::to_string(macros::SERVER_LOCK_FILE).c_str());
-      LOG_INFO << SERVER_LOG << "Lock file removed: " << macros::SERVER_LOCK_FILE;
-      lock_fd_ = -1;
+      LOG_ERROR << SERVER_LOG << "IPC Server Error: " << e.what();
     }
   }
 };
