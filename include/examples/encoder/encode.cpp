@@ -1,20 +1,28 @@
-#include <boost/proto/proto_fwd.hpp>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avassert.h>
+#include <libavutil/mathematics.h>
 #include <libavutil/opt.h>
 #include <libswresample/swresample.h>
 }
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
+#include <string>
 
-// Sometimes there is some LAME psymodel.c energy error at runtime
+// $NOTE
 //
-// `encode_mp3: psymodel.c:576: calc_energy: Assertion `el >= 0' failed.`
+// When we detect inf/NaN in frames, currently I am trying to just silence them but in reality
+// the audio has a high pitch uptick (glitch like noise) for a brief moment of that sample
 //
-// This may occur for quite a lot of files, I am not sure why this occurs and how to fix it.
+// Not sure on how to fix it at this moment.
+//
+// But this is great step up, this transcoder seems to be working with EVERY mp3 file I have tested it with.
+//
+// -> Also minimum bitrate for transcoding is 32kbps by default (i think it is set by LAME itself)
 
 void print_audio_info(const char* filename, AVFormatContext* format_ctx, AVCodecContext* codec_ctx,
                       const char* label)
@@ -33,280 +41,504 @@ void print_audio_info(const char* filename, AVFormatContext* format_ctx, AVCodec
   std::cout << "======================\n";
 }
 
-void transcode_mp3(const char* input_filename, const char* output_filename, const int given_bitrate)
+inline auto soft_clip(float x) -> float
 {
-  av_log_set_level(AV_LOG_INFO);
+  return std::tanhf(x); // Smoothly compresses extreme values
+}
 
-  AVFormatContext* in_format_ctx = nullptr;
-  AVCodecContext*  in_codec_ctx  = nullptr;
-  AVCodecContext*  out_codec_ctx = nullptr;
-  SwrContext*      swr_ctx       = nullptr;
+inline auto soft_clip(double x) -> double { return std::tanh(x); }
 
-  // Open input file
-  if (avformat_open_input(&in_format_ctx, input_filename, nullptr, nullptr) < 0)
+// Function to sanitize audio samples (to avoid any enery issues from psymodel or quantize source files of libmp3lame)
+void sanitize_audio_samples(AVFrame* frame)
+{
+  // Only process float-based sample formats
+  if (frame->format != AV_SAMPLE_FMT_FLT && frame->format != AV_SAMPLE_FMT_FLTP &&
+      frame->format != AV_SAMPLE_FMT_DBL && frame->format != AV_SAMPLE_FMT_DBLP)
   {
-    std::cerr << "Could not open input file\n";
     return;
   }
 
-  if (avformat_find_stream_info(in_format_ctx, nullptr) < 0)
-  {
-    std::cerr << "Could not find stream info\n";
-    return;
-  }
+  int  is_planar     = av_sample_fmt_is_planar((AVSampleFormat)frame->format);
+  int  channels      = frame->ch_layout.nb_channels;
+  int  samples       = frame->nb_samples;
+  bool found_invalid = false;
 
-  // Find audio stream
-  int audio_stream_index =
-    av_find_best_stream(in_format_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
-  if (audio_stream_index < 0)
+  // Process each audio channel
+  for (int ch = 0; ch < channels; ch++)
   {
-    for (unsigned int i = 0; i < in_format_ctx->nb_streams; i++)
+    if (frame->format == AV_SAMPLE_FMT_FLT || frame->format == AV_SAMPLE_FMT_FLTP)
     {
-      if (in_format_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      auto* data =
+        (float*)(is_planar ? frame->extended_data[ch] : (frame->data[0] + ch * sizeof(float)));
+      float* end = data + (is_planar ? samples : samples * channels);
+      float* ptr = data;
+
+      // Check the stride based on planar or interleaved format
+      int stride = is_planar ? 1 : channels;
+
+      // Process each sample
+      while (ptr < end)
       {
-        audio_stream_index = i;
-        break;
+        if (std::isnan(*ptr) || std::isinf(*ptr))
+        {
+          *ptr          = 0.5f; // Smooth interpolation
+          found_invalid = true;
+        }
+        else
+        {
+          // Clamp values to [-1.0, 1.0] to prevent MP3 encoder issues
+          *ptr = std::max(-1.0f, std::min(soft_clip(*ptr), 1.0f));
+        }
+        ptr += stride;
+      }
+    }
+    else if (frame->format == AV_SAMPLE_FMT_DBL || frame->format == AV_SAMPLE_FMT_DBLP)
+    {
+      auto* data =
+        (double*)(is_planar ? frame->extended_data[ch] : (frame->data[0] + ch * sizeof(double)));
+      double* end = data + (is_planar ? samples : samples * channels);
+      double* ptr = data;
+
+      int stride = is_planar ? 1 : channels;
+
+      while (ptr < end)
+      {
+        if (std::isnan(*ptr) || std::isinf(*ptr))
+        {
+          *ptr          = 0.5;
+          found_invalid = true;
+        }
+        else
+        {
+          *ptr = std::max(-1.0, std::min(*ptr, 1.0));
+        }
+        ptr += stride;
       }
     }
   }
 
-  AVStream*      in_stream = in_format_ctx->streams[audio_stream_index];
-  const AVCodec* in_codec  = avcodec_find_decoder(in_stream->codecpar->codec_id);
-  if (!in_codec)
+  if (found_invalid)
   {
-    std::cerr << "Decoder not found\n";
-    return;
+    std::cout << "\r[INFO] Sanitized invalid audio samples (NaN/Inf values) -> " << frame->format
+              << std::flush;
+  }
+}
+
+auto transcode_mp3(const char* input_filename, const char* output_filename, const int given_bitrate)
+  -> int
+{
+  av_log_set_level(AV_LOG_INFO);
+
+  // Initialize all required contexts and pointers
+  AVFormatContext* in_format_ctx  = nullptr;
+  AVFormatContext* out_format_ctx = nullptr;
+  AVCodecContext*  in_codec_ctx   = nullptr;
+  AVCodecContext*  out_codec_ctx  = nullptr;
+  SwrContext*      swr_ctx        = nullptr;
+  AVStream*        out_stream     = nullptr;
+  int              ret            = 0;
+
+  // Open input file
+  if ((ret = avformat_open_input(&in_format_ctx, input_filename, nullptr, nullptr)) < 0)
+  {
+    std::cerr << "Could not open input file: " << av_err2str(ret) << std::endl;
+    return ret;
   }
 
-  // Initialize input codec context
+  // Read stream information
+  if ((ret = avformat_find_stream_info(in_format_ctx, nullptr)) < 0)
+  {
+    std::cerr << "Could not find stream info: " << av_err2str(ret) << std::endl;
+    avformat_close_input(&in_format_ctx);
+    return ret;
+  }
+
+  // Find the audio stream
+  int audio_stream_index =
+    av_find_best_stream(in_format_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+  if (audio_stream_index < 0)
+  {
+    std::cerr << "Could not find an audio stream" << std::endl;
+    avformat_close_input(&in_format_ctx);
+    return AVERROR_STREAM_NOT_FOUND;
+  }
+
+  AVStream* in_stream = in_format_ctx->streams[audio_stream_index];
+
+  // Find decoder for the audio stream
+  const AVCodec* in_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
+  if (!in_codec)
+  {
+    std::cerr << "Decoder not found for codec ID: " << in_stream->codecpar->codec_id << std::endl;
+    avformat_close_input(&in_format_ctx);
+    return AVERROR_DECODER_NOT_FOUND;
+  }
+
+  // Allocate and initialize the decoder context
   in_codec_ctx = avcodec_alloc_context3(in_codec);
   if (!in_codec_ctx)
   {
-    fprintf(stderr, "**Could not allocate a decoding context**\n");
-    return;
+    std::cerr << "Could not allocate a decoding context" << std::endl;
+    avformat_close_input(&in_format_ctx);
+    return AVERROR(ENOMEM);
   }
-  avcodec_parameters_to_context(in_codec_ctx, in_stream->codecpar);
-  avcodec_open2(in_codec_ctx, in_codec, nullptr);
 
+  // Copy parameters from the input stream to the decoder context
+  if ((ret = avcodec_parameters_to_context(in_codec_ctx, in_stream->codecpar)) < 0)
+  {
+    std::cerr << "Failed to copy codec parameters to decoder context: " << av_err2str(ret)
+              << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    return ret;
+  }
+
+  // Set the sample rate and timebase
   in_codec_ctx->pkt_timebase = in_stream->time_base;
+
+  // Open the decoder
+  if ((ret = avcodec_open2(in_codec_ctx, in_codec, nullptr)) < 0)
+  {
+    std::cerr << "Failed to open decoder: " << av_err2str(ret) << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    return ret;
+  }
 
   print_audio_info(input_filename, in_format_ctx, in_codec_ctx, "Input File Info");
 
-  // Initialize output format context
-  AVFormatContext* out_format_ctx = nullptr;
-  avformat_alloc_output_context2(&out_format_ctx, nullptr, nullptr, output_filename);
-  if (!out_format_ctx)
+  // Create output format context
+  if ((ret = avformat_alloc_output_context2(&out_format_ctx, nullptr, nullptr, output_filename)) <
+      0)
   {
-    std::cerr << "Could not create output context\n";
-    return;
+    std::cerr << "Could not create output context: " << av_err2str(ret) << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    return ret;
   }
 
+  // Find MP3 (LAME) encoder
   const AVCodec* out_codec = avcodec_find_encoder(AV_CODEC_ID_MP3);
   if (!out_codec)
   {
-    std::cerr << "Encoder not found\n";
-    return;
+    std::cerr << "MP3 encoder not found" << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return AVERROR_ENCODER_NOT_FOUND;
   }
 
-  std::cout << "-- Encoding using libmp3flame (" << AV_CODEC_ID_MP3 << ")" << std::endl;
+  std::cout << "-- Encoding using MP3 (libmp3lame, ID: " << AV_CODEC_ID_MP3 << ")" << std::endl;
 
-  // Initialize output codec context
-  out_codec_ctx                        = avcodec_alloc_context3(out_codec);
-  out_codec_ctx->bit_rate              = given_bitrate;
-  out_codec_ctx->sample_rate           = in_codec_ctx->sample_rate;
-  out_codec_ctx->ch_layout.nb_channels = av_channel_layout_check(&out_codec_ctx->ch_layout);
-  out_codec_ctx->sample_fmt            = in_codec_ctx->sample_fmt; // MP3 format
-  out_codec_ctx->time_base             = in_codec_ctx->time_base;
-
-  // Explicitly set the channel layout for the output codec
-  if (av_channel_layout_copy(&out_codec_ctx->ch_layout, &in_codec_ctx->ch_layout) < 0)
+  // Create an audio stream in the output file
+  out_stream = avformat_new_stream(out_format_ctx, nullptr);
+  if (!out_stream)
   {
-    std::cerr << "Failed to copy input channel layout to output\n";
+    std::cerr << "Failed to create output stream" << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return AVERROR(ENOMEM);
   }
+
+  // Allocate and initialize the encoder context
+  out_codec_ctx = avcodec_alloc_context3(out_codec);
+  if (!out_codec_ctx)
+  {
+    std::cerr << "Could not allocate encoding context" << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return AVERROR(ENOMEM);
+  }
+
+  // Set encoder parameters
+  out_codec_ctx->bit_rate    = given_bitrate;
+  out_codec_ctx->sample_rate = in_codec_ctx->sample_rate;
+
+  // MP3 typically requires s16p sample format
+  out_codec_ctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+
+  // Copy channel layout from input
+  if ((ret = av_channel_layout_copy(&out_codec_ctx->ch_layout, &in_codec_ctx->ch_layout)) < 0)
+  {
+    std::cerr << "Failed to copy input channel layout to output: " << av_err2str(ret) << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avcodec_free_context(&out_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return ret;
+  }
+
+  // MP3 has limitations on channel count
+  if (out_codec_ctx->ch_layout.nb_channels > 2)
+  {
+    std::cout << "Warning: MP3 typically supports only mono or stereo. Limiting to stereo."
+              << std::endl;
+    av_channel_layout_uninit(&out_codec_ctx->ch_layout);
+    av_channel_layout_default(&out_codec_ctx->ch_layout, 2);
+  }
+
+  // Set time base for encoding (sample rate)
+  out_codec_ctx->time_base = (AVRational){1, out_codec_ctx->sample_rate};
+
+  // Set encoder quality
+  out_codec_ctx->compression_level = 5; // Medium quality (range is 0-9)
+
+  // Set VBR quality - optional setting for better quality
+  av_opt_set_int(out_codec_ctx->priv_data, "qscale", 1, 0); // Lower values = higher quality
 
   std::cout << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels << std::endl;
   std::cout << "Output Channels: " << out_codec_ctx->ch_layout.nb_channels << std::endl;
 
-  if (avcodec_open2(out_codec_ctx, out_codec, nullptr) < 0)
+  // Some formats require global header
+  if (out_format_ctx->oformat->flags & AVFMT_GLOBALHEADER)
   {
-    std::cerr << "Could not open output codec\n";
-    return;
+    out_codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
   }
 
-  std::cout << "-- Opened codec." << std::endl;
+  // Open the encoder
+  if ((ret = avcodec_open2(out_codec_ctx, out_codec, nullptr)) < 0)
+  {
+    std::cerr << "Could not open output codec: " << av_err2str(ret) << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avcodec_free_context(&out_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return ret;
+  }
 
-  AVStream* out_stream = avformat_new_stream(out_format_ctx, nullptr);
-  avcodec_parameters_from_context(out_stream->codecpar, out_codec_ctx);
-  out_stream->time_base     = out_codec_ctx->time_base;
-  out_stream->time_base.den = in_codec_ctx->sample_rate;
-  out_stream->time_base.num = 1;
+  std::cout << "-- Opened encoder successfully" << std::endl;
+
+  // Copy encoder parameters to output stream
+  if ((ret = avcodec_parameters_from_context(out_stream->codecpar, out_codec_ctx)) < 0)
+  {
+    std::cerr << "Failed to copy encoder parameters to output stream: " << av_err2str(ret)
+              << std::endl;
+    avcodec_free_context(&in_codec_ctx);
+    avcodec_free_context(&out_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return ret;
+  }
+
+  // Set output stream time base to match encoder time base
+  out_stream->time_base = out_codec_ctx->time_base;
 
   // Open output file
   if (!(out_format_ctx->oformat->flags & AVFMT_NOFILE))
   {
-    if (avio_open(&out_format_ctx->pb, output_filename, AVIO_FLAG_WRITE) < 0)
+    if ((ret = avio_open(&out_format_ctx->pb, output_filename, AVIO_FLAG_WRITE)) < 0)
     {
-      std::cerr << "Could not open output file\n";
-      return;
+      std::cerr << "Could not open output file: " << av_err2str(ret) << std::endl;
+      avcodec_free_context(&in_codec_ctx);
+      avcodec_free_context(&out_codec_ctx);
+      avformat_close_input(&in_format_ctx);
+      avformat_free_context(out_format_ctx);
+      return ret;
     }
-    std::cout << "-- Opened output file." << std::endl;
+    std::cout << "-- Opened output file successfully" << std::endl;
   }
 
-  if (avformat_write_header(out_format_ctx, nullptr) < 0)
+  // Write file header
+  if ((ret = avformat_write_header(out_format_ctx, nullptr)) < 0)
   {
-    std::cerr << "Error writing format header\n";
-    return;
+    std::cerr << "Error writing format header: " << av_err2str(ret) << std::endl;
+    if (!(out_format_ctx->oformat->flags & AVFMT_NOFILE))
+    {
+      avio_closep(&out_format_ctx->pb);
+    }
+    avcodec_free_context(&in_codec_ctx);
+    avcodec_free_context(&out_codec_ctx);
+    avformat_close_input(&in_format_ctx);
+    avformat_free_context(out_format_ctx);
+    return ret;
   }
 
-  std::cout << "-- Able to write format header!" << std::endl;
+  std::cout << "-- Successfully wrote format header" << std::endl;
 
   try
   {
-
-    // Allocate the SwrContext before setting options
+    // Initialize resampler context
     swr_ctx = swr_alloc();
-    // Set options correctly
-    int ret = swr_alloc_set_opts2(&swr_ctx, &out_codec_ctx->ch_layout, out_codec_ctx->sample_fmt,
-                                  out_codec_ctx->sample_rate, &in_codec_ctx->ch_layout,
-                                  in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate, 0, nullptr);
-
-    av_assert0(out_codec_ctx->sample_rate == in_codec_ctx->sample_rate);
-
-    // Finally, initialize the resampling context
-    if ((ret = swr_init(swr_ctx)) < 0)
+    if (!swr_ctx)
     {
-      std::cerr << "Failed to initialize SwrContext: " << av_err2str(ret) << "\n";
-      return;
+      throw std::runtime_error("Could not allocate resampler context");
     }
 
-    std::cout << "--> Initialized SwrContext!" << std::endl;
+    // Configure the resampler
+    ret = swr_alloc_set_opts2(&swr_ctx, &out_codec_ctx->ch_layout, out_codec_ctx->sample_fmt,
+                              out_codec_ctx->sample_rate, &in_codec_ctx->ch_layout,
+                              in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate, 0, nullptr);
 
-    // Read, resample, and encode
+    if (ret < 0)
+    {
+      throw std::runtime_error(std::string("Failed to set resampler options: ") + av_err2str(ret));
+    }
+
+    // Set additional options for better quality
+    av_opt_set_int(swr_ctx, "dither_method", SWR_DITHER_TRIANGULAR, 0);
+
+    // Initialize the resampler
+    if ((ret = swr_init(swr_ctx)) < 0)
+    {
+      throw std::runtime_error(std::string("Failed to initialize the resampler: ") +
+                               av_err2str(ret));
+    }
+
+    std::cout << "--> Initialized resampler successfully" << std::endl;
+
+    // Allocate packet and frames
     AVPacket* packet          = av_packet_alloc();
     AVFrame*  frame           = av_frame_alloc();
     AVFrame*  resampled_frame = av_frame_alloc();
 
     if (!packet || !frame || !resampled_frame)
     {
-      std::cerr << "Failed to allocate AVPacket or AVFrame!" << std::endl;
+      throw std::runtime_error("Failed to allocate AVPacket or AVFrame");
     }
 
-    std::cout << "--> Allocated AVPacket and AVFrame.." << std::endl;
-
-    // Ensure out_codec_ctx is initialized
-    if (!out_codec_ctx)
-    {
-      std::cerr << "Output codec context is NULL!" << std::endl;
-      return;
-    }
-
-    std::cout << "-- Output codec context is good.." << std::endl;
-
+    // Set up the resampled frame properties
     av_channel_layout_copy(&resampled_frame->ch_layout, &out_codec_ctx->ch_layout);
     resampled_frame->format      = out_codec_ctx->sample_fmt;
     resampled_frame->sample_rate = out_codec_ctx->sample_rate;
-    resampled_frame->nb_samples  = out_codec_ctx->frame_size; // May need correction
 
-    // Allocate buffer for frame
-    ret = av_frame_get_buffer(resampled_frame, 0);
-    if (ret < 0)
+    // For MP3, 1152 samples per frame is common (MPEG1 Layer 3)
+    if (out_codec_ctx->frame_size)
     {
-      std::cerr << "av_frame_get_buffer() failed: " << av_err2str(ret) << std::endl;
-      return;
+      resampled_frame->nb_samples = out_codec_ctx->frame_size;
+    }
+    else
+    {
+      resampled_frame->nb_samples = 1152;
     }
 
-    std::cout << "--> Allocated buffer for frame!" << std::endl;
+    // Allocate buffer for the resampled frame
+    if ((ret = av_frame_get_buffer(resampled_frame, 0)) < 0)
+    {
+      throw std::runtime_error(std::string("Failed to allocate frame buffer: ") + av_err2str(ret));
+    }
 
+    std::cout << "--> Allocated frame buffers successfully" << std::endl;
+
+    int64_t next_pts          = 0; // Track presentation timestamps
+    int     samples_sanitized = 0;
+
+    // Process input packets
     while (av_read_frame(in_format_ctx, packet) >= 0)
     {
-      std::cout << "\r[INFO] Read frame: stream_index=" << packet->stream_index << std::flush;
-
+      // Process only the audio stream
       if (packet->stream_index == audio_stream_index)
       {
-        int ret = avcodec_send_packet(in_codec_ctx, packet);
-        if (ret < 0)
+        ret = avcodec_send_packet(in_codec_ctx, packet);
+        if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
         {
-          std::cerr << "\r[ERROR] Failed to send packet to decoder: " << av_err2str(ret)
+          std::cerr << "\r[WARNING] Error sending packet to decoder: " << av_err2str(ret)
                     << std::flush;
           av_packet_unref(packet);
           continue;
         }
 
+        // Process decoded frames
         while ((ret = avcodec_receive_frame(in_codec_ctx, frame)) == 0)
         {
-          std::cout << "\r[INFO] Decoded PTS=" << frame->pts << " | samples=" << frame->nb_samples
-                    << " | format=" << av_get_sample_fmt_name(in_codec_ctx->sample_fmt)
-                    << std::flush;
+          // Sanitize audio samples to fix NaN and Inf values
+          sanitize_audio_samples(frame);
 
+          // Prepare the resampled frame for writing
           av_frame_make_writable(resampled_frame);
 
+          // Resample the frame
           int num_samples = swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
                                         (const uint8_t**)frame->data, frame->nb_samples);
+
           if (num_samples < 0)
           {
-            std::cerr << "\r[ERROR] swr_convert failed: " << av_err2str(num_samples) << std::flush;
+            std::cerr << "\r[WARNING] Resampling failed: " << av_err2str(num_samples) << std::flush;
             continue;
           }
 
-          std::cout << "\r[INFO] Converted samples=" << num_samples << " | format="
-                    << av_get_sample_fmt_name((AVSampleFormat)resampled_frame->format)
-                    << " | PTS=" << frame->best_effort_timestamp << std::flush;
+          // Set the correct pts for the resampled frame
+          if (frame->pts != AV_NOPTS_VALUE)
+          {
+            resampled_frame->pts =
+              av_rescale_q(frame->pts, in_codec_ctx->time_base, out_codec_ctx->time_base);
+          }
+          else
+          {
+            // If no pts available, generate based on sample count
+            resampled_frame->pts = next_pts;
+          }
 
-          resampled_frame->pts =
-            av_rescale_q(frame->pts, in_codec_ctx->time_base, out_codec_ctx->time_base);
+          next_pts = resampled_frame->pts + resampled_frame->nb_samples;
 
+          // Double-check resampled frame for invalid values (just to be sure)
+          sanitize_audio_samples(resampled_frame);
+
+          // Send the resampled frame to the encoder
           ret = avcodec_send_frame(out_codec_ctx, resampled_frame);
           if (ret < 0)
           {
-            std::cerr << "\r[ERROR] Failed to send frame to encoder: " << av_err2str(ret)
+            std::cerr << "\r[WARNING] Error sending frame to encoder: " << av_err2str(ret)
                       << std::flush;
+            samples_sanitized++;
             continue;
           }
 
+          // Get encoded packets
           AVPacket* out_packet = av_packet_alloc();
           while ((ret = avcodec_receive_packet(out_codec_ctx, out_packet)) == 0)
           {
-            std::cout << "\r[INFO] Encoded PTS=" << out_packet->pts
-                      << " | Size=" << out_packet->size << std::flush;
+            // Rescale packet timestamps
+            av_packet_rescale_ts(out_packet, out_codec_ctx->time_base, out_stream->time_base);
+            out_packet->stream_index = 0;
 
+            // Write the packet to the output file
             ret = av_interleaved_write_frame(out_format_ctx, out_packet);
             if (ret < 0)
             {
-              std::cerr << "\r[ERROR] Failed to write packet: " << av_err2str(ret) << std::flush;
+              std::cerr << "\r[WARNING] Error writing packet: " << av_err2str(ret) << std::flush;
             }
             av_packet_unref(out_packet);
           }
           av_packet_free(&out_packet);
         }
       }
-      else
-      {
-        std::cout << "\r[INFO] Skipping non-audio packet, stream_index=" << packet->stream_index
-                  << std::flush;
-      }
 
       av_packet_unref(packet);
     }
-    std::cout << "Finished processing all frames." << std::endl;
 
-    auto* samples = (float*)resampled_frame->data[0];
-    for (int i = 0; i < 10; ++i)
+    std::cout << std::endl << "Finished processing all frames" << std::endl;
+    if (samples_sanitized > 0)
     {
-      std::cout << "Sample[" << i << "]: " << samples[i] << "\n";
+      std::cout << "Total frames with sanitized samples: " << samples_sanitized << std::endl;
     }
 
-    // Flush encoder
+    // Flush the encoder
     avcodec_send_frame(out_codec_ctx, nullptr);
     AVPacket* out_packet = av_packet_alloc();
-    while (avcodec_receive_packet(out_codec_ctx, out_packet) == 0)
+    while ((ret = avcodec_receive_packet(out_codec_ctx, out_packet)) == 0)
     {
-      av_interleaved_write_frame(out_format_ctx, out_packet);
+      // Rescale packet timestamps
+      av_packet_rescale_ts(out_packet, out_codec_ctx->time_base, out_stream->time_base);
+      out_packet->stream_index = 0;
+
+      ret = av_interleaved_write_frame(out_format_ctx, out_packet);
+      if (ret < 0)
+      {
+        std::cerr << "Error writing flushed packet: " << av_err2str(ret) << std::endl;
+      }
       av_packet_unref(out_packet);
     }
     av_packet_free(&out_packet);
 
-    av_write_trailer(out_format_ctx);
+    // Write file trailer
+    if ((ret = av_write_trailer(out_format_ctx)) < 0)
+    {
+      std::cerr << "Error writing trailer: " << av_err2str(ret) << std::endl;
+    }
 
+    // Print output file information
     print_audio_info(output_filename, out_format_ctx, out_codec_ctx, "Output File Info");
 
     // Cleanup
@@ -314,36 +546,67 @@ void transcode_mp3(const char* input_filename, const char* output_filename, cons
     av_frame_free(&resampled_frame);
     av_packet_free(&packet);
     swr_free(&swr_ctx);
-    avcodec_free_context(&in_codec_ctx);
-    avcodec_free_context(&out_codec_ctx);
-    avformat_close_input(&in_format_ctx);
+
+    std::cout << "-- Transcoding completed successfully!" << std::endl;
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << "Transcoding error: " << e.what() << std::endl;
+    ret = AVERROR_UNKNOWN;
+  }
+
+  // Final cleanup
+  avcodec_free_context(&in_codec_ctx);
+  avcodec_free_context(&out_codec_ctx);
+  avformat_close_input(&in_format_ctx);
+
+  if (out_format_ctx)
+  {
     if (!(out_format_ctx->oformat->flags & AVFMT_NOFILE))
     {
       avio_closep(&out_format_ctx->pb);
     }
     avformat_free_context(out_format_ctx);
+  }
 
-    std::cout << "-- Transcoding complete!\n";
-  }
-  catch (std::exception& e)
-  {
-    std::cerr << "Transcoding error: " << e.what() << std::endl;
-  }
+  return ret;
 }
 
 auto main(int argc, char* argv[]) -> int
 {
-  if (argc == 4)
-  {
-    const char* input_file    = argv[1];
-    const char* output_file   = argv[2];
-    const int   given_bitrate = std::stoi(argv[3]);
+// Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
+#if LIBAVFORMAT_VERSION_MAJOR < 58
+  av_register_all();
+#endif
 
-    transcode_mp3(input_file, output_file, given_bitrate);
-  }
-  else
+  if (argc != 4)
   {
-    std::cout << argv[0] << " <input-file> " << "<output-file>" << " <bitrate> " << std::endl;
+    std::cout << "Usage: " << argv[0] << " <input-file> <output-file> <bitrate-in-bits/sec>"
+              << std::endl;
+    std::cout << "Example: " << argv[0] << " input.wav output.mp3 128000" << std::endl;
+    return 1;
   }
-  return 0;
+
+  const char* input_file  = argv[1];
+  const char* output_file = argv[2];
+  int         bitrate;
+
+  try
+  {
+    bitrate = std::stoi(argv[3]);
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << "Error: Bitrate must be a valid integer" << std::endl;
+    return 1;
+  }
+
+  if (bitrate <= 0)
+  {
+    std::cerr << "Error: Bitrate must be positive" << std::endl;
+    return 1;
+  }
+
+  int result = transcode_mp3(input_file, output_file, bitrate);
+  return (result < 0) ? 1 : 0;
 }
