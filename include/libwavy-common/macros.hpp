@@ -67,5 +67,11 @@ PROTOCOL_CONSTANTS(DECLARE_STRING_VIEW)
 
 // Convert string_view to string using a function (avoiding constexpr std::string)
 inline auto to_string(std::string_view sv) -> std::string { return std::string(sv); }
+inline auto to_cstr(std::string_view sv) -> const char*
+{
+  thread_local std::string buffer;
+  buffer = sv;
+  return buffer.c_str();
+}
 
 } // namespace macros
