@@ -73,7 +73,7 @@ verbose:
 
 # Code formatting
 format:
-	@find src include -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
+	@find src include examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
 
 # Code linting/fixing
 tidy:
