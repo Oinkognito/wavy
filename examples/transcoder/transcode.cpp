@@ -1,10 +1,10 @@
-#include "../../include/libwavy-ffmpeg/encoder/entry.hpp"
+#include "../../include/libwavy-ffmpeg/transcoder/entry.hpp"
 
 auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
   // Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
-  libwavy::ffmpeg::Encoder enc;
+  libwavy::ffmpeg::Transcoder trns;
 
   if (argc != 4)
   {
@@ -34,6 +34,6 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  int result = enc.transcode_mp3(input_file, output_file, bitrate);
+  int result = trns.transcode_mp3(input_file, output_file, bitrate);
   return (result < 0) ? 1 : 0;
 }

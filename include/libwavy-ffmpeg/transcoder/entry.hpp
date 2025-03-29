@@ -31,7 +31,7 @@ extern "C"
 namespace libwavy::ffmpeg
 {
 
-class Encoder
+class Transcoder
 {
 private:
   AVFormatContext* in_format_ctx   = nullptr;
