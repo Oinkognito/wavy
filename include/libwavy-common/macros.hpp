@@ -8,14 +8,15 @@
 #define WAVY_SERVER_AUDIO_SIZE_LIMIT 200 // in MiBs
 #define WAVY_SERVER_PORT_NO_STR      "8080"
 
-#define WAVY__SAFE_MULTIPLY(a, b, result)                             \
-  do                                                                  \
-  {                                                                   \
-    if ((a) > 0 && (b) > (std::numeric_limits<size_t>::max() / (a)))  \
-    {                                                                 \
-      throw std::overflow_error("Multiplication overflow detected!"); \
-    }                                                                 \
-    (result) = (a) * (b);                                             \
+#define WAVY__SAFE_MULTIPLY(a, b, result)                               \
+  do                                                                    \
+  {                                                                     \
+    using safe_type = long; /* Ensuring safe promotion */               \
+    if ((a) > 0 && (b) > (std::numeric_limits<safe_type>::max() / (a))) \
+    {                                                                   \
+      throw std::overflow_error("Multiplication overflow detected!");   \
+    }                                                                   \
+    (result) = static_cast<safe_type>(a) * static_cast<safe_type>(b);   \
   } while (0)
 
 #define STRING_CONSTANTS(X)                                   \

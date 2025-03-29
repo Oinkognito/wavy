@@ -116,7 +116,7 @@ private:
       std::string key   = tag->key;
       std::string value = tag->value;
 
-      std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+      std::ranges::transform(key, key.begin(), [](unsigned char c) { return std::tolower(c); });
 
       if (key == PARENT_METADATA_FIELD_TITLE)
         metadata.title = value;

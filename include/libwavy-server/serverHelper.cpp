@@ -91,7 +91,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
     std::string output_file = extract_path + "/" + filename;
 
     LOG_INFO << SERVER_EXTRACT_LOG
-             << "Extracting file: " << fs::relative(output_file, macros::SERVER_STORAGE_DIR);
+             << "Extracting file: " << bfs::relative(output_file, macros::SERVER_STORAGE_DIR);
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -118,7 +118,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
       if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
         LOG_INFO << "[ZSTD] Decompressing .zst file: "
-                 << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+                 << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         if (!ZSTD_decompress_file(output_file.c_str()))
         {
           LOG_ERROR << "[ZSTD] Failed to decompress .zst file: " << output_file;
@@ -128,17 +128,17 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
         std::string decompressed_filename =
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
         LOG_INFO << SERVER_EXTRACT_LOG << "Decompressed file: "
-                 << fs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR);
+                 << bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR);
 
         if (std::remove(output_file.c_str()) == 0)
         {
           LOG_INFO << "[ZSTD] Deleted the original .zst file: "
-                   << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+                   << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         }
         else
         {
           LOG_ERROR << "[ZSTD] Failed to delete .zst file: "
-                    << fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+                    << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
         }
       }
     }
@@ -156,7 +156,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
   LOG_INFO << SERVER_EXTRACT_LOG << "Validating and extracting GZIP file: " << gzip_path;
   int metadataFileCount = 0;
 
-  if (!fs::exists(gzip_path))
+  if (!bfs::exists(gzip_path))
   {
     LOG_ERROR << SERVER_EXTRACT_LOG << "File does not exist: " << gzip_path;
     return false;
@@ -164,7 +164,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
 
   std::string temp_extract_path =
     macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
-  fs::create_directories(temp_extract_path);
+  bfs::create_directories(temp_extract_path);
 
   if (!extract_payload(gzip_path, temp_extract_path))
   {
@@ -177,11 +177,11 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
   // Move valid files to storage
   std::string storage_path =
     macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_id + "/" + audio_id;
-  fs::create_directories(storage_path);
+  bfs::create_directories(storage_path);
 
   int valid_file_count = 0;
 
-  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path))
+  for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
   {
     std::string          fname = file.path().filename().string();
     std::ifstream        infile(file.path().string(), std::ios::binary);
@@ -192,7 +192,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
         LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid M3U8 file, removing: " << fname;
-        fs::remove(file.path());
+        bfs::remove(file.path());
         continue;
       }
     }
@@ -201,7 +201,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
       if (!validate_ts_file(data))
       {
         LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid TS file, removing: " << fname;
-        fs::remove(file.path());
+        bfs::remove(file.path());
         continue;
       }
     }
@@ -224,12 +224,12 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     else
     {
       LOG_WARNING << SERVER_EXTRACT_LOG << "Skipping unknown file: " << fname;
-      fs::remove(file.path());
+      bfs::remove(file.path());
       continue;
     }
 
     // Move validated file to storage
-    fs::rename(file.path(), storage_path + "/" + fname);
+    bfs::rename(file.path(), storage_path + "/" + fname);
     LOG_INFO << SERVER_EXTRACT_LOG << "File stored in HLS storage: " << fname;
     valid_file_count++;
   }

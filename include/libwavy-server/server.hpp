@@ -15,7 +15,6 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <unistd.h>
 #include <vector>
@@ -75,7 +74,7 @@
  *
  */
 
-namespace fs    = boost::filesystem;
+namespace bfs   = boost::filesystem; // Refers to boost filesystem (async file I/O ops)
 namespace beast = boost::beast;
 namespace http  = beast::http;
 using boost::asio::ip::tcp;
@@ -209,7 +208,7 @@ private:
     LOG_INFO << "[List Audio Info] Handling audio metadata listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
-    if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
+    if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
       LOG_ERROR << "[List Audio Info] Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
@@ -219,24 +218,24 @@ private:
     std::ostringstream response_stream;
     bool               entries_found = false;
 
-    for (const fs::directory_entry& ip_entry : fs::directory_iterator(storage_path))
+    for (const bfs::directory_entry& ip_entry : bfs::directory_iterator(storage_path))
     {
-      if (fs::is_directory(ip_entry.status()))
+      if (bfs::is_directory(ip_entry.status()))
       {
         std::string ip_id = ip_entry.path().filename().string();
         LOG_DEBUG << "[List Audio Info] Processing IP-ID: " << ip_id;
         response_stream << ip_id << ":\n";
 
         bool audio_found = false;
-        for (const fs::directory_entry& audio_entry : fs::directory_iterator(ip_entry.path()))
+        for (const bfs::directory_entry& audio_entry : bfs::directory_iterator(ip_entry.path()))
         {
-          if (fs::is_directory(audio_entry.status()))
+          if (bfs::is_directory(audio_entry.status()))
           {
             std::string audio_id = audio_entry.path().filename().string();
             LOG_DEBUG << "[List Audio Info] Found Audio-ID: " << audio_id;
 
             std::string metadata_path = audio_entry.path().string() + "/metadata.toml";
-            if (fs::exists(metadata_path))
+            if (bfs::exists(metadata_path))
             {
               LOG_DEBUG << "[List Audio Info] Found metadata file: " << metadata_path;
               if (fetch_metadata(metadata_path, response_stream, audio_id))
@@ -276,7 +275,7 @@ private:
     LOG_INFO << "[List IPs] Handling IP listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
-    if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
+    if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
       LOG_ERROR << "[List IPs] Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
@@ -286,17 +285,17 @@ private:
     std::ostringstream response_stream;
     bool               entries_found = false;
 
-    for (const fs::directory_entry& ip_entry : fs::directory_iterator(storage_path))
+    for (const bfs::directory_entry& ip_entry : bfs::directory_iterator(storage_path))
     {
-      if (fs::is_directory(ip_entry.status()))
+      if (bfs::is_directory(ip_entry.status()))
       {
         std::string ip_id = ip_entry.path().filename().string();
         response_stream << ip_id << ":\n"; // IP-ID Header
 
         bool audio_found = false;
-        for (const fs::directory_entry& audio_entry : fs::directory_iterator(ip_entry.path()))
+        for (const bfs::directory_entry& audio_entry : bfs::directory_iterator(ip_entry.path()))
         {
-          if (fs::is_directory(audio_entry.status()))
+          if (bfs::is_directory(audio_entry.status()))
           {
             response_stream << "  - " << audio_entry.path().filename().string() << "\n"; // Audio-ID
             audio_found = true;
@@ -391,7 +390,7 @@ private:
     std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
                             macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
-    fs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
+    bfs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
@@ -411,7 +410,7 @@ private:
 
     output_file.close();
 
-    if (!fs::exists(gzip_path) || fs::file_size(gzip_path) == 0)
+    if (!bfs::exists(gzip_path) || bfs::file_size(gzip_path) == 0)
     {
       LOG_ERROR << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
       send_response("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
@@ -430,7 +429,7 @@ private:
       send_response(macros::to_string(macros::SERVER_ERROR_400));
     }
 
-    fs::remove(gzip_path);
+    bfs::remove(gzip_path);
   }
 
   /*
@@ -487,7 +486,7 @@ private:
 
     LOG_DEBUG << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] Checking file: " << file_path;
 
-    if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
+    if (!bfs::exists(file_path) || !bfs::is_regular_file(file_path))
     {
       LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
                 << "] File not found: " << file_path;
