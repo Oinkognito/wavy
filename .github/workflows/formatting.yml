@@ -1,0 +1,27 @@
+name: C++ Formatting Check for Wavy
+
+on:
+  push:
+    branches: [ "main" ]  # Trigger on push to the 'main' branch
+  pull_request:
+    branches: [ "main" ]  # Trigger on pull requests to the 'main' branch
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install clang-format
+      run: sudo apt-get install -y clang-format
+
+    - name: Run clang-format check
+      run: |
+            find src include -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" \
+            -exec sh -c 'for file; do echo "Checking: $file"; clang-format --dry-run --Werror "$file"; done' sh {} +
