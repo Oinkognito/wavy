@@ -15,7 +15,7 @@ auto main(int argc, char* argv[]) -> int
     // Replace with your HLS master playlist URL
     std::string master_url = argv[1];
 
-    ABRManager abr_manager(ioc, master_url);
+    libwavy::abr::ABRManager abr_manager(ioc, master_url);
     abr_manager.selectBestBitrate();
   }
   catch (const std::exception& e)

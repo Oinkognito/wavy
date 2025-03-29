@@ -7,6 +7,10 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <utility>
+
+namespace libwavy::abr
+{
 
 namespace beast = boost::beast;
 namespace http  = beast::http;
@@ -17,12 +21,12 @@ using tcp       = net::ip::tcp;
 class PlaylistParser
 {
 public:
-  PlaylistParser(net::io_context& ioc, ssl::context& ssl_ctx, const std::string& url)
-      : resolver_(ioc), stream_(ioc, ssl_ctx), master_url_(url)
+  PlaylistParser(net::io_context& ioc, ssl::context& ssl_ctx, std::string url)
+      : resolver_(ioc), stream_(ioc, ssl_ctx), master_url_(std::move(url))
   {
   }
 
-  bool fetchMasterPlaylist()
+  auto fetchMasterPlaylist() -> bool
   {
     std::string host, port, target;
     parseUrl(master_url_, host, port, target);
@@ -69,7 +73,10 @@ public:
     }
   }
 
-  std::map<int, std::string> getBitratePlaylists() const { return bitrate_playlists_; }
+  [[nodiscard]] auto getBitratePlaylists() const -> std::map<int, std::string>
+  {
+    return bitrate_playlists_;
+  }
 
 private:
   net::ip::tcp::resolver         resolver_;
@@ -164,3 +171,5 @@ private:
     }
   }
 };
+
+} // namespace libwavy::abr

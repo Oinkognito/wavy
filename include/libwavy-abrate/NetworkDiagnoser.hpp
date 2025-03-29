@@ -6,6 +6,9 @@
 #include <random>
 #include <utility>
 
+namespace libwavy::abr
+{
+
 namespace net = boost::asio;
 using tcp     = net::ip::tcp;
 using namespace std::chrono;
@@ -123,3 +126,5 @@ private:
     return dist(gen);
   }
 };
+
+} // namespace libwavy::abr

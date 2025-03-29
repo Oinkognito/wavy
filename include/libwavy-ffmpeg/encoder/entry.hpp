@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../libwavy-common/logger.hpp"
+
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -46,19 +48,18 @@ public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
                         AVCodecContext* codec_ctx, const char* label)
   {
-    std::cout << "\n=== " << label << " ===\n";
-    std::cout << "File: " << filename << "\n";
-    std::cout << "Codec: " << codec_ctx->codec->long_name << " (" << codec_ctx->codec->name
-              << ")\n";
-    std::cout << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps\n";
-    std::cout << "Sample Rate: " << codec_ctx->sample_rate << " Hz\n";
-    std::cout << "Channels: " << codec_ctx->ch_layout.nb_channels << "\n";
-    std::cout << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt) << "\n";
-    std::cout << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec\n";
+    LOG_DEBUG << "========== " << label << " ===============";
+    LOG_DEBUG << "File: " << filename;
+    LOG_DEBUG << "Codec: " << codec_ctx->codec->long_name << " (" << codec_ctx->codec->name << ")";
+    LOG_DEBUG << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps";
+    LOG_DEBUG << "Sample Rate: " << codec_ctx->sample_rate << " Hz";
+    LOG_DEBUG << "Channels: " << codec_ctx->ch_layout.nb_channels;
+    LOG_DEBUG << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt);
+    LOG_DEBUG << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec";
     char layout_desc[256];
     av_channel_layout_describe(&codec_ctx->ch_layout, layout_desc, sizeof(layout_desc));
-    std::cout << "Channel Layout Description: " << layout_desc << std::endl;
-    std::cout << "======================\n";
+    LOG_DEBUG << "Channel Layout Description: " << layout_desc;
+    LOG_DEBUG << "=================================================";
   }
 
   inline auto soft_clip(float x) -> float
@@ -142,8 +143,8 @@ public:
 
     if (found_invalid)
     {
-      std::cout << "[INFO] Sanitized invalid audio samples (NaN/Inf values) -> Format: "
-                << frame->format << std::endl;
+      LOG_DEBUG << "[INFO] Sanitized invalid audio samples (NaN/Inf values) -> Format: "
+                << frame->format;
     }
   }
   // Main transcoding function - now more modular
@@ -200,11 +201,11 @@ public:
       // Print output file information
       print_audio_info(output_filename, out_format_ctx, out_codec_ctx, "Output File Info");
 
-      std::cout << "-- Transcoding completed successfully!" << std::endl;
+      LOG_INFO << "==> [Transcoding completed successfully!]";
     }
     catch (const std::exception& e)
     {
-      std::cerr << "Transcoding error: " << e.what() << std::endl;
+      LOG_ERROR << "Transcoding error: " << e.what();
       ret = AVERROR_UNKNOWN;
     }
 
@@ -224,14 +225,14 @@ public:
     // Open input file
     if ((ret = avformat_open_input(in_format_ctx, input_filename, nullptr, nullptr)) < 0)
     {
-      std::cerr << "Could not open input file: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Could not open input file: " << av_err2str(ret);
       return ret;
     }
 
     // Read stream information
     if ((ret = avformat_find_stream_info(*in_format_ctx, nullptr)) < 0)
     {
-      std::cerr << "Could not find stream info: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Could not find stream info: " << av_err2str(ret);
       avformat_close_input(in_format_ctx);
       return ret;
     }
@@ -241,7 +242,7 @@ public:
       av_find_best_stream(*in_format_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     if (*audio_stream_index < 0)
     {
-      std::cerr << "Could not find an audio stream" << std::endl;
+      LOG_ERROR << "Could not find an audio stream";
       avformat_close_input(in_format_ctx);
       return AVERROR_STREAM_NOT_FOUND;
     }
@@ -252,7 +253,7 @@ public:
     const AVCodec* in_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
     if (!in_codec)
     {
-      std::cerr << "Decoder not found for codec ID: " << in_stream->codecpar->codec_id << std::endl;
+      LOG_ERROR << "Decoder not found for codec ID: " << in_stream->codecpar->codec_id;
       avformat_close_input(in_format_ctx);
       return AVERROR_DECODER_NOT_FOUND;
     }
@@ -261,7 +262,7 @@ public:
     *in_codec_ctx = avcodec_alloc_context3(in_codec);
     if (!*in_codec_ctx)
     {
-      std::cerr << "Could not allocate a decoding context" << std::endl;
+      LOG_ERROR << "Could not allocate a decoding context";
       avformat_close_input(in_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -269,8 +270,7 @@ public:
     // Copy parameters from the input stream to the decoder context
     if ((ret = avcodec_parameters_to_context(*in_codec_ctx, in_stream->codecpar)) < 0)
     {
-      std::cerr << "Failed to copy codec parameters to decoder context: " << av_err2str(ret)
-                << std::endl;
+      LOG_ERROR << "Failed to copy codec parameters to decoder context: " << av_err2str(ret);
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -282,7 +282,7 @@ public:
     // Open the decoder
     if ((ret = avcodec_open2(*in_codec_ctx, in_codec, nullptr)) < 0)
     {
-      std::cerr << "Failed to open decoder: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Failed to open decoder: " << av_err2str(ret);
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -302,7 +302,7 @@ public:
     if ((ret = avformat_alloc_output_context2(out_format_ctx, nullptr, nullptr, output_filename)) <
         0)
     {
-      std::cerr << "Could not create output context: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Could not create output context: " << av_err2str(ret);
       return ret;
     }
 
@@ -310,18 +310,18 @@ public:
     const AVCodec* out_codec = avcodec_find_encoder(AV_CODEC_ID_MP3);
     if (!out_codec)
     {
-      std::cerr << "MP3 encoder not found" << std::endl;
+      LOG_ERROR << "MP3 encoder not found";
       avformat_free_context(*out_format_ctx);
       return AVERROR_ENCODER_NOT_FOUND;
     }
 
-    std::cout << "-- Encoding using MP3 (libmp3lame, ID: " << AV_CODEC_ID_MP3 << ")" << std::endl;
+    LOG_INFO << "==> Encoding using MP3 (libmp3lame, ID: " << AV_CODEC_ID_MP3 << ")";
 
     // Create an audio stream in the output file
     *out_stream = avformat_new_stream(*out_format_ctx, nullptr);
     if (!*out_stream)
     {
-      std::cerr << "Failed to create output stream" << std::endl;
+      LOG_ERROR << "Failed to create output stream";
       avformat_free_context(*out_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -330,7 +330,7 @@ public:
     *out_codec_ctx = avcodec_alloc_context3(out_codec);
     if (!*out_codec_ctx)
     {
-      std::cerr << "Could not allocate encoding context" << std::endl;
+      LOG_ERROR << "Could not allocate encoding context";
       avformat_free_context(*out_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -345,8 +345,7 @@ public:
     // Copy channel layout from input
     if ((ret = av_channel_layout_copy(&(*out_codec_ctx)->ch_layout, &in_codec_ctx->ch_layout)) < 0)
     {
-      std::cerr << "Failed to copy input channel layout to output: " << av_err2str(ret)
-                << std::endl;
+      LOG_ERROR << "Failed to copy input channel layout to output: " << av_err2str(ret);
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -355,8 +354,7 @@ public:
     // MP3 has limitations on channel count
     if ((*out_codec_ctx)->ch_layout.nb_channels > 2)
     {
-      std::cout << "Warning: MP3 typically supports only mono or stereo. Limiting to stereo."
-                << std::endl;
+      LOG_DEBUG << "Warning: MP3 typically supports only mono or stereo. Limiting to stereo.";
       av_channel_layout_uninit(&(*out_codec_ctx)->ch_layout);
       av_channel_layout_default(&(*out_codec_ctx)->ch_layout, 2);
     }
@@ -370,8 +368,8 @@ public:
     // Set VBR quality - optional setting for better quality
     av_opt_set_int((*out_codec_ctx)->priv_data, "qscale", 1, 0); // Lower values = higher quality
 
-    std::cout << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels << std::endl;
-    std::cout << "Output Channels: " << (*out_codec_ctx)->ch_layout.nb_channels << std::endl;
+    LOG_DEBUG << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels;
+    LOG_DEBUG << "Output Channels: " << (*out_codec_ctx)->ch_layout.nb_channels;
 
     // Some formats require global header
     if ((*out_format_ctx)->oformat->flags & AVFMT_GLOBALHEADER)
@@ -382,19 +380,18 @@ public:
     // Open the encoder
     if ((ret = avcodec_open2(*out_codec_ctx, out_codec, nullptr)) < 0)
     {
-      std::cerr << "Could not open output codec: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Could not open output codec: " << av_err2str(ret);
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
     }
 
-    std::cout << "-- Opened encoder successfully" << std::endl;
+    LOG_INFO << "==> Opened encoder successfully";
 
     // Copy encoder parameters to output stream
     if ((ret = avcodec_parameters_from_context((*out_stream)->codecpar, *out_codec_ctx)) < 0)
     {
-      std::cerr << "Failed to copy encoder parameters to output stream: " << av_err2str(ret)
-                << std::endl;
+      LOG_ERROR << "Failed to copy encoder parameters to output stream: " << av_err2str(ret);
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -408,18 +405,18 @@ public:
     {
       if ((ret = avio_open(&(*out_format_ctx)->pb, output_filename, AVIO_FLAG_WRITE)) < 0)
       {
-        std::cerr << "Could not open output file: " << av_err2str(ret) << std::endl;
+        LOG_ERROR << "Could not open output file: " << av_err2str(ret);
         avcodec_free_context(out_codec_ctx);
         avformat_free_context(*out_format_ctx);
         return ret;
       }
-      std::cout << "-- Opened output file successfully" << std::endl;
+      LOG_INFO << "==> Opened output file successfully";
     }
 
     // Write file header
     if ((ret = avformat_write_header(*out_format_ctx, nullptr)) < 0)
     {
-      std::cerr << "Error writing format header: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Error writing format header: " << av_err2str(ret);
       if (!((*out_format_ctx)->oformat->flags & AVFMT_NOFILE))
       {
         avio_closep(&(*out_format_ctx)->pb);
@@ -429,7 +426,7 @@ public:
       return ret;
     }
 
-    std::cout << "-- Successfully wrote format header" << std::endl;
+    LOG_INFO << "==> Successfully wrote format header";
 
     return 0;
   }
@@ -468,7 +465,7 @@ public:
       return ret;
     }
 
-    std::cout << "--> Initialized resampler successfully" << std::endl;
+    LOG_INFO << "==> Initialized resampler successfully";
 
     return 0;
   }
@@ -510,7 +507,7 @@ public:
       return ret;
     }
 
-    std::cout << "--> Allocated frame buffers successfully" << std::endl;
+    LOG_INFO << "==> Allocated frame buffers successfully";
 
     return 0;
   }
@@ -536,17 +533,17 @@ public:
         if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
         {
           // Non-critical error, continue with next packet
-          std::cerr << "\r[WARNING] Error processing packet: " << av_err2str(ret) << std::flush;
+          LOG_WARNING << "\r[WARNING] Error processing packet: " << av_err2str(ret);
         }
       }
 
       av_packet_unref(packet);
     }
 
-    std::cout << std::endl << "Finished processing all frames" << std::endl;
+    LOG_DEBUG << "Finished processing all frames";
     if (samples_sanitized > 0)
     {
-      std::cout << "Total frames with sanitized samples: " << samples_sanitized << std::endl;
+      LOG_DEBUG << "Total frames with sanitized samples: " << samples_sanitized;
     }
 
     // Flush the encoder
@@ -555,7 +552,7 @@ public:
     // Write file trailer
     if ((ret = av_write_trailer(out_format_ctx)) < 0)
     {
-      std::cerr << "Error writing trailer: " << av_err2str(ret) << std::endl;
+      LOG_ERROR << "Error writing trailer: " << av_err2str(ret);
       return ret;
     }
 
@@ -571,7 +568,7 @@ public:
     int ret = avcodec_send_packet(in_codec_ctx, packet);
     if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
     {
-      std::cerr << "\r[WARNING] Error sending packet to decoder: " << av_err2str(ret) << std::flush;
+      LOG_ERROR << "\r[WARNING] Error sending packet to decoder: " << av_err2str(ret) << std::flush;
       return ret;
     }
 
@@ -608,7 +605,7 @@ public:
 
     if (num_samples < 0)
     {
-      std::cerr << "\r[WARNING] Resampling failed: " << av_err2str(num_samples) << std::flush;
+      LOG_ERROR << "\r[WARNING] Resampling failed: " << av_err2str(num_samples) << std::flush;
       (*samples_sanitized)++;
       return num_samples;
     }
@@ -648,7 +645,7 @@ public:
     int ret = avcodec_send_frame(codec_ctx, frame);
     if (ret < 0)
     {
-      std::cerr << "\r[WARNING] Error sending frame to encoder: " << av_err2str(ret) << std::flush;
+      LOG_ERROR << "\r[WARNING] Error sending frame to encoder: " << av_err2str(ret) << std::flush;
       return ret;
     }
 
@@ -664,7 +661,7 @@ public:
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
-        std::cerr << "\r[WARNING] Error writing packet: " << av_err2str(ret) << std::flush;
+        LOG_ERROR << "\r[WARNING] Error writing packet: " << av_err2str(ret) << std::flush;
       }
       av_packet_unref(out_packet);
     }
@@ -689,7 +686,7 @@ public:
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
-        std::cerr << "Error writing flushed packet: " << av_err2str(ret) << std::endl;
+        LOG_ERROR << "Error writing flushed packet: " << av_err2str(ret);
       }
       av_packet_unref(out_packet);
     }

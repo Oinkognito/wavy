@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <vector>
 
+namespace libwavy::abr
+{
+
 class ABRManager
 {
 public:
@@ -102,3 +105,5 @@ private:
     return selected_bitrate;
   }
 };
+
+} // namespace libwavy::abr
