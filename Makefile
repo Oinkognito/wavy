@@ -38,6 +38,7 @@ init:
 
 # Build all targets
 all:
+	@$(MAKE) init
 	$(call configure,All,Release)
 	@$(MAKE) -C $(BUILD_DIR)
 
@@ -78,6 +79,9 @@ format:
 # Code linting/fixing
 tidy:
 	@clang-tidy -fix src/*.cpp include/*.hpp --
+
+prepend-license-src:
+	@find src include examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" ! -name "miniaudio.h" -exec ./scripts/license-prepend.sh {} +
 
 # Clean build files
 clean:
