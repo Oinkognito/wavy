@@ -26,7 +26,10 @@ extern "C"
 //
 // -> Also minimum bitrate for transcoding is 32kbps by default (i think it is set by LAME itself)
 
-class LBW_Encoder
+namespace libwavy::ffmpeg
+{
+
+class Encoder
 {
 private:
   AVFormatContext* in_format_ctx   = nullptr;
@@ -747,3 +750,5 @@ public:
     }
   }
 };
+
+} // namespace libwavy::ffmpeg

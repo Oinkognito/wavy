@@ -3,7 +3,7 @@
 auto main(int argc, char* argv[]) -> int
 {
   // Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
-  LBW_Encoder enc;
+  libwavy::ffmpeg::Encoder enc;
 
   if (argc != 4)
   {

@@ -87,6 +87,9 @@ auto validate_m4s(const std::string& m4s_path) -> bool;
 auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
                           const std::string& ip_id) -> bool;
 
+namespace libwavy::server
+{
+
 class HLS_Session : public std::enable_shared_from_this<HLS_Session>
 {
 public:
@@ -647,3 +650,5 @@ private:
       });
   }
 };
+
+} // namespace libwavy::server

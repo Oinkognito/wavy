@@ -21,7 +21,7 @@ auto main() -> int
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
                                      boost::asio::ssl::context::pem);
 
-    HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
+    libwavy::server::HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();
   }
   catch (std::exception& e)
