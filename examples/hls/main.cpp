@@ -14,7 +14,7 @@ auto main(int argc, char* argv[]) -> int
     }
     else
     {
-      LOG_ERROR << argv[0] << "<input-file> " << "<output-dir>";
+      LOG_ERROR << argv[0] << " <input-file> " << "<output-dir>";
       return 1;
     }
   }

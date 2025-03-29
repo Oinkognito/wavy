@@ -82,6 +82,7 @@ tidy:
 # Clean build files
 clean:
 	@rm -rf $(BUILD_DIR)
+	@echo -e "-- Cleaned up the project's '$(BUILD_DIR)' directory"
 
 cleanup:
 	@rm -f *.ts *.m3u8

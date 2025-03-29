@@ -154,6 +154,22 @@ Wavy relies on **FFmpeg's core libraries** for processing audio:
 For detailed API documentation, see:  
 [APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
 
+## **Examples**
+
+Wavy currently is under heavy development as mentioned above, so for people to understand the project better,
+the project maintains an `examples/` directory. Latest `libwavy` APIs are made sure to have atleast one in-depth example 
+
+> [!NOTE]
+> 
+> To compile all examples:
+> 
+> ```bash 
+> make "-DBUILD_EXAMPLES=ON"
+> ```
+> 
+
+Each example should be pretty straightforward as they are isolated API calls to a particular aspect of `libwavy`
+
 ## **Server**
 The **Wavy-Server** allows **secure** transport stream handling over HTTPS.
 

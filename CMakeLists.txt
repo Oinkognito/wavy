@@ -26,6 +26,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Verbose")
 endif()
 
 option(BUILD_NINJA "Use Ninja to build the project" OFF)
+option(BUILD_EXAMPLES "Compile examples for the project" OFF)
 
 # Check if CMake is using Ninja
 if (DEFINED BUILD_NINJA AND BUILD_NINJA)
@@ -129,6 +130,15 @@ add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SER
 add_custom_target(build_dispatcher COMMAND ${CMAKE_COMMAND} --build . --target ${DISPATCHER_BIN})
 add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLIENT_BIN})
 
+# Examples
+if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
+  message(STATUS "Compiling examples for Wavy...")
+  add_subdirectory(examples/hls)
+  add_subdirectory(examples/transcoder)
+  add_subdirectory(examples/flac)
+  add_subdirectory(examples/registry)
+endif()
+
 if(DEFINED BUILD_TARGET)
     set(TARGET_BUILT ${BUILD_TARGET})
 else()
@@ -191,21 +201,11 @@ set(STANDARD_CXX_HEADERS
 message(STATUS "${BLUE}Checking Standard C Headers...${RESET}")
 foreach(header ${STANDARD_HEADERS})
     check_include_files(${header} HAS_${header})
-    if(HAS_${header})
-      message(STATUS "${GREEN}✔ Found header: ${header}${RESET}")
-    else()
-      message(WARNING "${YELLOW}✘ Missing header: ${header}${RESET}")
-    endif()
 endforeach()
 
 message(STATUS "${BLUE}Checking Standard C++ Headers...${RESET}")
 foreach(header ${STANDARD_CXX_HEADERS})
     check_include_file_cxx(${header} HAS_${header})
-    if(HAS_${header})
-      message(STATUS "${GREEN}✔ Found header: ${header}${RESET}")
-    else()
-      message(WARNING "${YELLOW}✘ Missing header: ${header}${RESET}")
-    endif()
 endforeach()
 
 message(STATUS "\n\n━━━━━━━━━━━━━━━━━ ${PROJECT_NAME} project v${PROJECT_VERSION} ━━━━━━━━━━━━━━━━━\n")
