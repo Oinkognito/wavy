@@ -51,6 +51,7 @@
   X(PLAYLIST_EXT, ".m3u8")                                    \
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
   X(MASTER_PLAYLIST, "index.m3u8")                            \
+  X(MASTER_PLAYLIST_HEADER, "#EXTM3U\n#EXT-X-VERSION:3\n")    \
   X(TRANSPORT_STREAM_EXT, ".ts")                              \
   X(MP4_FILE_EXT, ".mp4")                                     \
   X(M4S_FILE_EXT, ".m4s")                                     \

@@ -48,27 +48,10 @@ class HLS_Segmenter
 {
 public:
   libwavy::ffmpeg::Metadata lbwMetadata;
-  /**
-   * @brief Initializes the HLS encoder.
-   *
-   * This constructor initializes the FFmpeg network stack and sets the log level for debugging.
-   */
   HLS_Segmenter() { avformat_network_init(); }
 
-  /**
-   * @brief Cleans up resources and deinitializes FFmpeg network stack.
-   */
   ~HLS_Segmenter() { avformat_network_deinit(); }
-  /**
-   * @brief Creates HLS segments for multiple bitrates.
-   *
-   * @param input_file The path to the input audio file.
-   * @param bitrates A vector of bitrates (in kbps) for encoding.
-   * @param output_dir The directory where HLS playlists and segments will be stored.
-   *
-   * This function iterates over the provided bitrates, encoding each into an HLS playlist.
-   * It then generates a master playlist linking all variant playlists.
-   */
+
   void create_hls_segments(const char* input_file, const char* output_dir, bool use_flac = false)
   {
     std::vector<std::string> playlist_files;
@@ -95,16 +78,6 @@ public:
   }
 
 private:
-  /**
-   * @brief Encodes an audio file into HLS format at a specific bitrate.
-   *
-   * @param input_file The input audio file.
-   * @param output_playlist The output HLS playlist (.m3u8 file).
-   * @param bitrate The target bitrate (in kbps).
-   * @return `true` on success, `false` on failure.
-   *
-   * This function extracts the audio stream, sets the encoding bitrate, and writes HLS segments.
-   */
   auto encode_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
   {
     AVFormatContext* input_ctx          = nullptr;
@@ -377,13 +350,6 @@ private:
     return ret < 0 ? false : true;
   }
 
-  /**
-   * @brief Generates the master playlist (.m3u8) linking all variant playlists.
-   *
-   * @param playlists The list of variant playlists.
-   * @param bitrates The corresponding bitrates.
-   * @param output_dir The directory to save the master playlist.
-   */
   void create_master_playlist(const std::vector<std::string>& playlists,
                               const std::vector<int>& bitrates, const char* output_dir,
                               bool use_flac)
@@ -403,8 +369,7 @@ private:
       return;
     }
 
-    m3u8 << "#EXTM3U\n";
-    m3u8 << "#EXT-X-VERSION:3\n";
+    m3u8 << macros::MASTER_PLAYLIST_HEADER;
 
     for (size_t i = 0; i < playlists.size(); i++)
     {
