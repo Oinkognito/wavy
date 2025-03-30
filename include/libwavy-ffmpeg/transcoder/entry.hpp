@@ -80,7 +80,6 @@ private:
   AVPacket*        packet          = av_packet_alloc();
   AVFrame*         frame           = av_frame_alloc();
   AVFrame*         resampled_frame = av_frame_alloc();
-  bool             found_flac      = false;
 
 public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
@@ -342,9 +341,6 @@ public:
     }
 
     LOG_INFO << "==> Found codec " << in_codec->name << " <==";
-
-    if (strcmp(in_codec->name, "flac") == 0)
-      found_flac = true;
 
     // Allocate and initialize the decoder context
     *in_codec_ctx = avcodec_alloc_context3(in_codec);

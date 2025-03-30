@@ -29,6 +29,16 @@
 
 #include "../../include/libwavy-ffmpeg/transcoder/entry.hpp"
 
+/*
+ * This is a universal transcoder that works in the following formats:
+ *
+ * flac (16,32 bit) ==> mp3 transcoding 
+ * mp3 ==> mp3 transcoding 
+ *
+ * wav to mp3 is also possible I believe if we use FLAC++ API to decode WAV to FLAC first
+ *
+ */
+
 auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
@@ -37,9 +47,8 @@ auto main(int argc, char* argv[]) -> int
 
   if (argc != 4)
   {
-    std::cout << "Usage: " << argv[0] << " <input-file> <output-file> <bitrate-in-bits/sec>"
-              << std::endl;
-    std::cout << "Example: " << argv[0] << " input.wav output.mp3 128000" << std::endl;
+    LOG_ERROR << "Usage: " << argv[0] << " <input-file> <output-mp3-file> <bitrate-in-bits/sec>";
+    LOG_INFO << "Example: " << argv[0] << " input.flac output.mp3 128000";
     return 1;
   }
 
@@ -53,13 +62,13 @@ auto main(int argc, char* argv[]) -> int
   }
   catch (const std::exception& e)
   {
-    std::cerr << "Error: Bitrate must be a valid integer" << std::endl;
+    LOG_ERROR << "Error: Bitrate must be a valid integer";
     return 1;
   }
 
   if (bitrate <= 0)
   {
-    std::cerr << "Error: Bitrate must be positive" << std::endl;
+    LOG_ERROR << "Error: Bitrate must be positive";
     return 1;
   }
 
