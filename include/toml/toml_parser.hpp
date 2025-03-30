@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "toml.hpp"
 #include <cstdlib>
 #include <filesystem>

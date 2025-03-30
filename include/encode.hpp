@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "libwavy-common/logger.hpp"
 #include "libwavy-common/macros.hpp"
 #include <fstream>

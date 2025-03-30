@@ -42,6 +42,10 @@ all:
 	$(call configure,All,Release)
 	@$(MAKE) -C $(BUILD_DIR)
 
+rebuild:
+	$(call configure,All,Release)
+	@$(MAKE) -C $(BUILD_DIR)
+
 # Build individual components
 encoder:
 	$(call configure,Encoder Only,Release)

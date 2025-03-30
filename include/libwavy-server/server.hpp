@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "../libwavy-common/macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>

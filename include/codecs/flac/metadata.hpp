@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "../../libwavy-common/logger.hpp"
 #include <FLAC++/metadata.h>
 #include <sys/stat.h> // For file size

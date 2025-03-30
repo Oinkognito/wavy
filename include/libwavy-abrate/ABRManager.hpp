@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "NetworkDiagnoser.hpp"
 #include "PlaylistParser.hpp"
 #include <algorithm>

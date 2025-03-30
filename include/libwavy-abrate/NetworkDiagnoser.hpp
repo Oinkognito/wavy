@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <boost/asio.hpp>
 #include <chrono>
 #include <iostream>

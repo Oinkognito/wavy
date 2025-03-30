@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <cstring>
 #include <fcntl.h>
 #include <stdexcept>

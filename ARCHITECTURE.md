@@ -1,5 +1,10 @@
 # HLS Streaming System Architecture
 
+> [!IMPORTANT]
+> 
+> This is outdated!
+> 
+
 ## Overview
 
 In this architecture model, there are 3 main components which various jobs:

@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include "../../libwavy-common/logger.hpp"
 
 extern "C"
@@ -38,6 +37,7 @@ extern "C"
 #include <libavutil/avassert.h>
 #include <libavutil/mathematics.h>
 #include <libavutil/opt.h>
+#include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 }
 
@@ -56,6 +56,11 @@ extern "C"
 // But this is great step up, this transcoder seems to be working with EVERY mp3 file I have tested it with.
 //
 // -> Also minimum bitrate for transcoding is 32kbps by default (i think it is set by LAME itself)
+//
+// This Transcoder should work for the following:
+//
+// flac -> mp3 transcoding (16, 32 bit tested and verified)
+// mp3 -> mp3 transcoding
 
 namespace libwavy::ffmpeg
 {
@@ -72,6 +77,7 @@ private:
   AVPacket*        packet          = av_packet_alloc();
   AVFrame*         frame           = av_frame_alloc();
   AVFrame*         resampled_frame = av_frame_alloc();
+  bool             found_flac      = false;
 
 public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
@@ -104,14 +110,8 @@ public:
     if (!frame)
       return;
 
-    // Only process float-based sample formats
-    if (frame->format != AV_SAMPLE_FMT_FLT && frame->format != AV_SAMPLE_FMT_FLTP &&
-        frame->format != AV_SAMPLE_FMT_DBL && frame->format != AV_SAMPLE_FMT_DBLP)
-    {
-      return;
-    }
-
-    int  is_planar     = av_sample_fmt_is_planar(static_cast<AVSampleFormat>(frame->format));
+    int  format        = frame->format;
+    int  is_planar     = av_sample_fmt_is_planar(static_cast<AVSampleFormat>(format));
     int  channels      = frame->ch_layout.nb_channels;
     int  samples       = frame->nb_samples;
     bool found_invalid = false;
@@ -126,8 +126,9 @@ public:
     // Process each audio channel
     for (int ch = 0; ch < channels; ch++)
     {
-      if (frame->format == AV_SAMPLE_FMT_FLT || frame->format == AV_SAMPLE_FMT_FLTP)
+      if (format == AV_SAMPLE_FMT_FLT || format == AV_SAMPLE_FMT_FLTP)
       {
+        // Handle floating-point formats
         auto* data =
           reinterpret_cast<float*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
         int stride = is_planar ? 1 : channels;
@@ -138,7 +139,7 @@ public:
 
           if (std::isnan(sample) || std::isinf(sample))
           {
-            sample        = 0.0f; // Replace NaN/Inf with silence (or 0.5f for smooth interpolation)
+            sample        = 0.0f; // Replace NaN/Inf with silence
             found_invalid = true;
           }
           else
@@ -147,8 +148,9 @@ public:
           }
         }
       }
-      else if (frame->format == AV_SAMPLE_FMT_DBL || frame->format == AV_SAMPLE_FMT_DBLP)
+      else if (format == AV_SAMPLE_FMT_DBL || format == AV_SAMPLE_FMT_DBLP)
       {
+        // Handle double-precision floating point
         auto* data =
           reinterpret_cast<double*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
         int stride = is_planar ? 1 : channels;
@@ -168,12 +170,63 @@ public:
           }
         }
       }
+      else if (format == AV_SAMPLE_FMT_S32 || format == AV_SAMPLE_FMT_S32P)
+      {
+        // Handle 32-bit FLAC PCM -> Convert to float (-1.0 to 1.0)
+        auto* data =
+          reinterpret_cast<int32_t*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
+        int stride = is_planar ? 1 : channels;
+
+        for (int i = 0; i < samples; i++)
+        {
+          float sample =
+            static_cast<float>(data[i * stride]) / 2147483648.0f; // Normalize to (-1.0, 1.0)
+
+          if (std::isnan(sample) || std::isinf(sample))
+          {
+            sample        = 0.0f;
+            found_invalid = true;
+          }
+          else
+          {
+            sample = clamp(soft_clip(sample));
+          }
+
+          // Convert back to int32 after processing (only if needed)
+          data[i * stride] = static_cast<int32_t>(sample * 2147483648.0f);
+        }
+      }
+      else if (format == AV_SAMPLE_FMT_S16 || format == AV_SAMPLE_FMT_S16P)
+      {
+        // Handle 16-bit FLAC PCM -> Convert to float (-1.0 to 1.0)
+        auto* data =
+          reinterpret_cast<int16_t*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
+        int stride = is_planar ? 1 : channels;
+
+        for (int i = 0; i < samples; i++)
+        {
+          float sample =
+            static_cast<float>(data[i * stride]) / 32768.0f; // Normalize to (-1.0, 1.0)
+
+          if (std::isnan(sample) || std::isinf(sample))
+          {
+            sample        = 0.0f;
+            found_invalid = true;
+          }
+          else
+          {
+            sample = clamp(soft_clip(sample));
+          }
+
+          // Convert back to int16 after processing (only if needed)
+          data[i * stride] = static_cast<int16_t>(sample * 32768.0f);
+        }
+      }
     }
 
     if (found_invalid)
     {
-      LOG_DEBUG << "[INFO] Sanitized invalid audio samples (NaN/Inf values) -> Format: "
-                << frame->format;
+      LOG_DEBUG << "[INFO] Sanitized invalid audio samples (NaN/Inf values) -> Format: " << format;
     }
   }
   // Main transcoding function - now more modular
@@ -287,6 +340,11 @@ public:
       return AVERROR_DECODER_NOT_FOUND;
     }
 
+    LOG_INFO << "==> Found codec " << in_codec->name << " <==";
+
+    if (strcmp(in_codec->name, "flac") == 0)
+      found_flac = true;
+
     // Allocate and initialize the decoder context
     *in_codec_ctx = avcodec_alloc_context3(in_codec);
     if (!*in_codec_ctx)
@@ -368,8 +426,17 @@ public:
     (*out_codec_ctx)->bit_rate    = bitrate;
     (*out_codec_ctx)->sample_rate = in_codec_ctx->sample_rate;
 
-    // MP3 typically requires s16p sample format
-    (*out_codec_ctx)->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    // Handle FLAC input sample format conversion
+    if (in_codec_ctx->sample_fmt == AV_SAMPLE_FMT_S16 ||
+        in_codec_ctx->sample_fmt == AV_SAMPLE_FMT_S32)
+    {
+      LOG_INFO << "FLAC input detected, converting to MP3-compatible format.";
+      (*out_codec_ctx)->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    }
+    else
+    {
+      (*out_codec_ctx)->sample_fmt = in_codec_ctx->sample_fmt;
+    }
 
     // Copy channel layout from input
     if ((ret = av_channel_layout_copy(&(*out_codec_ctx)->ch_layout, &in_codec_ctx->ch_layout)) < 0)
@@ -554,14 +621,12 @@ public:
     // Process input packets
     while (av_read_frame(in_format_ctx, packet) >= 0)
     {
-      // Process only the audio stream
       if (packet->stream_index == audio_stream_index)
       {
         ret = decode_audio_packet(in_codec_ctx, packet, frame, out_codec_ctx, out_format_ctx,
                                   swr_ctx, resampled_frame, &next_pts, &samples_sanitized);
         if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
         {
-          // Non-critical error, continue with next packet
           LOG_WARNING << "\r[WARNING] Error processing packet: " << av_err2str(ret);
         }
       }
@@ -575,7 +640,11 @@ public:
       LOG_DEBUG << "Total frames with sanitized samples: " << samples_sanitized;
     }
 
-    // Flush the encoder
+    // Flush the resampler (ensure all buffered FLAC samples are output)
+    flush_resampler(swr_ctx, resampled_frame, out_codec_ctx, out_format_ctx, &next_pts,
+                    &samples_sanitized);
+
+    // Flush the encoder (ensure all encoded MP3 frames are written)
     flush_encoder(out_codec_ctx, out_format_ctx);
 
     // Write file trailer
@@ -699,12 +768,54 @@ public:
     return (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) ? 0 : ret;
   }
 
+  auto flush_resampler(SwrContext* swr_ctx, AVFrame* resampled_frame, AVCodecContext* out_codec_ctx,
+                       AVFormatContext* out_format_ctx, int64_t* next_pts, int* samples_sanitized)
+    -> int
+  {
+    int ret = 0;
+
+    while (true)
+    {
+      av_frame_make_writable(resampled_frame);
+
+      int num_samples =
+        swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples, nullptr, 0);
+
+      if (num_samples <= 0)
+        break; // No more samples left to process
+
+      resampled_frame->pts = *next_pts;
+      *next_pts += num_samples;
+
+      sanitize_audio_samples(resampled_frame);
+
+      ret = encode_audio_frame(resampled_frame, out_codec_ctx, out_format_ctx);
+      if (ret < 0)
+      {
+        (*samples_sanitized)++;
+        return ret;
+      }
+    }
+
+    return 0;
+  }
+
   // Function to flush encoder and write remaining packets
   auto flush_encoder(AVCodecContext* codec_ctx, AVFormatContext* format_ctx) -> int
   {
-    int ret = 0;
-    avcodec_send_frame(codec_ctx, nullptr);
+    int ret = avcodec_send_frame(codec_ctx, nullptr);
+    if (ret < 0 && ret != AVERROR_EOF)
+    {
+      LOG_ERROR << "Error sending null frame for flushing: " << av_err2str(ret);
+      return ret;
+    }
+
     AVPacket* out_packet = av_packet_alloc();
+    if (!out_packet)
+    {
+      LOG_ERROR << "Failed to allocate output packet";
+      return AVERROR(ENOMEM);
+    }
 
     while ((ret = avcodec_receive_packet(codec_ctx, out_packet)) == 0)
     {
@@ -712,16 +823,23 @@ public:
       av_packet_rescale_ts(out_packet, codec_ctx->time_base, format_ctx->streams[0]->time_base);
       out_packet->stream_index = 0;
 
+      // Write the packet
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
         LOG_ERROR << "Error writing flushed packet: " << av_err2str(ret);
+        av_packet_unref(out_packet);
+        av_packet_free(&out_packet);
+        return ret;
       }
+
       av_packet_unref(out_packet);
     }
+
     av_packet_free(&out_packet);
 
-    return (ret == AVERROR_EOF) ? 0 : ret;
+    // Return 0 for both EAGAIN and EOF since EOF is expected behavior
+    return (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) ? 0 : ret;
   }
 
   // Function to clean up and free all allocated resources

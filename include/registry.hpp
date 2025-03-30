@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <algorithm>
 #include <iostream>
 #include <string>

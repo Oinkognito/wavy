@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 extern "C"
 {
 #include <libavformat/avformat.h>
