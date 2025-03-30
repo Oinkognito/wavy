@@ -62,6 +62,9 @@ extern "C"
 // flac -> mp3 transcoding (16, 32 bit tested and verified)
 // mp3 -> mp3 transcoding
 
+constexpr float SCALE_FACTOR_32B = 1.0f / (1 << 31);
+constexpr float SCALE_FACTOR_16B = static_cast<float>(1 << 15); // 32768.0f
+
 namespace libwavy::ffmpeg
 {
 
@@ -179,8 +182,7 @@ public:
 
         for (int i = 0; i < samples; i++)
         {
-          float sample =
-            static_cast<float>(data[i * stride]) / 2147483648.0f; // Normalize to (-1.0, 1.0)
+          float sample = static_cast<float>(data[i * stride]) * SCALE_FACTOR_32B;
 
           if (std::isnan(sample) || std::isinf(sample))
           {
@@ -193,7 +195,7 @@ public:
           }
 
           // Convert back to int32 after processing (only if needed)
-          data[i * stride] = static_cast<int32_t>(sample * 2147483648.0f);
+          data[i * stride] = static_cast<int32_t>(sample * SCALE_FACTOR_32B);
         }
       }
       else if (format == AV_SAMPLE_FMT_S16 || format == AV_SAMPLE_FMT_S16P)
@@ -205,8 +207,7 @@ public:
 
         for (int i = 0; i < samples; i++)
         {
-          float sample =
-            static_cast<float>(data[i * stride]) / 32768.0f; // Normalize to (-1.0, 1.0)
+          float sample = static_cast<float>(data[i * stride]) / SCALE_FACTOR_16B; // Normalize
 
           if (std::isnan(sample) || std::isinf(sample))
           {
@@ -218,8 +219,8 @@ public:
             sample = clamp(soft_clip(sample));
           }
 
-          // Convert back to int16 after processing (only if needed)
-          data[i * stride] = static_cast<int16_t>(sample * 32768.0f);
+          // Convert back to int16 after processing
+          data[i * stride] = static_cast<int16_t>(sample * SCALE_FACTOR_16B);
         }
       }
     }
