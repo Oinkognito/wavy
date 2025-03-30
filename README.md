@@ -14,7 +14,9 @@ A **local networking solution** for **audio streaming and sharing**, supporting 
 - [**Dependencies**](#dependencies)
 - [**Building**](#building)
 - [**Architecture**](#architecture)
+- [**Security**](#security)
 - [**API References**](#api-references)
+- [**Examples**](#examples)
 - [**Server**](#server)
 - [**Usage**](#usage)
 - [**Documentation**](#documentation)
@@ -142,6 +144,13 @@ The **Wavy** system consists of the following components:
 
 For a more detailed explanation, read:  
 [ARCHITECTURE.md](https://github.com/nots1dd/wavy/blob/main/ARCHITECTURE.md)
+
+## **Security**
+
+We do have a [SECURITY.md](https://github.com/Oinkognito/wavy/blob/main/SECURITY.md).
+
+Since the project is still in **active development**, no absolute promises can be made other than the standards and 
+practices of the codebase.
 
 ## **API References**
 Wavy relies on **FFmpeg's core libraries** for processing audio:
