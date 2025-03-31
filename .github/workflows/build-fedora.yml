@@ -17,7 +17,7 @@ jobs:
       run: |
         dnf upgrade -y
         dnf install -y \
-          @development-tools flac-devel boost-devel openssl-devel \
+          @development-tools gcc-c++ flac-devel boost-devel openssl-devel \
           ffmpeg zstd cmake make pkgconf \
           libarchive-devel lame-devel git wget
 
