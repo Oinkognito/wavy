@@ -101,7 +101,7 @@ public:
 
   inline auto soft_clip(float x) -> float
   {
-    return std::tanhf(x); // Smoothly compresses extreme values
+    return std::tanh(x); // Smoothly compresses extreme values
   }
 
   inline auto soft_clip(double x) -> double { return std::tanh(x); }
