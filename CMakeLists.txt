@@ -91,14 +91,21 @@ function(add_custom_executable name src_file)
     target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES} OpenSSL::Crypto ${ZSTD_LIBRARIES})
 endfunction()
 
+# Add custom executable for FFmpeg target builds
+function(add_custom_executable_ffmpeg name src_file)
+    add_executable(${name} ${src_file})
+    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES})
+endfunction()
+
 add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
 target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads)
 
 
-add_executable(${CLIENT_BIN} ${CLIENT_SRC})
+add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
 message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
-target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${FFMPEG_LIBRARIES} ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_library(wavy-server SHARED include/libwavy-server/serverHelper.cpp)
 
