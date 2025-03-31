@@ -132,7 +132,7 @@ public:
 
   void start()
   {
-    LOG_INFO << SERVER_LOG << "Starting new session";
+    LOG_INFO_ASYNC << SERVER_LOG << "Starting new session";
     do_handshake();
   }
 
@@ -163,11 +163,11 @@ private:
     try
     {
       ip_id_ = socket_.lowest_layer().remote_endpoint().address().to_string();
-      LOG_INFO << SERVER_LOG << "Resolved IP: " << ip_id_;
+      LOG_INFO_ASYNC << SERVER_LOG << "Resolved IP: " << ip_id_;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << SERVER_LOG << "Failed to resolve IP: " << e.what();
+      LOG_ERROR_ASYNC << SERVER_LOG << "Failed to resolve IP: " << e.what();
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -190,17 +190,17 @@ private:
       {
         if (ec)
         {
-          LOG_ERROR << SERVER_LOG << "Read error: " << ec.message();
+          LOG_ERROR_ASYNC << SERVER_LOG << "Read error: " << ec.message();
           if (ec == http::error::body_limit)
           {
-            LOG_ERROR << SERVER_LOG << "Upload size exceeded the limit!";
+            LOG_ERROR_ASYNC << SERVER_LOG << "Upload size exceeded the limit!";
             send_response(macros::to_string(macros::SERVER_ERROR_413));
           }
           return;
         }
         /* bytes_to_mib is a C FFI from common.h */
-        LOG_INFO << SERVER_LOG << "Received " << bytes_to_mib(bytes_transferred) << " MiB ("
-                 << bytes_transferred << ") bytes";
+        LOG_INFO_ASYNC << SERVER_LOG << "Received " << bytes_to_mib(bytes_transferred) << " MiB ("
+                       << bytes_transferred << ") bytes";
         request_ = parser->release();
         process_request();
       });
@@ -218,7 +218,7 @@ private:
     try
     {
       AudioMetadata metadata = parseAudioMetadata(metadata_path);
-      LOG_DEBUG << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
+      LOG_DEBUG_ASYNC << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
       response_stream << "  - " << audio_id << "\n";
       response_stream << "      1. Title:         " << metadata.title << "\n";
@@ -230,8 +230,8 @@ private:
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": "
-                << e.what();
+      LOG_ERROR_ASYNC << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": "
+                      << e.what();
       return false;
     }
 
@@ -240,12 +240,12 @@ private:
 
   void handle_list_audio_info()
   {
-    LOG_INFO << "[List Audio Info] Handling audio metadata listing request";
+    LOG_INFO_ASYNC << "[List Audio Info] Handling audio metadata listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR << "[List Audio Info] Storage directory not found: " << storage_path;
+      LOG_ERROR_ASYNC << "[List Audio Info] Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -258,7 +258,7 @@ private:
       if (bfs::is_directory(ip_entry.status()))
       {
         std::string ip_id = ip_entry.path().filename().string();
-        LOG_DEBUG << "[List Audio Info] Processing IP-ID: " << ip_id;
+        LOG_DEBUG_ASYNC << "[List Audio Info] Processing IP-ID: " << ip_id;
         response_stream << ip_id << ":\n";
 
         bool audio_found = false;
@@ -267,27 +267,28 @@ private:
           if (bfs::is_directory(audio_entry.status()))
           {
             std::string audio_id = audio_entry.path().filename().string();
-            LOG_DEBUG << "[List Audio Info] Found Audio-ID: " << audio_id;
+            LOG_DEBUG_ASYNC << "[List Audio Info] Found Audio-ID: " << audio_id;
 
             std::string metadata_path =
               audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
             if (bfs::exists(metadata_path))
             {
-              LOG_DEBUG << "[List Audio Info] Found metadata file: " << metadata_path;
+              LOG_DEBUG_ASYNC << "[List Audio Info] Found metadata file: " << metadata_path;
               if (fetch_metadata(metadata_path, response_stream, audio_id))
                 audio_found = true;
             }
             else
             {
-              LOG_DEBUG << "[List Audio Info] No metadata file found for Audio-ID: " << audio_id;
+              LOG_DEBUG_ASYNC << "[List Audio Info] No metadata file found for Audio-ID: "
+                              << audio_id;
             }
           }
         }
 
         if (!audio_found)
         {
-          LOG_WARNING << "[List Audio Info] No metadata found for any audio IDs under IP-ID: "
-                      << ip_id;
+          LOG_WARNING_ASYNC << "[List Audio Info] No metadata found for any audio IDs under IP-ID: "
+                            << ip_id;
           response_stream << "  (No metadata found for any audio IDs)\n";
         }
 
@@ -297,7 +298,7 @@ private:
 
     if (!entries_found)
     {
-      LOG_WARNING << "[List Audio Info] No IPs or Audio-IDs with metadata found in storage";
+      LOG_WARNING_ASYNC << "[List Audio Info] No IPs or Audio-IDs with metadata found in storage";
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -308,12 +309,12 @@ private:
 
   void handle_list_ips()
   {
-    LOG_INFO << "[List IPs] Handling IP listing request";
+    LOG_INFO_ASYNC << "[List IPs] Handling IP listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR << "[List IPs] Storage directory not found: " << storage_path;
+      LOG_ERROR_ASYNC << "[List IPs] Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -349,7 +350,7 @@ private:
 
     if (!entries_found)
     {
-      LOG_WARNING << "[List IPs] No IPs or Audio-IDs found in storage";
+      LOG_WARNING_ASYNC << "[List IPs] No IPs or Audio-IDs found in storage";
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -375,7 +376,7 @@ private:
         auto toml_data_opt = parseAudioMetadataFromDataString(body);
         if (toml_data_opt.path.empty())
         {
-          LOG_ERROR << "[TOML] Failed to parse TOML data";
+          LOG_ERROR_ASYNC << "[TOML] Failed to parse TOML data";
           send_response(macros::to_string(macros::SERVER_ERROR_400));
           return;
         }
@@ -408,7 +409,7 @@ private:
 
   void handle_upload()
   {
-    LOG_INFO << SERVER_UPLD_LOG << "Handling GZIP file upload";
+    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "Handling GZIP file upload";
 
     std::string audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
     std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
@@ -418,7 +419,7 @@ private:
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
-      LOG_ERROR << SERVER_UPLD_LOG << "Failed to open output file for writing: " << gzip_path;
+      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to open output file for writing: " << gzip_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -427,7 +428,7 @@ private:
 
     if (!output_file.good())
     {
-      LOG_ERROR << SERVER_UPLD_LOG << "Failed to write data to file: " << gzip_path;
+      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to write data to file: " << gzip_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -436,12 +437,12 @@ private:
 
     if (!bfs::exists(gzip_path) || bfs::file_size(gzip_path) == 0)
     {
-      LOG_ERROR << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
+      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
       send_response("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
       return;
     }
 
-    LOG_INFO << SERVER_UPLD_LOG << "File successfully written: " << gzip_path;
+    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "File successfully written: " << gzip_path;
 
     if (extract_and_validate(gzip_path, audio_id, ip_id_))
     {
@@ -449,7 +450,7 @@ private:
     }
     else
     {
-      LOG_ERROR << SERVER_UPLD_LOG << "Extraction or validation failed!";
+      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Extraction or validation failed!";
       send_response(macros::to_string(macros::SERVER_ERROR_400));
     }
 
@@ -558,43 +559,42 @@ private:
   {
     LOG_DEBUG << SERVER_LOG << "Attempting to send " << msg;
     auto self(shared_from_this());
-    boost::asio::async_write(socket_, boost::asio::buffer(msg),
-                             [this, self, msg_size = msg.size()](boost::system::error_code ec,
-                                                                 std::size_t bytes_transferred)
-                             {
-                               // Always perform shutdown, even on error
-                               auto do_shutdown = [this, self]()
-                               {
-                                 socket_.async_shutdown(
-                                   [this, self](boost::system::error_code shutdown_ec)
-                                   {
-                                     if (shutdown_ec)
-                                     {
-                                       LOG_ERROR << SERVER_LOG
-                                                 << "Shutdown error: " << shutdown_ec.message();
-                                     }
-                                     socket_.lowest_layer().close();
-                                   });
-                               };
+    boost::asio::async_write(
+      socket_, boost::asio::buffer(msg),
+      [this, self, msg_size = msg.size()](boost::system::error_code ec,
+                                          std::size_t               bytes_transferred)
+      {
+        // Always perform shutdown, even on error
+        auto do_shutdown = [this, self]()
+        {
+          socket_.async_shutdown(
+            [this, self](boost::system::error_code shutdown_ec)
+            {
+              if (shutdown_ec)
+              {
+                LOG_ERROR_ASYNC << SERVER_LOG << "Shutdown error: " << shutdown_ec.message();
+              }
+              socket_.lowest_layer().close();
+            });
+        };
 
-                               if (ec)
-                               {
-                                 LOG_ERROR << SERVER_LOG << "Write error: " << ec.message();
-                                 do_shutdown();
-                                 return;
-                               }
+        if (ec)
+        {
+          LOG_ERROR_ASYNC << SERVER_LOG << "Write error: " << ec.message();
+          do_shutdown();
+          return;
+        }
 
-                               if (bytes_transferred != msg_size)
-                               {
-                                 LOG_ERROR << SERVER_LOG
-                                           << "Incomplete write: " << bytes_transferred << " of "
-                                           << msg_size << " bytes";
-                                 do_shutdown();
-                                 return;
-                               }
+        if (bytes_transferred != msg_size)
+        {
+          LOG_ERROR_ASYNC << SERVER_LOG << "Incomplete write: " << bytes_transferred << " of "
+                          << msg_size << " bytes";
+          do_shutdown();
+          return;
+        }
 
-                               do_shutdown();
-                             });
+        do_shutdown();
+      });
   }
 };
 
@@ -637,12 +637,12 @@ private:
       {
         if (ec)
         {
-          LOG_ERROR << SERVER_LOG << "Accept failed: " << ec.message();
+          LOG_ERROR_ASYNC << SERVER_LOG << "Accept failed: " << ec.message();
           return;
         }
 
         std::string ip = socket.remote_endpoint().address().to_string();
-        LOG_INFO << SERVER_LOG << "Accepted new connection from " << ip;
+        LOG_INFO_ASYNC << SERVER_LOG << "Accepted new connection from " << ip;
 
         auto session = std::make_shared<HLS_Session>(
           boost::asio::ssl::stream<tcp::socket>(std::move(socket), ssl_context_), ip);

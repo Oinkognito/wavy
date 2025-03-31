@@ -84,6 +84,7 @@
   X(SERVER_ERROR_500,                                                                      \
     "HTTP/1.1 500 Internal Server Error\r\n\r\nUnable to read file (or) File write error") \
   X(SERVER_ERROR_400, "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request format")            \
+  X(SERVER_ERROR_401, "HTTP/1.1 401 Authentication Error\r\n\r\n")                         \
   X(SERVER_ERROR_405, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")                           \
   X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large\r\n\r\n")
 
