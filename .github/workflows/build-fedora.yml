@@ -19,7 +19,7 @@ jobs:
         dnf install -y \
           @development-tools flac-devel boost-devel openssl-devel \
           ffmpeg-devel zstd-devel cmake make pkgconf \
-          libarchive-devel lame-devel git
+          libarchive-devel lame-devel git wget
 
     - name: Checkout repository
       uses: actions/checkout@v3
