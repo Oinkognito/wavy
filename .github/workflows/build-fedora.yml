@@ -18,7 +18,7 @@ jobs:
         dnf upgrade -y
         dnf install -y \
           @development-tools gcc-c++ flac-devel boost-devel openssl-devel \
-          libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
+          ffmpeg-free-devel libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
           zstd cmake make pkgconf \
           libarchive-devel lame-devel git wget
 
