@@ -104,7 +104,7 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
   archive_read_support_format_tar(a);
   archive_write_disk_set_options(ext, ARCHIVE_EXTRACT_PERM);
 
-  if (archive_read_open_filename(a, payload_path.c_str(), 10240) != ARCHIVE_OK)
+  if (archive_read_open_filename(a, payload_path.c_str(), ARCHIVE_READ_BUFFER_SIZE) != ARCHIVE_OK)
   {
     LOG_ERROR << SERVER_EXTRACT_LOG << "Failed to open archive: " << archive_error_string(a);
     archive_read_free(a);
@@ -182,12 +182,13 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
                           const std::string& ip_id) -> bool
 {
-  LOG_INFO << SERVER_EXTRACT_LOG << "Validating and extracting GZIP file: " << gzip_path;
+  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and extracting GZIP file: " << gzip_path;
+
   int metadataFileCount = 0;
 
   if (!bfs::exists(gzip_path))
   {
-    LOG_ERROR << SERVER_EXTRACT_LOG << "File does not exist: " << gzip_path;
+    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG << " File does not exist: " << gzip_path;
     return false;
   }
 
@@ -197,13 +198,12 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
 
   if (!extract_payload(gzip_path, temp_extract_path))
   {
-    LOG_ERROR << SERVER_EXTRACT_LOG << "Extraction failed!";
+    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG << " Extraction failed!";
     return false;
   }
 
-  LOG_INFO << SERVER_EXTRACT_LOG << "Extraction complete, validating files...";
+  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction complete, validating files...";
 
-  // Move valid files to storage
   std::string storage_path =
     macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_id + "/" + audio_id;
   bfs::create_directories(storage_path);
@@ -220,7 +220,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     {
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
-        LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid M3U8 file, removing: " << fname;
+        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Invalid M3U8 file, removing: " << fname;
         bfs::remove(file.path());
         continue;
       }
@@ -229,46 +229,78 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     {
       if (!validate_ts_file(data))
       {
-        LOG_WARNING << SERVER_EXTRACT_LOG << "Invalid TS file, removing: " << fname;
+        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Invalid TS file, removing: " << fname;
         bfs::remove(file.path());
         continue;
       }
     }
     else if (fname.ends_with(macros::M4S_FILE_EXT))
     {
-      if (!validate_m4s(file.path().string())) // Validate .m4s
+      if (!validate_m4s(file.path().string()))
       {
-        LOG_WARNING << SERVER_EXTRACT_LOG << "Possibly invalid M4S segment: " << fname;
+        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Possibly invalid M4S segment: " << fname;
       }
     }
     else if (fname.ends_with(macros::MP4_FILE_EXT))
     {
-      LOG_DEBUG << SERVER_EXTRACT_LOG << "Found MP4 file: " << fname;
+      LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found MP4 file: " << fname;
     }
     else if (fname.ends_with(macros::TOML_FILE_EXT) && metadataFileCount == 0)
     {
-      LOG_DEBUG << SERVER_EXTRACT_LOG << "Found metadata TOML file: " << fname;
+      LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found metadata TOML file: " << fname;
       metadataFileCount++;
     }
     else
     {
-      LOG_WARNING << SERVER_EXTRACT_LOG << "Skipping unknown file: " << fname;
+      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Skipping unknown file: " << fname;
       bfs::remove(file.path());
       continue;
     }
 
-    // Move validated file to storage
     bfs::rename(file.path(), storage_path + "/" + fname);
-    LOG_INFO << SERVER_EXTRACT_LOG << "File stored in HLS storage: " << fname;
+    LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " File stored in HLS storage: " << fname;
     valid_file_count++;
   }
 
   if (valid_file_count == 0)
   {
-    LOG_ERROR << SERVER_EXTRACT_LOG << "No valid files remain after validation, extraction failed!";
+    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG
+                    << " No valid files remain after validation, extraction failed!";
     return false;
   }
 
-  LOG_INFO << SERVER_EXTRACT_LOG << "Extraction and validation successful.";
+  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction and validation successful.";
   return true;
+}
+
+void removeBodyPadding(std::string& body)
+{
+  auto pos = body.find(macros::NETWORK_TEXT_DELIM);
+  if (pos != std::string::npos)
+  {
+    body = body.substr(pos + macros::NETWORK_TEXT_DELIM.length());
+  }
+
+  // Remove bottom padding text
+  std::string bottom_delimiter = "--------------------------";
+  auto        bottom_pos       = body.find(bottom_delimiter);
+  if (bottom_pos != std::string::npos)
+  {
+    body = body.substr(0, bottom_pos);
+  }
+}
+
+auto tokenizePath(std::istringstream& iss) -> vector<std::string>
+{
+  std::string         token;
+  vector<std::string> parts;
+  while (std::getline(iss, token, '/'))
+  {
+    if (!token.empty())
+    {
+      parts.push_back(token);
+    }
+  }
+
+  return parts;
 }

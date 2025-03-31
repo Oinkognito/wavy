@@ -38,6 +38,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/file.hpp>
+#include <boost/thread.hpp>
 #include <chrono>
 #include <iomanip>
 #include <iostream>
@@ -133,9 +134,17 @@ inline void init_logging()
 }
 
 // Macros for logging
+#define THREAD_ID "[Worker " << boost::this_thread::get_id() << "] "
+
 #define LOG_INFO    BOOST_LOG_TRIVIAL(info)
 #define LOG_WARNING BOOST_LOG_TRIVIAL(warning)
 #define LOG_ERROR   BOOST_LOG_TRIVIAL(error)
 #define LOG_DEBUG   BOOST_LOG_TRIVIAL(debug)
+
+// Async logging macros (include thread ID)
+#define LOG_INFO_ASYNC    BOOST_LOG_TRIVIAL(info) << THREAD_ID
+#define LOG_WARNING_ASYNC BOOST_LOG_TRIVIAL(warning) << THREAD_ID
+#define LOG_ERROR_ASYNC   BOOST_LOG_TRIVIAL(error) << THREAD_ID
+#define LOG_DEBUG_ASYNC   BOOST_LOG_TRIVIAL(debug) << THREAD_ID
 
 } // namespace logger

@@ -69,6 +69,7 @@
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream")    \
   X(PLAYLIST_VARIANT_TAG, "#EXT-X-STREAM-INF:")               \
   X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
+  X(SERVER_PATH_TOML_UPLOAD, "/toml/upload")                  \
   X(SERVER_PATH_AUDIO_INFO, "/hls/audio-info/")               \
   X(SERVER_LOCK_FILE, "/tmp/hls_server.lock")                 \
   X(METADATA_FILE, "metadata.toml")                           \

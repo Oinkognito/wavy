@@ -107,6 +107,8 @@ namespace beast = boost::beast;
 namespace http  = beast::http;
 using boost::asio::ip::tcp;
 
+#define ARCHIVE_READ_BUFFER_SIZE 10240
+
 /* PROTOTYPES DEFINITION FOR VALIDATION IN SERVER */
 auto is_valid_extension(const std::string& filename) -> bool;
 auto validate_m3u8_format(const std::string& content) -> bool;
@@ -114,6 +116,8 @@ auto validate_ts_file(const std::vector<uint8_t>& data) -> bool;
 auto validate_m4s(const std::string& m4s_path) -> bool;
 auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
                           const std::string& ip_id) -> bool;
+void removeBodyPadding(std::string& body);
+auto tokenizePath(std::istringstream& iss) -> vector<std::string>;
 
 namespace libwavy::server
 {
@@ -265,7 +269,8 @@ private:
             std::string audio_id = audio_entry.path().filename().string();
             LOG_DEBUG << "[List Audio Info] Found Audio-ID: " << audio_id;
 
-            std::string metadata_path = audio_entry.path().string() + "/metadata.toml";
+            std::string metadata_path =
+              audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
             if (bfs::exists(metadata_path))
             {
               LOG_DEBUG << "[List Audio Info] Found metadata file: " << metadata_path;
@@ -360,23 +365,11 @@ private:
       // Check if this is a TOML file upload request.
       // For example, if the request target is "/toml/upload"...
       std::string target(request_.target().begin(), request_.target().end());
-      if (target == "/toml/upload")
+      if (target == macros::SERVER_PATH_TOML_UPLOAD)
       {
         // Remove padding text before parsing
         std::string body = request_.body();
-        auto        pos  = body.find(macros::NETWORK_TEXT_DELIM);
-        if (pos != std::string::npos)
-        {
-          body = body.substr(pos + macros::NETWORK_TEXT_DELIM.length());
-        }
-
-        // Remove bottom padding text
-        std::string bottom_delimiter = "--------------------------";
-        auto        bottom_pos       = body.find(bottom_delimiter);
-        if (bottom_pos != std::string::npos)
-        {
-          body = body.substr(0, bottom_pos);
-        }
+        removeBodyPadding(body);
 
         // Call your TOML parsing function.
         auto toml_data_opt = parseAudioMetadataFromDataString(body);
@@ -480,29 +473,17 @@ private:
    */
   void handle_download()
   {
-    // Capture thread ID for debugging
-    auto thread_id = boost::this_thread::get_id();
-
     // Parse request target (expected: /hls/<audio_id>/<filename>)
-    std::string              target(request_.target().begin(), request_.target().end());
-    std::vector<std::string> parts;
-    std::istringstream       iss(target);
-    std::string              token;
+    std::string        target(request_.target().begin(), request_.target().end());
+    std::istringstream iss(target);
 
-    LOG_DEBUG << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] Processing request: " << target;
+    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << " Processing request: " << target;
 
-    while (std::getline(iss, token, '/'))
-    {
-      if (!token.empty())
-      {
-        parts.push_back(token);
-      }
-    }
+    std::vector<std::string> parts = tokenizePath(iss);
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-                << "] Invalid request path: " << target;
+      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Invalid request path: " << target;
       send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
@@ -515,32 +496,25 @@ private:
     std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
                             audio_id + "/" + filename;
 
-    LOG_DEBUG << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] Checking file: " << file_path;
+    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << " Checking file: " << file_path;
 
-    if (!bfs::exists(file_path) || !bfs::is_regular_file(file_path))
-    {
-      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-                << "] File not found: " << file_path;
-      send_response(macros::to_string(macros::SERVER_ERROR_404));
-      return;
-    }
+    // Use async file reading (prevent blocking on large files)
+    auto file_stream = std::make_shared<boost::beast::http::file_body::value_type>();
 
-    std::ifstream file(file_path, std::ios::binary);
-    if (!file)
+    boost::system::error_code ec;
+    file_stream->open(file_path.c_str(), boost::beast::file_mode::read, ec);
+
+    if (ec)
     {
-      LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-                << "] Failed to open file: " << file_path;
+      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Failed to open file: " << file_path
+                      << " Error: " << ec.message();
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    std::string file_content = buffer.str();
-
-    LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-             << "] File read complete: " << file_path << " (Size: " << file_content.size()
-             << " bytes)";
+    std::uint64_t file_size = file_stream->size();
+    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " File opened asynchronously: " << file_path
+                   << " (Size: " << file_size << " bytes)";
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
     if (filename.ends_with(macros::PLAYLIST_EXT))
@@ -552,33 +526,32 @@ private:
       content_type = "video/mp2t";
     }
 
-    auto response = std::make_shared<http::response<http::string_body>>();
+    auto response = std::make_shared<http::response<http::file_body>>();
     response->version(request_.version());
     response->result(http::status::ok);
     response->set(http::field::server, "Wavy Server");
     response->set(http::field::content_type, content_type);
-    response->body() = std::move(file_content);
+    response->content_length(file_size);
+    response->body() = std::move(*file_stream);
     response->prepare_payload();
 
     auto self = shared_from_this(); // Keep session alive
     http::async_write(socket_, *response,
-                      [this, self, response, thread_id](boost::system::error_code ec, std::size_t)
+                      [this, self, response](boost::system::error_code ec, std::size_t)
                       {
                         if (ec)
                         {
-                          LOG_ERROR << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-                                    << "] Write error: " << ec.message();
+                          LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Write error: " << ec.message();
                         }
                         else
                         {
-                          LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id
-                                   << "] Response sent successfully.";
+                          LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " Response sent successfully.";
                         }
                         socket_.lowest_layer().close();
                       });
 
-    LOG_INFO << SERVER_DWNLD_LOG << "[Thread: " << thread_id << "] [OWNER:" << ip_addr
-             << "] Served: " << filename << " (" << audio_id << ")";
+    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " [OWNER:" << ip_addr << "] Served: " << filename << " ("
+                   << audio_id << ")";
   }
 
   void send_response(const std::string& msg)
