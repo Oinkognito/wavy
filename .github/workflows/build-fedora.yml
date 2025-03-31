@@ -1,0 +1,29 @@
+name: "Building Wavy in Fedora (x86-64 arch - GCC)"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest  # No native Fedora runner
+    container:
+      image: fedora:latest  # Use Fedora container
+
+    steps:
+    - name: Update DNF and Install Dependencies
+      run: |
+        dnf upgrade -y
+        dnf install -y \
+          @development-tools flac-devel boost-devel openssl-devel \
+          ffmpeg-devel zstd-devel cmake make pkgconf \
+          libarchive-devel lame-devel git
+
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Build Release Version of Wavy (x86-64 arch) - GCC
+      run: |
+        make

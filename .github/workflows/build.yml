@@ -31,5 +31,4 @@ jobs:
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC (with GNU-ld)
       run: |
-        make init
         make

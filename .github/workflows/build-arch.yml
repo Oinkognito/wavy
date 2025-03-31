@@ -1,0 +1,29 @@
+name: "Building Wavy in Arch Linux (x86-64 arch - GCC)"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest  # No native Arch Linux runner
+    container:
+      image: archlinux:latest  # Use Arch Linux container
+
+    steps:
+    - name: Update Pacman and Install Dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm \
+          base-devel flac boost openssl \
+          ffmpeg zstd cmake make pkgconf \
+          libarchive lame git
+
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Build Release Version of Wavy (x86-64 arch) - GCC
+      run: |
+        make
