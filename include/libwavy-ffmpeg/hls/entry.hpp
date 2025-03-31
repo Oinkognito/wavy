@@ -31,7 +31,9 @@
 #include "../../libwavy-common/logger.hpp"
 #include "../../libwavy-common/macros.hpp"
 #include "../misc/metadata.hpp"
+#include <filesystem>
 #include <fstream>
+#include <regex>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -73,8 +75,61 @@ public:
       av_log(nullptr, AV_LOG_ERROR, "Encoding failed for file %s\n", input_file);
       return;
     }
+  }
 
-    //create_master_playlist(playlist_files, bitrates, output_dir, use_flac);
+  void create_master_playlist(const std::string& input_dir, const std::string& output_dir,
+                              bool use_flac)
+  {
+    std::vector<std::string> playlists;
+    std::vector<int>         bitrates;
+
+    std::regex bitrate_regex(R"(hls_mp3_(\d+)\.m3u8$)"); // Matches "hls_mp3_<bitrate>.m3u8"
+
+    for (const auto& entry : fs::directory_iterator(input_dir))
+    {
+      if (entry.is_regular_file() && entry.path().extension() == ".m3u8")
+      {
+        std::string filename = entry.path().filename().string();
+        std::smatch match;
+        if (std::regex_search(filename, match, bitrate_regex))
+        {
+          playlists.push_back(filename);
+          bitrates.push_back(std::stoi(match[1])); // Extract bitrate
+        }
+      }
+    }
+
+    if (playlists.empty())
+    {
+      std::cerr << "No playlists found in directory: " << input_dir << "\n";
+      return;
+    }
+
+    std::string   master_playlist = output_dir + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+    std::ofstream m3u8(master_playlist);
+
+    if (!m3u8)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to create master playlist\n");
+      return;
+    }
+
+    m3u8 << macros::MASTER_PLAYLIST_HEADER;
+
+    for (size_t i = 0; i < playlists.size(); i++)
+    {
+      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << bitrates[i] << ",CODECS=\""
+           << (use_flac ? "fLaC" : "mp4a.40.2") << "\"\n";
+      m3u8 << playlists[i] << "\n";
+    }
+
+    m3u8.close();
+    if (use_flac)
+      LOG_INFO << "Created HLS segments for FLAC with references written to: "
+               << macros::to_string(macros::MASTER_PLAYLIST);
+    else
+      LOG_INFO << "Created HLS segments for LOSSY with references written to master playlist: "
+               << macros::to_string(macros::MASTER_PLAYLIST);
   }
 
 private:
@@ -348,43 +403,6 @@ private:
     if (input_ctx)
       avformat_close_input(&input_ctx);
     return ret < 0 ? false : true;
-  }
-
-  void create_master_playlist(const std::vector<std::string>& playlists,
-                              const std::vector<int>& bitrates, const char* output_dir,
-                              bool use_flac)
-  {
-    bool is_flac = false;
-    if (!playlists.empty())
-    {
-      is_flac = playlists[0].find("flac") != std::string::npos;
-    }
-    std::string master_playlist =
-      std::string(output_dir) + "/" + macros::to_string(macros::MASTER_PLAYLIST);
-    std::ofstream m3u8(master_playlist);
-
-    if (!m3u8)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to create master playlist\n");
-      return;
-    }
-
-    m3u8 << macros::MASTER_PLAYLIST_HEADER;
-
-    for (size_t i = 0; i < playlists.size(); i++)
-    {
-      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << (bitrates[i] * 1000) << ",CODECS=\""
-           << (use_flac ? "fLaC" : "mp4a.40.2") << "\"\n";
-      m3u8 << playlists[i].substr(strlen(output_dir) + 1) << "\n";
-    }
-
-    m3u8.close();
-    if (use_flac)
-      LOG_INFO << "Created HLS segments for FLAC with references written to: "
-               << macros::to_string(macros::MASTER_PLAYLIST);
-    else
-      LOG_INFO << "Created HLS segments for LOSSY with references written to master playlist: "
-               << macros::to_string(macros::MASTER_PLAYLIST);
   }
 };
 

@@ -27,7 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../include/encode.hpp"
+#include "../include/libwavy-ffmpeg/hls/entry.hpp"
+#include "../include/libwavy-ffmpeg/transcoder/entry.hpp"
 #include "../include/registry.hpp"
 
 /*
@@ -92,7 +93,7 @@ auto main(int argc, char* argv[]) -> int
    * `std::vector<int> bitrates = { 64, 128, 190 }`
    *
    */
-  std::vector<int> bitrates = {64, 128, 256};        // Example bitrates in kbps
+  std::vector<int> bitrates = {64, 112, 128};        // Example bitrates in kbps
   /* This is a godawful way of doing it will fix. */ //[TODO]: Fix this command line argument
                                                      // structure
   bool        use_flac   = (strcmp(argv[3], "flac") == 0);
@@ -115,9 +116,25 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  HLS_Encoder encoder;
-  encoder.create_hls_segments(argv[1], bitrates, argv[2], use_flac);
-  LOG_INFO << "Encoding seems to be complete.";
+  libwavy::hls::HLS_Segmenter seg;
+  const char*                 output_file =
+    "output.mp3"; // this will constantly get re-written it can stay constant
+  for (const auto& i : bitrates)
+  {
+    libwavy::ffmpeg::Transcoder trns;
+    LOG_INFO << "Encoding for bitrate: " << i * 1000;
+    int result = trns.transcode_mp3(argv[1], output_file, i * 1000);
+    if (result == 0)
+    {
+      LOG_INFO << "Transcoding seems to be succesful. Creating HLS segmentes in '" << output_dir
+               << "'.";
+      seg.create_hls_segments(output_file, output_dir.c_str());
+    }
+  }
+  LOG_INFO
+    << "Total encoding seems to be complete. Going ahead with creating <master playlist> ...";
+
+  seg.create_master_playlist(output_dir, output_dir, use_flac);
 
   AudioParser parser(argv[1]);
   if (!parser.parse())
