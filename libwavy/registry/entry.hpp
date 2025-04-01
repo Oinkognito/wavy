@@ -44,10 +44,15 @@ extern "C"
 namespace libwavy::registry
 {
 
+using namespace libwavy::Toml;
+
 class RegisterAudio
 {
 public:
-  RegisterAudio(std::string filePath) : filePath(std::move(filePath)) {}
+  RegisterAudio(std::string filePath, std::vector<int> bitrates)
+      : filePath(std::move(filePath)), bitrates(std::move(bitrates))
+  {
+  }
 
   ~RegisterAudio()
   {
@@ -74,7 +79,6 @@ public:
       return false;
     }
 
-    // Fill the AudioMetadata structure
     populateMetadata();
     return true;
   }
@@ -91,7 +95,8 @@ public:
     tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION, metadata.duration);
     tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE, metadata.bitrate);
 
-    // Metadata fields
+    tomlGen.addTableArray(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATES, bitrates);
+
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TITLE, metadata.title);
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ARTIST, metadata.artist);
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ALBUM, metadata.album);
@@ -111,7 +116,6 @@ public:
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ENCODED_BY, metadata.encoded_by);
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_DATE, metadata.date);
 
-    // Stream data
     saveStreamMetadataToToml(tomlGen, metadata.audio_stream, PARENT_STREAM_0);
     saveStreamMetadataToToml(tomlGen, metadata.video_stream, PARENT_STREAM_1);
 
@@ -124,6 +128,7 @@ private:
   std::string      filePath;
   AVFormatContext* fmt_ctx{};
   AudioMetadata    metadata;
+  std::vector<int> bitrates;
 
   void populateMetadata()
   {
@@ -140,7 +145,6 @@ private:
       (fmt_ctx->duration != AV_NOPTS_VALUE) ? fmt_ctx->duration / AV_TIME_BASE : -1;
     metadata.bitrate = (fmt_ctx->bit_rate > 0) ? fmt_ctx->bit_rate / 1000 : -1;
 
-    // Extract metadata
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
     {

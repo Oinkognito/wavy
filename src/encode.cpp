@@ -28,6 +28,7 @@
  ************************************************/
 
 #include <libwavy/ffmpeg/hls/entry.hpp>
+#include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>
 #include <libwavy/registry/entry.hpp>
 
@@ -39,6 +40,14 @@
  * provide with verbose AV LOGS regarding the HLS encoding process.
  *
  */
+
+void DBG_printBitrateVec(vector<int>& vec)
+{
+  LOG_DEBUG << "Printing Bitrate Vec...";
+  for (const auto& i : vec)
+    LOG_DEBUG << i;
+  LOG_DEBUG << "Finished listing.";
+}
 
 auto main(int argc, char* argv[]) -> int
 {
@@ -117,6 +126,8 @@ auto main(int argc, char* argv[]) -> int
   }
 
   libwavy::hls::HLS_Segmenter seg;
+  libwavy::ffmpeg::Metadata   metadata;
+  vector<int>                 found_bitrates;
   const char*                 output_file =
     "output.mp3"; // this will constantly get re-written it can stay constant
   for (const auto& i : bitrates)
@@ -128,15 +139,18 @@ auto main(int argc, char* argv[]) -> int
     {
       LOG_INFO << "Transcoding seems to be succesful. Creating HLS segmentes in '" << output_dir
                << "'.";
-      seg.create_hls_segments(output_file, output_dir.c_str());
+      found_bitrates = seg.create_hls_segments(output_file, output_dir.c_str());
     }
   }
   LOG_INFO
     << "Total encoding seems to be complete. Going ahead with creating <master playlist> ...";
 
+  // For debug if you want to sanity check the resultant bitrates
+  DBG_printBitrateVec(found_bitrates);
+
   seg.create_master_playlist(output_dir, output_dir, use_flac);
 
-  libwavy::registry::RegisterAudio parser(argv[1]);
+  libwavy::registry::RegisterAudio parser(argv[1], found_bitrates);
   if (!parser.parse())
   {
     std::cerr << "Failed to parse audio file.\n";

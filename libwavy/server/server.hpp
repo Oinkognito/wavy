@@ -221,12 +221,19 @@ private:
       LOG_DEBUG_ASYNC << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
       response_stream << "  - " << audio_id << "\n";
-      response_stream << "      1. Title:         " << metadata.title << "\n";
-      response_stream << "      2. Artist:        " << metadata.artist << "\n";
-      response_stream << "      3. Album:         " << metadata.album << "\n";
-      response_stream << "      4. Bitrate:       " << metadata.bitrate << " kbps\n";
-      response_stream << "      5. Audio Bitrate: " << metadata.audio_stream.bitrate << " kbps\n";
-      response_stream << "      6. Codec:         " << metadata.audio_stream.codec << "\n";
+      response_stream << "      1. Title:              " << metadata.title << "\n";
+      response_stream << "      2. Artist:             " << metadata.artist << "\n";
+      response_stream << "      3. Album:              " << metadata.album << "\n";
+      response_stream << "      4. Bitrate:            " << metadata.bitrate << " kbps\n";
+      response_stream << "      5. Audio Bitrate:      " << metadata.audio_stream.bitrate
+                      << " kbps\n";
+      response_stream << "      6. Codec:              " << metadata.audio_stream.codec << "\n";
+      response_stream << "      7. Available Bitrates: [";
+      for (const auto& br : metadata.bitrates)
+      {
+        response_stream << br << ",";
+      }
+      response_stream << "]\n";
     }
     catch (const std::exception& e)
     {

@@ -1,24 +1,25 @@
 [audio_parser]
 bitrate = 131
-duration = 233
+bitrates = [ 64005, 112008, 128010 ]
+duration = 337
 file_format = 'mp3'
 file_format_long = 'MP2/3 (MPEG audio layer 2/3)'
-path = '../../sample2.mp3'
+path = 'sample.mp3'
 
 [metadata]
-TSRC = 'GBAYE9400058'
-album = 'The Bends'
-album_artist = 'Radiohead'
-artist = 'Radiohead'
-comment = 'https://music.youtube.com/watch?v=jIjTFt6XmFM'
-copyright = '1995 XL Recordings Ltd'
-date = '1995'
+TSRC = ''
+album = 'From Mars to Sirius'
+album_artist = 'Gojira'
+artist = 'Gojira'
+comment = 'https://music.youtube.com/watch?v=BuXOmxGlzwI'
+copyright = '2005 Listenable Records'
+date = '2005'
 disc = '1/1'
-encoded_by = 'XL Recordings'
+encoded_by = 'Listenable records'
 encoder = 'Lavf61.7.100'
-genre = 'Alternative Rock'
-title = '(Nice Dream)'
-track = '6/12'
+genre = 'Metal'
+title = 'To Sirius'
+track = '11/12'
 
 [stream_0]
 bitrate = 128
@@ -30,5 +31,10 @@ sample_rate = 48000
 type = 'Audio'
 
 [stream_1]
+bitrate = 128
+channel_layout = ''
+channels = 2
 codec = 'mjpeg'
+sample_format = ''
+sample_rate = 48000
 type = 'Video'

@@ -39,10 +39,10 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  std::string server          = argv[1];
-  std::string port            = argv[2];
-  std::string dir             = argv[3];
-  std::string master_playlist = argv[4];
+  const std::string server          = argv[1];
+  const std::string port            = argv[2];
+  const std::string dir             = argv[3];
+  const std::string master_playlist = argv[4];
 
   try
   {

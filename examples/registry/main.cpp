@@ -43,7 +43,8 @@ auto main(int argc, char* argv[]) -> int
 
   avformat_network_init(); // Initialize FFmpeg network components
 
-  libwavy::registry::RegisterAudio parser(inputFile);
+  libwavy::registry::RegisterAudio parser(inputFile,
+                                          {}); // just give empty vector for found bitrates
   if (!parser.parse())
   {
     std::cerr << "Failed to parse audio file.\n";

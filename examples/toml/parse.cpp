@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../toml_parser.hpp"
 #include <iostream>
+#include <libwavy/toml/toml_parser.hpp>
 
 using namespace std;
 

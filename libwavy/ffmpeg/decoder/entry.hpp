@@ -119,7 +119,7 @@ namespace libwavy::ffmpeg
 class MediaDecoder
 {
 public:
-  MediaDecoder() {}
+  MediaDecoder() = default;
 
   auto is_lossless_codec(AVCodecID codec_id) -> bool
   {

@@ -42,6 +42,7 @@ namespace toml_fs = std::filesystem;
 #define PARENT_AUDIO_FIELD_PATH             "path"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT      "file_format"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT_LONG "file_format_long"
+#define PARENT_AUDIO_FIELD_BITRATES         "bitrates"
 
 #define PARENT_METADATA                    "metadata"
 #define PARENT_METADATA_FIELD_TSRC         "TSRC"
@@ -81,11 +82,12 @@ struct StreamMetadata
 
 struct AudioMetadata
 {
-  int    bitrate;
-  int    duration;
-  string path;
-  string file_format;
-  string file_format_long;
+  int         bitrate;
+  int         duration;
+  string      path;
+  string      file_format;
+  string      file_format_long;
+  vector<int> bitrates;
 
   string         title;
   string         artist;
@@ -125,6 +127,16 @@ inline auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> Audi
   result.file_format = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT].value_or(""s);
   result.file_format_long =
     metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT_LONG].value_or(""s);
+  if (auto bitrates_array = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_BITRATES].as_array())
+  {
+    for (const auto& val : *bitrates_array)
+    {
+      if (val.is_integer())
+      {
+        result.bitrates.push_back(static_cast<int>(val.as_integer()->get()));
+      }
+    }
+  }
 
   // Metadata Section
   result.tsrc         = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_TSRC].value_or(""s);

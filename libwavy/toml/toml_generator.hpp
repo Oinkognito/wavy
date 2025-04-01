@@ -32,6 +32,9 @@
 #include <fstream>
 #include <string>
 
+namespace libwavy::Toml
+{
+
 class TomlGenerator
 {
 public:
@@ -77,6 +80,21 @@ public:
     data[table].as_table()->insert_or_assign(key, value);
   }
 
+  template <typename T>
+  void addTableArray(const std::string& table, const std::string& key, const std::vector<T>& values)
+  {
+    if (!data.contains(table))
+    {
+      createTable(table);
+    }
+    toml::array arr;
+    for (const auto& value : values)
+    {
+      arr.push_back(value);
+    }
+    data[table].as_table()->insert_or_assign(key, arr);
+  }
+
   // Save to file
   void saveToFile(const std::string& filename)
   {
@@ -91,3 +109,5 @@ public:
 private:
   toml::table data;
 };
+
+} // namespace libwavy::Toml

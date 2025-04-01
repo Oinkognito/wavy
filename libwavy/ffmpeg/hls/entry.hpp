@@ -34,6 +34,7 @@
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/logger.hpp>
 #include <regex>
+#include <vector>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -48,17 +49,22 @@ namespace libwavy::hls
 
 class HLS_Segmenter
 {
+private:
+  std::vector<int> found_bitrates;
+
 public:
   libwavy::ffmpeg::Metadata lbwMetadata;
   HLS_Segmenter() { avformat_network_init(); }
 
   ~HLS_Segmenter() { avformat_network_deinit(); }
 
-  void create_hls_segments(const char* input_file, const char* output_dir, bool use_flac = false)
+  auto create_hls_segments(const char* input_file, const char* output_dir, bool use_flac = false)
+    -> std::vector<int>
   {
     std::vector<std::string> playlist_files;
 
     int bitrate = lbwMetadata.fetchBitrate(input_file);
+    found_bitrates.emplace_back(bitrate);
 
     LOG_DEBUG << "Found bitrate: " << bitrate;
 
@@ -73,8 +79,10 @@ public:
     if (!success)
     {
       av_log(nullptr, AV_LOG_ERROR, "Encoding failed for file %s\n", input_file);
-      return;
+      return {};
     }
+
+    return found_bitrates;
   }
 
   void create_master_playlist(const std::string& input_dir, const std::string& output_dir,

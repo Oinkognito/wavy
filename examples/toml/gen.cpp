@@ -27,8 +27,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../toml_generator.hpp"
 #include <iostream>
+#include <libwavy/toml/toml_generator.hpp>
+
+using namespace libwavy::Toml;
 
 auto main() -> int
 {
@@ -42,6 +44,8 @@ auto main() -> int
   gen.createTable("settings");
   gen.addTableValue("settings", "quality", "high");
   gen.addTableValue("settings", "volume", 80);
+
+  gen.addTableArray("settings", "pixels", {1, 3, 4, 5});
 
   // Save to file
   gen.saveToFile("config.toml");
