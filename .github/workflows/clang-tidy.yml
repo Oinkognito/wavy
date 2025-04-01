@@ -21,6 +21,17 @@ jobs:
     - name: Install clang-tidy
       run: sudo apt-get install -y clang-tidy make wget
 
+    - name: Install dependencies for Wavy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential libflac++-dev libboost-log-dev libboost-system-dev libboost-filesystem-dev libssl-dev \
+          libavformat-dev libavutil-dev libswresample-dev libavcodec-dev \
+            libzstd-dev \
+            cmake make pkg-config \
+            libarchive-dev \
+            libmp3lame-dev
+
     - name: Compile Wavy for x86-64 Ubuntu
       run: |
         make
