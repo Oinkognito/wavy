@@ -4,3 +4,4 @@ CheckOptions:
     value:           '1'
 WarningsAsErrors:  ''
 FormatStyle:       file
+HeaderFilterRegex: '^(?!.*(miniaudio\.h|toml\.hpp)).*$'
