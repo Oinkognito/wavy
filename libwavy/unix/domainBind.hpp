@@ -35,7 +35,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "../libwavy-common/logger.hpp"
+#include <libwavy/logger.hpp>
 
 /*
  * @UnixSocketBind 
@@ -43,6 +43,9 @@
  * For now it just binds a UNIX domain socket for the server and cleans up after exit.
  *
  */
+
+namespace libwavy::unix
+{
 
 class UnixSocketBind
 {
@@ -91,3 +94,5 @@ public:
 
   ~UnixSocketBind() { cleanup(); }
 };
+
+} // namespace libwavy::unix

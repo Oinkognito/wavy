@@ -38,15 +38,18 @@ extern "C"
 #include <libavutil/dict.h>
 #include <libavutil/samplefmt.h>
 }
-#include "toml/toml_generator.hpp"
-#include "toml/toml_parser.hpp"
+#include <libwavy/toml/toml_generator.hpp>
+#include <libwavy/toml/toml_parser.hpp>
 
-class AudioParser
+namespace libwavy::registry
+{
+
+class RegisterAudio
 {
 public:
-  AudioParser(std::string filePath) : filePath(std::move(filePath)) {}
+  RegisterAudio(std::string filePath) : filePath(std::move(filePath)) {}
 
-  ~AudioParser()
+  ~RegisterAudio()
   {
     if (fmt_ctx)
     {
@@ -224,3 +227,5 @@ private:
     tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CHANNEL_LAYOUT, stream.channel_layout);
   }
 };
+
+} // namespace libwavy::registry

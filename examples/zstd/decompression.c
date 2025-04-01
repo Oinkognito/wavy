@@ -1,4 +1,5 @@
-#include "../../include/decompression.h"
+#include <libwavy/zstd-logging.h>
+#include <libwavy/zstd/decompression.h>
 
 int main(int argc, const char **argv) {
   const char *const exeName = argv[0];

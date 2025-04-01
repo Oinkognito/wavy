@@ -36,11 +36,11 @@
 #include <string>
 #include <vector>
 
-#include "../include/decode.hpp"
-#include "../include/libwavy-common/logger.hpp"
-#include "../include/libwavy-common/macros.hpp"
-#include "../include/libwavy-common/state.hpp"
-#include "../include/playback.hpp"
+#include <libwavy/common/macros.hpp>
+#include <libwavy/common/state.hpp>
+#include <libwavy/ffmpeg/decoder/entry.hpp>
+#include <libwavy/logger.hpp>
+#include <libwavy/playback.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl/error.hpp>
@@ -270,8 +270,8 @@ auto decode_and_play(GlobalState& gs, bool& flac_found) -> bool
 
   LOG_INFO << "Decoding transport stream segments...";
 
-  MediaDecoder               decoder;
-  std::vector<unsigned char> decoded_audio;
+  libwavy::ffmpeg::MediaDecoder decoder;
+  std::vector<unsigned char>    decoded_audio;
   if (!decoder.decode(gs.transport_segments, decoded_audio))
   {
     LOG_ERROR << "Decoding failed";

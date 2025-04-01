@@ -29,7 +29,7 @@ pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
 add_executable(make_hls ${SOURCES})
 
 # Include directories
-target_include_directories(make_hls PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(make_hls PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
 target_link_libraries(make_hls PRIVATE 

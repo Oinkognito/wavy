@@ -27,12 +27,12 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy-common/macros.hpp"
+#include <libwavy/common/macros.hpp>
 #define MINIAUDIO_IMPLEMENTATION
-#include "libwavy-common/logger.hpp"
 #include "miniaudio.h"
 #include <cstring>
 #include <iomanip> // for std::fixed and std::setprecision
+#include <libwavy/logger.hpp>
 #include <stdexcept>
 #include <vector>
 

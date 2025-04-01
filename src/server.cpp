@@ -31,7 +31,7 @@
 #error "Wavy-Server requires C++20 or later."
 #endif
 
-#include "../include/libwavy-server/server.hpp"
+#include <libwavy/server/server.hpp>
 
 auto main() -> int
 {

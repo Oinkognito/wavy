@@ -27,7 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/libwavy-ffmpeg/hls/entry.hpp"
+#include <libwavy/ffmpeg/hls/entry.hpp>
 
 // This will create a singular mp3 file's HLS segments
 

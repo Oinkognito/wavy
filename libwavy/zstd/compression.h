@@ -43,12 +43,12 @@ extern "C"
 {
 #endif
 
-#include "libwavy-common/common.h" // Helper functions, CHECK(), and CHECK_ZSTD()
-#include "zstd-logging.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <libwavy/common/common.h> //Helper functions, CHECK(), and CHECK_ZSTD()
+#include <libwavy/zstd-logging.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

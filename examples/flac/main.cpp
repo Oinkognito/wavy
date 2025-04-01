@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/codecs/flac/metadata.hpp"
 #include <iostream>
+#include <libwavy/codecs/flac/metadata.hpp>
 #include <sys/stat.h> // For file size
 
 auto main(int argc, char* argv[]) -> int
@@ -36,7 +36,7 @@ auto main(int argc, char* argv[]) -> int
   if (argc > 1)
   {
     std::string file     = argv[1];
-    auto        metadata = FlacMetadataParser::parse_metadata(file);
+    auto        metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
 
     std::cout << "Bitrate:         " << metadata.bitrate << " bps\n";
     std::cout << "Total Samples:   " << metadata.total_samples << "\n";

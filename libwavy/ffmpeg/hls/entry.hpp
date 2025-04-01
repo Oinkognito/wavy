@@ -28,11 +28,11 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../libwavy-common/logger.hpp"
-#include "../../libwavy-common/macros.hpp"
-#include "../misc/metadata.hpp"
 #include <filesystem>
 #include <fstream>
+#include <libwavy/common/macros.hpp>
+#include <libwavy/ffmpeg/misc/metadata.hpp>
+#include <libwavy/logger.hpp>
 #include <regex>
 extern "C"
 {

@@ -16,8 +16,11 @@ pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
     libavformat
 )
 
+
 # Executable
 add_executable(registry-create ${SOURCES})
+
+target_include_directories(registry-create PRIVATE ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
 target_link_libraries(registry-create PRIVATE PkgConfig::LIBAV)

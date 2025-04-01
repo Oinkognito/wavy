@@ -28,7 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../libwavy-common/logger.hpp"
+#include <libwavy/logger.hpp>
 
 extern "C"
 {
@@ -43,7 +43,6 @@ extern "C"
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <string>
 
 // $NOTE

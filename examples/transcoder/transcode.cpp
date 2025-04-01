@@ -27,7 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/libwavy-ffmpeg/transcoder/entry.hpp"
+#include <libwavy/ffmpeg/transcoder/entry.hpp>
 
 /*
  * This is a universal transcoder that works in the following formats:

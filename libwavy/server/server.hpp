@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../libwavy-common/macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/asio/ip/tcp.hpp>
@@ -43,13 +42,14 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
+#include <libwavy/common/macros.hpp>
 #include <sstream>
 #include <unistd.h>
 #include <vector>
 
-#include "../decompression.h"
-#include "../toml/toml_parser.hpp"
-#include "../unix/domainBind.hpp"
+#include <libwavy/toml/toml_parser.hpp>
+#include <libwavy/unix/domainBind.hpp>
+#include <libwavy/zstd/decompression.h>
 
 /*
  * @SERVER
@@ -628,7 +628,7 @@ private:
   boost::asio::ssl::context& ssl_context_;
   boost::asio::signal_set    signals_;
   std::string                socketPath;
-  UnixSocketBind             wavySocketBind;
+  unix::UnixSocketBind       wavySocketBind;
 
   void start_accept()
   {

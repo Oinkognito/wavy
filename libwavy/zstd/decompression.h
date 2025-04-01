@@ -43,7 +43,7 @@ extern "C"
 {
 #endif
 
-#include "libwavy-common/common.h" // Helper functions, CHECK(), and CHECK_ZSTD()
+#include <libwavy/common/common.h> // Helper functions, CHECK(), and CHECK_ZSTD()
 #include <stdio.h>                 // printf, fopen, fwrite
 #include <stdlib.h>                // free, malloc
 #include <zstd.h>                  // presumes zstd library is installed

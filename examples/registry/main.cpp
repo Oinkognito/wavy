@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/registry.hpp"
 #include <iostream>
+#include <libwavy/registry/entry.hpp>
 
 auto main(int argc, char* argv[]) -> int
 {
@@ -43,7 +43,7 @@ auto main(int argc, char* argv[]) -> int
 
   avformat_network_init(); // Initialize FFmpeg network components
 
-  AudioParser parser(inputFile);
+  libwavy::registry::RegisterAudio parser(inputFile);
   if (!parser.parse())
   {
     std::cerr << "Failed to parse audio file.\n";

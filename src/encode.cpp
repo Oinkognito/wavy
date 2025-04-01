@@ -27,9 +27,9 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../include/libwavy-ffmpeg/hls/entry.hpp"
-#include "../include/libwavy-ffmpeg/transcoder/entry.hpp"
-#include "../include/registry.hpp"
+#include <libwavy/ffmpeg/hls/entry.hpp>
+#include <libwavy/ffmpeg/transcoder/entry.hpp>
+#include <libwavy/registry/entry.hpp>
 
 /*
  * @NOTE:
@@ -136,7 +136,7 @@ auto main(int argc, char* argv[]) -> int
 
   seg.create_master_playlist(output_dir, output_dir, use_flac);
 
-  AudioParser parser(argv[1]);
+  libwavy::registry::RegisterAudio parser(argv[1]);
   if (!parser.parse())
   {
     std::cerr << "Failed to parse audio file.\n";

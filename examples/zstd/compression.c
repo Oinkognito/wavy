@@ -1,5 +1,5 @@
-#include "../../include/compression.h"
 #include <dirent.h> // For working with directories
+#include <libwavy/zstd/compression.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

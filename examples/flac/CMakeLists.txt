@@ -27,7 +27,7 @@ pkg_check_modules(FLAC REQUIRED IMPORTED_TARGET flac++)
 add_executable(flac_metadata ${SOURCES})
 
 # Include directories
-target_include_directories(flac_metadata PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(flac_metadata PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
 target_link_libraries(flac_metadata PRIVATE 

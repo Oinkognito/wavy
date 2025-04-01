@@ -28,9 +28,12 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../libwavy-common/logger.hpp"
 #include <FLAC++/metadata.h>
+#include <libwavy/logger.hpp>
 #include <sys/stat.h> // For file size
+
+namespace libwavy::codecs
+{
 
 class FlacMetadataParser
 {
@@ -130,3 +133,5 @@ public:
     return metadata;
   }
 };
+
+} // namespace libwavy::codecs

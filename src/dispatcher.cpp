@@ -40,9 +40,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../include/compression.h"
-#include "../include/libwavy-common/logger.hpp"
-#include "../include/libwavy-common/macros.hpp"
+#include <libwavy/common/macros.hpp>
+#include <libwavy/logger.hpp>
+#include <libwavy/zstd/compression.h>
 
 /*
  * DISPATCHER

@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/playback.hpp"
 #include <iostream>
+#include <libwavy/playback.hpp>
 
 auto main() -> int
 {

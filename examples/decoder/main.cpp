@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "../../include/decode.hpp"
-#include "../../include/libwavy-common/state.hpp"
+#include <libwavy/common/state.hpp>
+#include <libwavy/ffmpeg/decoder/entry.hpp>
 
 auto main() -> int
 {

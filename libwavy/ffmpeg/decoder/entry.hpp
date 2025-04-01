@@ -28,10 +28,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy-common/logger.hpp"
-#include "libwavy-common/macros.hpp"
 #include <fstream>
 #include <iostream>
+#include <libwavy/common/macros.hpp>
+#include <libwavy/logger.hpp>
 #include <vector>
 
 extern "C"
@@ -108,6 +108,9 @@ static auto custom_read_packet(void* opaque, uint8_t* buf, int buf_size) -> int
 
   return bytes_to_copy;
 }
+
+namespace libwavy::ffmpeg
+{
 
 /**
  * @class MediaDecoder
@@ -338,3 +341,5 @@ public:
     return true;
   }
 };
+
+} // namespace libwavy::ffmpeg

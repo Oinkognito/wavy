@@ -59,7 +59,7 @@ set(DISPATCHER_BIN hls_dispatcher)
 set(CLIENT_BIN hls_client)
 
 set(ENCODER_SRC src/encode.cpp)
-set(SERVER_SRC src/server.cpp include/libwavy-server/serverHelper.cpp)
+set(SERVER_SRC src/server.cpp libwavy/server/serverHelper.cpp)
 set(DISPATCHER_SRC src/dispatcher.cpp)
 set(CLIENT_SRC src/client_receive.cpp)
 
@@ -87,14 +87,14 @@ endif()
 
 function(add_custom_executable name src_file)
     add_executable(${name} ${src_file})
-    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS})
+    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
     target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES} OpenSSL::Crypto ${ZSTD_LIBRARIES})
 endfunction()
 
 # Add custom executable for FFmpeg target builds
 function(add_custom_executable_ffmpeg name src_file)
     add_executable(${name} ${src_file})
-    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_include_directories(${name} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
     target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES})
 endfunction()
 
@@ -107,21 +107,22 @@ message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
-add_library(wavy-server SHARED include/libwavy-server/serverHelper.cpp)
+add_library(wavy-server SHARED libwavy/server/serverHelper.cpp)
 
 # Specify include directories
-target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS})
+target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
 target_link_libraries(wavy-server PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 # Now, link the shared library to the server executable
 add_executable(${SERVER_BIN} src/server.cpp)
-
+target_include_directories(${SERVER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE  ${ARCHIVE_LIB} ${ZSTD_LIBRARIES} wavy-server)
 
 add_executable(${DISPATCHER_BIN} ${DISPATCHER_SRC})
+target_include_directories(${DISPATCHER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(${DISPATCHER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_custom_target(format COMMAND clang-format -i src/*.cpp include/*.h)
@@ -224,6 +225,7 @@ message(STATUS "│ Target(s)               : ${TARGET_BUILT}")
 message(STATUS "│ CMake Version           : ${CMAKE_VERSION}")
 message(STATUS "│ Compiler                : ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "│ Compiler Flags          : ${CMAKE_CXX_FLAGS}")
+message(STATUS "│ Libwavy Dest            : ${CMAKE_SOURCE_DIR}/libwavy/")
 message(STATUS "│ Executable Names        : ${ENCODER_BIN}, ${CLIENT_BIN}, ${SERVER_BIN}, ${DISPATCHER_BIN}")
 message(STATUS "│ C++ Standard            : ${CMAKE_CXX_STANDARD}")
 message(STATUS "│ FFmpeg Libraries        : ${FFMPEG_LIBRARIES}")

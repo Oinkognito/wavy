@@ -8,6 +8,4 @@ This library is where we use `libav` (FFmpeg's libraries) for:
 
 ## Notes
 
-Currently, there is no implementation of HLS segmenting here
-
 Possibly in the future will also account for retaining metadata in transcoded files.
