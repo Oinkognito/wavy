@@ -82,7 +82,7 @@ format:
 
 # Code linting/fixing
 tidy:
-	@clang-tidy -fix src/*.cpp libwavy/*.hpp --
+	@find src libwavy -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" | xargs clang-tidy -p $(BUILD_DIR)
 
 prepend-license-src:
 	@find src libwavy examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" ! -name "miniaudio.h" -exec ./scripts/license-prepend.sh {} +
