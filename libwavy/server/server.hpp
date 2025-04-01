@@ -396,6 +396,10 @@ private:
       {
         handle_list_audio_info();
       }
+      else if (request_.target() == macros::SERVER_PATH_PING)
+      {
+        handle_send_pong();
+      }
       else
       {
         handle_download();
@@ -405,6 +409,12 @@ private:
     {
       send_response(macros::to_string(macros::SERVER_ERROR_405));
     }
+  }
+
+  void handle_send_pong()
+  {
+    LOG_INFO_ASYNC << "Sending pong to client...";
+    send_response(macros::to_string(macros::SERVER_PONG_MSG));
   }
 
   void handle_upload()

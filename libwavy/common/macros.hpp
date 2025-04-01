@@ -71,6 +71,7 @@
   X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
   X(SERVER_PATH_TOML_UPLOAD, "/toml/upload")                  \
   X(SERVER_PATH_AUDIO_INFO, "/hls/audio-info/")               \
+  X(SERVER_PATH_PING, "/hls/ping")                            \
   X(SERVER_LOCK_FILE, "/tmp/hls_server.lock")                 \
   X(METADATA_FILE, "metadata.toml")                           \
   X(NETWORK_TEXT_DELIM, "\r\n\r\n")                           \
@@ -86,7 +87,8 @@
   X(SERVER_ERROR_400, "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request format")            \
   X(SERVER_ERROR_401, "HTTP/1.1 401 Authentication Error\r\n\r\n")                         \
   X(SERVER_ERROR_405, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")                           \
-  X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large\r\n\r\n")
+  X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large\r\n\r\n")                            \
+  X(SERVER_PONG_MSG, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\npong")
 
 namespace macros
 {

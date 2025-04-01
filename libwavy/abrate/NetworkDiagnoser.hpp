@@ -28,11 +28,15 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/network/entry.hpp"
 #include <boost/asio.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <chrono>
-#include <iostream>
-#include <random>
-#include <utility>
+#include <cmath>
+#include <future>
+#include <libwavy/common/macros.hpp>
+#include <libwavy/logger.hpp>
+#include <vector>
 
 namespace libwavy::abr
 {
@@ -52,7 +56,7 @@ class NetworkDiagnoser
 {
 public:
   NetworkDiagnoser(net::io_context& ioc, std::string server_url)
-      : resolver_(ioc), socket_(ioc), server_url_(std::move(server_url))
+      : resolver_(ioc), socket_(ioc), timer_(ioc), server_url_(std::move(server_url))
   {
   }
 
@@ -60,57 +64,58 @@ public:
   {
     std::string host, port, target;
     parseUrl(server_url_, host, port, target);
-
-    NetworkStats stats = {
-      .latency = -1, .jitter = 0.0, .packet_loss = 0.0}; // Default invalid values
+    NetworkStats stats = {.latency = -1, .jitter = 0.0, .packet_loss = 0.0};
 
     try
     {
-      std::cout << "[INFO] Diagnosing network speed to: " << host << "\n";
-      auto const results = resolver_.resolve(host, port);
-
       std::vector<int> latencies;
+      int              failed_pings = 0;
 
+      std::vector<std::future<int>> futures;
       for (int i = 0; i < 5; ++i)
-      { // Send 5 probes to calculate jitter
-        auto start = high_resolution_clock::now();
-        socket_.connect(*results.begin());
-        auto end       = high_resolution_clock::now();
-        int  ping_time = duration_cast<milliseconds>(end - start).count();
-        latencies.push_back(ping_time);
-        socket_.close();
+      {
+        futures.push_back(std::async(std::launch::async, [&]() { return sendProbe(host, 2000); }));
       }
 
-      stats.latency     = calculateAverage(latencies);
-      stats.jitter      = calculateJitter(latencies);
-      stats.packet_loss = simulatePacketLoss(); // Simulating packet loss
+      for (auto& future : futures)
+      {
+        int ping_time = future.get();
+        if (ping_time >= 0)
+          latencies.push_back(ping_time);
+        else
+          ++failed_pings;
+      }
 
-      std::cout << "[INFO] Network Latency: " << stats.latency << " ms\n";
-      std::cout << "[INFO] Network Jitter: " << stats.jitter << " ms\n";
-      std::cout << "[INFO] Packet Loss: " << stats.packet_loss << "%\n";
+      if (!latencies.empty())
+      {
+        stats.latency = calculateAverage(latencies);
+        stats.jitter  = calculateJitter(latencies);
+      }
+
+      stats.packet_loss = (failed_pings / 5.0) * 100.0;
     }
     catch (const std::exception& e)
     {
-      std::cerr << "[ERROR] Network speed diagnosis failed: " << e.what() << "\n";
+      LOG_ERROR << "Network diagnosis failed: " << e.what();
     }
 
     return stats;
   }
 
 private:
-  tcp::resolver resolver_;
-  tcp::socket   socket_;
-  std::string   server_url_;
+  tcp::resolver                     resolver_;
+  tcp::socket                       socket_;
+  net::steady_timer                 timer_;
+  std::string                       server_url_;
+  time_point<high_resolution_clock> start_time_;
 
   void parseUrl(const std::string& url, std::string& host, std::string& port, std::string& target)
   {
-    size_t pos   = url.find("//");
-    size_t start = (pos == std::string::npos) ? 0 : pos + 2;
-    size_t end   = url.find('/', start);
-
+    size_t      pos       = url.find("//");
+    size_t      start     = (pos == std::string::npos) ? 0 : pos + 2;
+    size_t      end       = url.find('/', start);
     std::string full_host = url.substr(start, end - start);
     size_t      port_pos  = full_host.find(':');
-
     if (port_pos != std::string::npos)
     {
       host = full_host.substr(0, port_pos);
@@ -119,10 +124,35 @@ private:
     else
     {
       host = full_host;
-      port = "443"; // Default HTTPS port
+      port = WAVY_SERVER_PORT_NO_STR; // fallback to wavys default port
+    }
+    target = (end == std::string::npos) ? "/" : url.substr(end);
+  }
+
+  auto sendProbe(const std::string& server, int timeout_ms) -> int
+  {
+    asio::io_context ioc;
+    ssl::context     ctx{ssl::context::sslv23_client};
+
+    libwavy::network::HttpsClient client(ioc, ctx, server);
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    std::future<std::string> future =
+      std::async(std::launch::async,
+                 [&]()
+                 {
+                   return client.get("/hls/ping"); // Assuming a simple ping request
+                 });
+
+    if (future.wait_for(std::chrono::milliseconds(timeout_ms)) == std::future_status::timeout)
+    {
+      return -1;
     }
 
-    target = (end == std::string::npos) ? "/" : url.substr(end);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
   }
 
   auto calculateAverage(const std::vector<int>& values) -> int
@@ -137,21 +167,10 @@ private:
   {
     if (latencies.size() < 2)
       return 0.0;
-
     double sum = 0.0;
     for (size_t i = 1; i < latencies.size(); ++i)
-    {
-      sum += std::abs(latencies[i] - latencies[i - 1]);
-    }
-    return sum / (latencies.size() - 1);
-  }
-
-  auto simulatePacketLoss() -> double
-  {
-    std::random_device               rd;
-    std::mt19937                     gen(rd());
-    std::uniform_real_distribution<> dist(0.0, 10.0); // Simulating 0-10% loss
-    return dist(gen);
+      sum += std::pow(latencies[i] - latencies[i - 1], 2);
+    return std::sqrt(sum / (latencies.size() - 1));
   }
 };
 

@@ -31,7 +31,8 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
-#include <iostream>
+#include <libwavy/common/macros.hpp>
+#include <libwavy/logger.hpp>
 #include <map>
 #include <sstream>
 #include <string>
@@ -59,14 +60,14 @@ public:
     std::string host, port, target;
     parseUrl(master_url_, host, port, target);
 
-    std::cout << "[INFO] Fetching master playlist from: " << master_url_ << "\n";
+    LOG_INFO << "Fetching master playlist from: " << master_url_;
 
     try
     {
-      std::cout << "[INFO] Resolving host: " << host << " on port " << port << "\n";
+      LOG_INFO << "Resolving host: " << host << " on port " << port;
       auto const results = resolver_.resolve(host, port);
 
-      std::cout << "[INFO] Connecting to: " << host << ":" << port << "\n";
+      LOG_INFO << "Connecting to: " << host << ":" << port;
       beast::get_lowest_layer(stream_).connect(results);
       stream_.handshake(ssl::stream_base::client);
 
@@ -74,19 +75,19 @@ public:
       req.set(http::field::host, host);
       req.set(http::field::user_agent, "Boost.Beast");
 
-      std::cout << "[INFO] Sending HTTP GET request...\n";
+      LOG_INFO << "Sending HTTP GET request...";
       http::write(stream_, req);
 
       beast::flat_buffer                 buffer;
       http::response<http::dynamic_body> res;
       http::read(stream_, buffer, res);
 
-      std::cout << "[INFO] Received HTTP Response. Status: " << res.result_int() << "\n";
+      LOG_INFO << "Received HTTP Response. Status: " << res.result_int();
       beast::error_code ec;
       stream_.shutdown(ec);
       if (ec && ec != beast::errc::not_connected)
       {
-        std::cerr << "[WARN] SSL Shutdown failed: " << ec.message() << "\n";
+        LOG_WARNING << "SSL Shutdown failed: " << ec.message();
       }
 
       std::string body = beast::buffers_to_string(res.body().data());
@@ -96,7 +97,7 @@ public:
     }
     catch (const std::exception& e)
     {
-      std::cerr << "[ERROR] Error fetching master playlist: " << e.what() << "\n";
+      LOG_ERROR << "Error fetching master playlist: " << e.what();
       return false;
     }
   }
@@ -129,12 +130,11 @@ private:
     else
     {
       host = full_host;
-      port = "443"; // Default HTTPS port
+      port = WAVY_SERVER_PORT_NO_STR; // Default HTTPS port
     }
 
     target = (end == std::string::npos) ? "/" : url.substr(end);
-    std::cout << "[DEBUG] Parsed Host: " << host << ", Port: " << port << ", Target: " << target
-              << "\n";
+    LOG_DEBUG << "Parsed Host: " << host << ", Port: " << port << ", Target: " << target;
   }
 
   void parsePlaylist(const std::string& playlist)
@@ -156,29 +156,27 @@ private:
           std::string bitrate_str = line.substr(start, end - start);
 
           // Remove any '=' sign if it appears (edge case)
-          bitrate_str.erase(std::remove(bitrate_str.begin(), bitrate_str.end(), '='),
-                            bitrate_str.end());
+          std::erase(bitrate_str, '=');
 
-          std::cout << "[DEBUG] Extracted Bitrate String: '" << bitrate_str << "'\n";
+          LOG_DEBUG << "Extracted Bitrate String: '" << bitrate_str << "'";
 
           // Ensure it's numeric
-          if (!bitrate_str.empty() &&
-              std::all_of(bitrate_str.begin(), bitrate_str.end(), ::isdigit))
+          if (!bitrate_str.empty() && std::ranges::all_of(bitrate_str, ::isdigit))
           {
             try
             {
               current_bitrate = std::stoi(bitrate_str);
-              std::cout << "[INFO] Parsed Bitrate: " << current_bitrate << " kbps\n";
+              LOG_INFO << "Parsed Bitrate: " << current_bitrate << " kbps";
             }
             catch (const std::exception& e)
             {
-              std::cerr << "[ERROR] Failed to parse bitrate: " << e.what() << "\n";
+              LOG_ERROR << "Failed to parse bitrate: " << e.what();
               continue;
             }
           }
           else
           {
-            std::cerr << "[ERROR] Invalid bitrate format: '" << bitrate_str << "'\n";
+            LOG_ERROR << "Invalid bitrate format: '" << bitrate_str << "'";
             continue;
           }
         }
@@ -188,12 +186,11 @@ private:
         if (current_bitrate > 0)
         {
           bitrate_playlists_[current_bitrate] = line;
-          std::cout << "[INFO] Added bitrate playlist: " << current_bitrate << " -> " << line
-                    << "\n";
+          LOG_INFO << "Added bitrate playlist: " << current_bitrate << " -> " << line;
         }
         else
         {
-          std::cerr << "[ERROR] Playlist URL found but no valid bitrate!\n";
+          LOG_ERROR << "Playlist URL found but no valid bitrate!";
         }
       }
     }

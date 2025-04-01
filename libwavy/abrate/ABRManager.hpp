@@ -28,9 +28,9 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "NetworkDiagnoser.hpp"
-#include "PlaylistParser.hpp"
 #include <algorithm>
+#include <libwavy/abrate/NetworkDiagnoser.hpp>
+#include <libwavy/abrate/PlaylistParser.hpp>
 #include <vector>
 
 namespace libwavy::abr
@@ -73,7 +73,7 @@ public:
     {
       available_bitrates.push_back(bitrate);
     }
-    std::sort(available_bitrates.begin(), available_bitrates.end());
+    std::ranges::sort(available_bitrates);
 
     int selected_bitrate = determineBestBitrate(stats, available_bitrates);
     std::cout << "[INFO] Selected Best Bitrate: " << selected_bitrate << " kbps\n";
@@ -88,7 +88,7 @@ private:
   /**
      * Determines the best bitrate based on network statistics.
      */
-  int determineBestBitrate(const NetworkStats& stats, const std::vector<int>& bitrates)
+  auto determineBestBitrate(const NetworkStats& stats, const std::vector<int>& bitrates) -> int
   {
     if (bitrates.empty())
       return 64000; // Default minimum bitrate

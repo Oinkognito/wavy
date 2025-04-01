@@ -146,6 +146,7 @@ if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
   add_subdirectory(examples/flac)
   add_subdirectory(examples/registry)
   add_subdirectory(examples/network)
+  add_subdirectory(examples/abr)
 endif()
 
 if(DEFINED BUILD_TARGET)

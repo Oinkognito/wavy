@@ -27,14 +27,25 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "ABRManager.hpp"
 #include <boost/asio.hpp>
+#include <libwavy/abrate/ABRManager.hpp>
+
+std::atomic<bool> running{true};
+
+void signalHandler(int signal)
+{
+  if (signal == SIGINT || signal == SIGTERM)
+  {
+    running = false;
+  }
+}
 
 auto main(int argc, char* argv[]) -> int
 {
+  logger::init_logging();
   if (argc != 2)
   {
-    std::cerr << "Usage: " << argv[0] << " <network-stream>" << std::endl;
+    LOG_ERROR << "Usage: " << argv[0] << " <network-stream>";
     return EXIT_FAILURE;
   }
   try
@@ -42,14 +53,22 @@ auto main(int argc, char* argv[]) -> int
     boost::asio::io_context ioc;
 
     // Replace with your HLS master playlist URL
-    std::string master_url = argv[1];
+    const std::string master_url = argv[1];
 
-    libwavy::abr::ABRManager abr_manager(ioc, master_url);
-    abr_manager.selectBestBitrate();
+    std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
+
+    while (running)
+    {
+      libwavy::abr::ABRManager abr_manager(ioc, master_url);
+      abr_manager.selectBestBitrate();
+      LOG_INFO << "Waiting for 2 seconds...";
+      std::this_thread::sleep_for(std::chrono::seconds(2)); // Poll every 2 seconds
+    }
   }
   catch (const std::exception& e)
   {
-    std::cerr << "[ERROR] Exception: " << e.what() << "\n";
+    LOG_ERROR << "Exception: " << e.what();
     return EXIT_FAILURE;
   }
 
