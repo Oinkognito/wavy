@@ -101,7 +101,7 @@ public:
 
   inline auto soft_clip(float x) -> float
   {
-    return std::tanhf(x); // Smoothly compresses extreme values
+    return std::tanh(x); // Smoothly compresses extreme values
   }
 
   inline auto soft_clip(double x) -> double { return std::tanh(x); }
@@ -245,7 +245,7 @@ public:
       ret = initialize_input(input_filename, &in_format_ctx, &in_codec_ctx, &audio_stream_index);
       if (ret < 0)
       {
-        throw std::runtime_error(std::string("Failed to initialize input: ") + av_err2str(ret));
+        throw std::runtime_error(std::string("Failed to initialize input!"));
       }
 
       print_audio_info(input_filename, in_format_ctx, in_codec_ctx, "Input File Info");
@@ -255,21 +255,21 @@ public:
                               in_codec_ctx, given_bitrate);
       if (ret < 0)
       {
-        throw std::runtime_error(std::string("Failed to initialize output: ") + av_err2str(ret));
+        throw std::runtime_error(std::string("Failed to initialize output!"));
       }
 
       // Step 3: Initialize resampler
       ret = initialize_resampler(&swr_ctx, in_codec_ctx, out_codec_ctx);
       if (ret < 0)
       {
-        throw std::runtime_error(std::string("Failed to initialize resampler: ") + av_err2str(ret));
+        throw std::runtime_error(std::string("Failed to initialize resampler!"));
       }
 
       // Step 4: Prepare frames and packets
       ret = prepare_frames(&frame, &resampled_frame, &packet, out_codec_ctx);
       if (ret < 0)
       {
-        throw std::runtime_error(std::string("Failed to prepare frames: ") + av_err2str(ret));
+        throw std::runtime_error(std::string("Failed to prepare frames!"));
       }
 
       // Step 5: Process audio frames
@@ -277,7 +277,7 @@ public:
                                  swr_ctx, frame, resampled_frame, packet, audio_stream_index);
       if (ret < 0)
       {
-        throw std::runtime_error(std::string("Error processing audio frames: ") + av_err2str(ret));
+        throw std::runtime_error(std::string("Error processing audio frames!"));
       }
 
       // Print output file information
@@ -307,14 +307,14 @@ public:
     // Open input file
     if ((ret = avformat_open_input(in_format_ctx, input_filename, nullptr, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not open input file: " << av_err2str(ret);
+      LOG_ERROR << "Could not open input file!";
       return ret;
     }
 
     // Read stream information
     if ((ret = avformat_find_stream_info(*in_format_ctx, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not find stream info: " << av_err2str(ret);
+      LOG_ERROR << "Could not find stream info!";
       avformat_close_input(in_format_ctx);
       return ret;
     }
@@ -354,7 +354,7 @@ public:
     // Copy parameters from the input stream to the decoder context
     if ((ret = avcodec_parameters_to_context(*in_codec_ctx, in_stream->codecpar)) < 0)
     {
-      LOG_ERROR << "Failed to copy codec parameters to decoder context: " << av_err2str(ret);
+      LOG_ERROR << "Failed to copy codec parameters to decoder context!";
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -366,7 +366,7 @@ public:
     // Open the decoder
     if ((ret = avcodec_open2(*in_codec_ctx, in_codec, nullptr)) < 0)
     {
-      LOG_ERROR << "Failed to open decoder: " << av_err2str(ret);
+      LOG_ERROR << "Failed to open decoder!";
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -386,7 +386,7 @@ public:
     if ((ret = avformat_alloc_output_context2(out_format_ctx, nullptr, nullptr, output_filename)) <
         0)
     {
-      LOG_ERROR << "Could not create output context: " << av_err2str(ret);
+      LOG_ERROR << "Could not create output context!";
       return ret;
     }
 
@@ -438,7 +438,7 @@ public:
     // Copy channel layout from input
     if ((ret = av_channel_layout_copy(&(*out_codec_ctx)->ch_layout, &in_codec_ctx->ch_layout)) < 0)
     {
-      LOG_ERROR << "Failed to copy input channel layout to output: " << av_err2str(ret);
+      LOG_ERROR << "Failed to copy input channel layout to output!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -473,7 +473,7 @@ public:
     // Open the encoder
     if ((ret = avcodec_open2(*out_codec_ctx, out_codec, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not open output codec: " << av_err2str(ret);
+      LOG_ERROR << "Could not open output codec!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -484,7 +484,7 @@ public:
     // Copy encoder parameters to output stream
     if ((ret = avcodec_parameters_from_context((*out_stream)->codecpar, *out_codec_ctx)) < 0)
     {
-      LOG_ERROR << "Failed to copy encoder parameters to output stream: " << av_err2str(ret);
+      LOG_ERROR << "Failed to copy encoder parameters to output stream!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -498,7 +498,7 @@ public:
     {
       if ((ret = avio_open(&(*out_format_ctx)->pb, output_filename, AVIO_FLAG_WRITE)) < 0)
       {
-        LOG_ERROR << "Could not open output file: " << av_err2str(ret);
+        LOG_ERROR << "Could not open output file!";
         avcodec_free_context(out_codec_ctx);
         avformat_free_context(*out_format_ctx);
         return ret;
@@ -509,7 +509,7 @@ public:
     // Write file header
     if ((ret = avformat_write_header(*out_format_ctx, nullptr)) < 0)
     {
-      LOG_ERROR << "Error writing format header: " << av_err2str(ret);
+      LOG_ERROR << "Error writing format header!";
       if (!((*out_format_ctx)->oformat->flags & AVFMT_NOFILE))
       {
         avio_closep(&(*out_format_ctx)->pb);
@@ -624,7 +624,7 @@ public:
                                   swr_ctx, resampled_frame, &next_pts, &samples_sanitized);
         if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
         {
-          LOG_WARNING << "\r[WARNING] Error processing packet: " << av_err2str(ret);
+          LOG_WARNING << "\r[WARNING] Error processing packet!";
         }
       }
 
@@ -647,7 +647,7 @@ public:
     // Write file trailer
     if ((ret = av_write_trailer(out_format_ctx)) < 0)
     {
-      LOG_ERROR << "Error writing trailer: " << av_err2str(ret);
+      LOG_ERROR << "Error writing trailer!";
       return ret;
     }
 
@@ -663,7 +663,7 @@ public:
     int ret = avcodec_send_packet(in_codec_ctx, packet);
     if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
     {
-      LOG_ERROR << "\r[WARNING] Error sending packet to decoder: " << av_err2str(ret) << std::flush;
+      LOG_ERROR << "\r[WARNING] Error sending packet to decoder!" << std::flush;
       return ret;
     }
 
@@ -700,7 +700,7 @@ public:
 
     if (num_samples < 0)
     {
-      LOG_ERROR << "\r[WARNING] Resampling failed: " << av_err2str(num_samples) << std::flush;
+      LOG_ERROR << "\r[WARNING] Resampling failed!" << std::flush;
       (*samples_sanitized)++;
       return num_samples;
     }
@@ -740,7 +740,7 @@ public:
     int ret = avcodec_send_frame(codec_ctx, frame);
     if (ret < 0)
     {
-      LOG_ERROR << "\r[WARNING] Error sending frame to encoder: " << av_err2str(ret) << std::flush;
+      LOG_ERROR << "\r[WARNING] Error sending frame to encoder!" << std::flush;
       return ret;
     }
 
@@ -756,7 +756,7 @@ public:
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
-        LOG_ERROR << "\r[WARNING] Error writing packet: " << av_err2str(ret) << std::flush;
+        LOG_ERROR << "\r[WARNING] Error writing packet!" << std::flush;
       }
       av_packet_unref(out_packet);
     }
@@ -803,7 +803,7 @@ public:
     int ret = avcodec_send_frame(codec_ctx, nullptr);
     if (ret < 0 && ret != AVERROR_EOF)
     {
-      LOG_ERROR << "Error sending null frame for flushing: " << av_err2str(ret);
+      LOG_ERROR << "Error sending null frame for flushing!";
       return ret;
     }
 
@@ -824,7 +824,7 @@ public:
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
-        LOG_ERROR << "Error writing flushed packet: " << av_err2str(ret);
+        LOG_ERROR << "Error writing flushed packet!";
         av_packet_unref(out_packet);
         av_packet_free(&out_packet);
         return ret;
