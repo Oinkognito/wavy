@@ -78,14 +78,14 @@ verbose:
 
 # Code formatting
 format:
-	@find src include examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
+	@find src libwavy examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
 
 # Code linting/fixing
 tidy:
-	@clang-tidy -fix src/*.cpp include/*.hpp --
+	@clang-tidy -fix src/*.cpp libwavy/*.hpp --
 
 prepend-license-src:
-	@find src include examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" ! -name "miniaudio.h" -exec ./scripts/license-prepend.sh {} +
+	@find src libwavy examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" ! -name "miniaudio.h" -exec ./scripts/license-prepend.sh {} +
 
 # Clean build files
 clean:
