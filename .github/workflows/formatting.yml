@@ -23,5 +23,5 @@ jobs:
 
     - name: Run clang-format check
       run: |
-            find src include examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" \
+            find src libwavy examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" \
             -exec sh -c 'for file; do echo "Checking: $file"; clang-format --dry-run --Werror "$file"; done' sh {} +
