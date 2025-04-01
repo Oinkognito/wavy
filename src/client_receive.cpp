@@ -40,78 +40,23 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 #include <libwavy/logger.hpp>
+#include <libwavy/network/entry.hpp>
 #include <libwavy/playback.hpp>
 
-#include <boost/asio.hpp>
-#include <boost/asio/ssl/error.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/ssl.hpp>
-
-namespace ssl   = boost::asio::ssl;
-namespace beast = boost::beast;
-namespace http  = beast::http;
-namespace net   = boost::asio;
-using tcp       = net::ip::tcp;
-
-// Perform an HTTPS GET request and return the response body as a string.
-auto perform_https_request(net::io_context& ioc, ssl::context& ctx, const std::string_view& target,
-                           const std::string& server) -> std::string
-{
-  try
-  {
-    tcp::resolver resolver(ioc);
-    auto const    results = resolver.resolve(server, WAVY_SERVER_PORT_NO_STR);
-
-    beast::ssl_stream<tcp::socket> stream(ioc, ctx);
-    net::connect(stream.next_layer(), results.begin(), results.end());
-    stream.handshake(ssl::stream_base::client);
-
-    http::request<http::string_body> req{http::verb::get, target, 11};
-    req.set(http::field::host, server);
-    req.set(http::field::user_agent, "WavyClient");
-    http::write(stream, req);
-
-    beast::flat_buffer                 buffer;
-    http::response<http::dynamic_body> res;
-    http::read(stream, buffer, res);
-
-    std::string response_data = boost::beast::buffers_to_string(res.body().data());
-
-    beast::error_code ec;
-    stream.shutdown(ec);
-
-    if (ec == net::error::eof)
-    {
-      ec.clear();
-    }
-    else if (ec)
-    {
-      LOG_WARNING << RECEIVER_LOG << "Stream shutdown error: " << ec.message();
-    }
-
-    return response_data;
-  }
-  catch (const std::exception& e)
-  {
-    LOG_ERROR << RECEIVER_LOG << "HTTPS request failed: " << e.what();
-    return "";
-  }
-}
-
 auto fetch_transport_segments(const std::string& ip_id, const std::string& audio_id,
-                              GlobalState& gs, const std::string& server, bool& flac_found) -> bool
+                              GlobalState& gs, const std::string& server,
+                              const int desired_bandwith, bool& flac_found) -> bool
 {
-  net::io_context ioc;
-  ssl::context    ctx(ssl::context::tlsv12_client);
+  asio::io_context ioc; // boost::asio handles async network contexts as well
+  ssl::context     ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
+  libwavy::network::HttpsClient client(ioc, ctx, server);
 
   LOG_INFO << RECEIVER_LOG << "Request Owner: " << ip_id << " for audio-id: " << audio_id;
 
   std::string playlist_path =
     "/hls/" + ip_id + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
-  std::string playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
+  std::string playlist_content = client.get(playlist_path);
 
   if (playlist_content.empty())
   {
@@ -121,7 +66,6 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
 
   if (playlist_content.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
   {
-    int                max_bandwidth = 0;
     std::string        selected_playlist;
     std::istringstream iss(playlist_content);
     std::string        line;
@@ -141,9 +85,8 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
           std::string streamPlaylist;
           if (std::getline(iss, streamPlaylist))
           {
-            if (bandwidth > max_bandwidth)
+            if (bandwidth == desired_bandwith)
             {
-              max_bandwidth     = bandwidth;
               selected_playlist = streamPlaylist;
             }
           }
@@ -160,7 +103,7 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
     LOG_INFO << RECEIVER_LOG << "Selected highest bitrate playlist: " << selected_playlist;
 
     playlist_path    = "/hls/" + ip_id + "/" + audio_id + "/" + selected_playlist;
-    playlist_content = perform_https_request(ioc, ctx, playlist_path, server);
+    playlist_content = client.get(playlist_path);
   }
 
   std::istringstream       segment_stream(playlist_content);
@@ -183,7 +126,7 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
   if (has_m4s_segments)
   {
     std::string init_mp4_url = "/hls/" + ip_id + "/" + audio_id + "/init.mp4";
-    init_mp4_data            = perform_https_request(ioc, ctx, init_mp4_url, server);
+    init_mp4_data            = client.get(init_mp4_url);
 
     if (init_mp4_data.empty())
     {
@@ -207,7 +150,7 @@ auto fetch_transport_segments(const std::string& ip_id, const std::string& audio
 
       if (line.ends_with(macros::TRANSPORT_STREAM_EXT) || line.ends_with(macros::M4S_FILE_EXT))
       {
-        std::string segment_data = perform_https_request(ioc, ctx, segment_url, server);
+        std::string segment_data = client.get(segment_url);
         if (!segment_data.empty())
         {
           if (line.ends_with(macros::M4S_FILE_EXT))
@@ -296,11 +239,12 @@ auto decode_and_play(GlobalState& gs, bool& flac_found) -> bool
 auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
   -> std::vector<std::string>
 {
-  net::io_context ioc;
-  ssl::context    ctx(ssl::context::tlsv12_client);
+  asio::io_context ioc;
+  ssl::context     ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
+  libwavy::network::HttpsClient client(ioc, ctx, server);
 
-  std::string response = perform_https_request(ioc, ctx, macros::SERVER_PATH_HLS_CLIENTS, server);
+  std::string response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
 
   std::istringstream       iss(response);
   std::string              line;
@@ -351,9 +295,9 @@ auto main(int argc, char* argv[]) -> int
 {
   logger::init_logging();
 
-  if (argc < 3)
+  if (argc < 5)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <index> <server-ip>";
+    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <index> <server-ip> <bitrate-stream>";
     return EXIT_FAILURE;
   }
 
@@ -371,9 +315,10 @@ auto main(int argc, char* argv[]) -> int
 
   std::string audio_id   = clients[index];
   bool        flac_found = false;
+  int         bitrate    = std::stoi(argv[4]);
   GlobalState gs;
 
-  if (!fetch_transport_segments(ip_id, audio_id, gs, server, flac_found))
+  if (!fetch_transport_segments(ip_id, audio_id, gs, server, bitrate, flac_found))
   {
     return EXIT_FAILURE;
   }
