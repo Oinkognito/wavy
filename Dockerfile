@@ -6,6 +6,7 @@ RUN apk add --no-cache \
     build-base \
     cmake \
     make \
+    bash \
     wget \
     boost-dev \
     openssl-dev \
