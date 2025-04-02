@@ -1,0 +1,41 @@
+name: Docker Build & Test for Wavy
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image
+        run: docker build -t wavy-server-test .
+
+      - name: Run Container
+        run: |
+          docker run -d --name wavy-server -p 8080:8080 wavy-server-test
+          sleep 5 # Wait for server to start
+
+      - name: Test Server Response
+        run: |
+          if curl -k -sSf https://localhost:8080/hls/ping; then
+            echo "-- Server is running!"
+          else
+            echo "**Server failed to start!**" && exit 1
+          fi
+
+      - name: Stop and Remove Container
+        run: docker stop wavy-server && docker rm wavy-server

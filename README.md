@@ -106,6 +106,21 @@ make remove      # Cleans up all generated transport streams and playlists
 make all         # Builds all components at once
 ```
 
+If you want to build the server without **FFmpeg**:
+
+```bash 
+make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON"
+```
+
+### Containerized Server
+
+To run the Wavy server in a **Docker** container:
+
+```bash 
+docker build -t wavy-server . # to build the container
+docker run -d -p 8080:8080 --name wavy-server-test wavy-server
+```
+
 > [!IMPORTANT]
 > 
 > If you want to contribute to Wavy and want compile times 
@@ -214,6 +229,7 @@ So the capability of the server totally depends on **YOUR** filesystem. This giv
 
 1. `/hls/clients`: Gives a neat hierarchial structure of each Owner-IP-ID with their uploaded audio ids.
 2. `/hls/audio-info/`: Provides a neat hierarchial structure of every Audio ID's provided metadata (from their uploaded metadata.toml)
+3. `/hls/ping`: A basic route to check if the server is "alive" (sends `pong` if running)
 
 If you want to get the metadata for a single audio-id, you can always just query it like so:
 
