@@ -15,7 +15,7 @@ RUN apk add --no-cache \
 
 COPY . /app
 
-RUN make clean && make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON"
+RUN make clean && make init && make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON"
 
 EXPOSE 8080
 
