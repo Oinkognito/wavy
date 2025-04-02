@@ -34,6 +34,7 @@ Wavy is a **lightweight** and **efficient** solution for audio streaming within 
 > 
 > 1. Arch Linux
 > 2. Ubuntu (Debian)
+> 3. Fedora
 > 
 > In the future, perhaps Windows / MacOS will be supported.
 
@@ -64,6 +65,7 @@ To build and run **Wavy**, install the following dependencies:
 | Dependency  | Purpose |
 |-------------|---------|
 | **FLAC & FLAC++** | FLAC decoding and encoding for lossless streaming |
+| **Qt6** (_Core, Widgets_) | Required for GUI development. |
 
 > [!NOTE] 
 > 
