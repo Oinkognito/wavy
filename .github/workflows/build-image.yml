@@ -27,7 +27,6 @@ jobs:
       - name: Run Container
         run: |
           docker run -d --name wavy-server -p 8080:8080 wavy-server-test
-          sleep 5 # Wait for server to start
 
       - name: Test Server Response
         run: |
