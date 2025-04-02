@@ -1,0 +1,12 @@
+# Force LF line endings
+* text=auto eol=lf
+
+*.h text
+*.c text
+*.cpp text
+*.hpp text
+
+*.png binary
+*.jpg binary
+*.zip binary
+*.tar.gz binary

@@ -28,6 +28,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <boost/algorithm/string/regex.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks.hpp>
@@ -38,6 +40,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/file.hpp>
+#include <boost/regex.hpp>
 #include <boost/thread.hpp>
 #include <chrono>
 #include <iomanip>
@@ -64,6 +67,10 @@
 #define BLUE   "\033[38;5;109m"          // Gruvbox Blue (#458588)
 #define CYAN   "\033[38;5;108m"          // Gruvbox Aqua/Cyan (#689d6a)
 #define WHITE  "\033[38;5;223m"          // Gruvbox FG1 (#ebdbb2)
+#define PURPLE "\033[38;5;141m"          // Gruvbox Purple (#b16286) -> For TRACE logs
+
+#define FILENAME \
+  (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
 // Define log categories
 #define LOG_CATEGORIES                                   \
@@ -87,11 +94,18 @@ namespace logger
 
 enum SeverityLevel
 {
+  TRACE,
   INFO,
   WARNING,
   ERROR,
   DEBUG
 };
+
+inline auto strip_ansi(const std::string& input) -> std::string
+{
+  static const boost::regex ansi_regex("\033\\[[0-9;]*m");
+  return boost::regex_replace(input, ansi_regex, "");
+}
 
 inline auto get_current_timestamp() -> std::string
 {
@@ -107,18 +121,40 @@ inline auto get_current_timestamp() -> std::string
   return oss.str();
 }
 
-inline void init_logging()
+void init_logging()
 {
+  namespace bfs      = boost::filesystem;
   namespace sinks    = boost::log::sinks;
   namespace expr     = boost::log::expressions;
   namespace keywords = boost::log::keywords;
 
-  // Console logging with color
+  const char* home = getenv("HOME");
+  if (!home)
+  {
+    std::cerr << "ERROR: Unable to determine HOME directory for logging." << std::endl;
+    return;
+  }
+
+  bfs::path log_dir = bfs::path(home) / ".cache/wavy/logs";
+
+  if (!bfs::exists(log_dir))
+  {
+    if (!bfs::create_directories(log_dir))
+    {
+      std::cerr << "ERROR: Failed to create log directory: " << log_dir.string() << std::endl;
+      return;
+    }
+  }
+
+  // Define log file path
+  std::string log_file = (log_dir / "wavy_%Y-%m-%d_%H-%M-%S.log").string();
+
   boost::log::add_console_log(
     std::cout,
     keywords::format =
-      expr::stream << BOLD << "[" << get_current_timestamp()
-                   << "] " // boost posix time header is weird
+      expr::stream << BOLD << "[" << get_current_timestamp() << "] "
+                   << expr::if_(expr::attr<boost::log::trivial::severity_level>("Severity") ==
+                                boost::log::trivial::trace)[expr::stream << PURPLE << "[TRACE]   "]
                    << expr::if_(expr::attr<boost::log::trivial::severity_level>("Severity") ==
                                 boost::log::trivial::info)[expr::stream << GREEN << "[INFO]    "]
                    << expr::if_(
@@ -130,21 +166,51 @@ inline void init_logging()
                                 boost::log::trivial::debug)[expr::stream << BLUE << "[DEBUG]   "]
                    << RESET << expr::smessage);
 
+  // File logging (without ANSI codes)
+  using text_sink = sinks::synchronous_sink<sinks::text_file_backend>;
+  boost::shared_ptr<text_sink> file_sink =
+    boost::make_shared<text_sink>(keywords::file_name     = log_file,
+                                  keywords::rotation_size = 10 * 1024 * 1024, // 10 MB
+                                  keywords::auto_flush    = true);
+
+  // Custom Filtering: Strip ANSI codes before writing logs to a file
+  file_sink->set_formatter(
+    [](boost::log::record_view const& rec, boost::log::formatting_ostream& strm)
+    {
+      auto        severity    = rec[boost::log::trivial::severity];
+      auto        message_ref = rec[expr::smessage];
+      std::string message     = message_ref ? message_ref.get() : "";
+
+      // Strip ANSI escape codes
+      static const boost::regex ansi_regex("\033\\[[0-9;]*m");
+      message = boost::regex_replace(message, ansi_regex, "");
+
+      strm << "[" << get_current_timestamp() << "] "
+           << (severity ? severity.get() : boost::log::trivial::info) << " " << message;
+    });
+
+  boost::log::core::get()->add_sink(file_sink);
+
   boost::log::add_common_attributes();
 }
 
-// Macros for logging
-#define THREAD_ID "[Worker " << boost::this_thread::get_id() << "] "
+inline void flush_logs() { boost::log::core::get()->flush(); }
 
+// Macros for logging
+#define THREAD_ID    BOLD << "[Worker " << boost::this_thread::get_id() << "] " << RESET
+#define _TRACE_BACK_ "[" << FILENAME << ":" << __LINE__ << " - " << __func__ << "] "
+
+#define LOG_TRACE   BOOST_LOG_TRIVIAL(trace) << _TRACE_BACK_
 #define LOG_INFO    BOOST_LOG_TRIVIAL(info)
 #define LOG_WARNING BOOST_LOG_TRIVIAL(warning)
-#define LOG_ERROR   BOOST_LOG_TRIVIAL(error)
-#define LOG_DEBUG   BOOST_LOG_TRIVIAL(debug)
+#define LOG_ERROR   BOOST_LOG_TRIVIAL(error) << _TRACE_BACK_
+#define LOG_DEBUG   BOOST_LOG_TRIVIAL(debug) << _TRACE_BACK_
 
 // Async logging macros (include thread ID)
+#define LOG_TRACE_ASYNC   BOOST_LOG_TRIVIAL(trace) << THREAD_ID << _TRACE_BACK_
 #define LOG_INFO_ASYNC    BOOST_LOG_TRIVIAL(info) << THREAD_ID
 #define LOG_WARNING_ASYNC BOOST_LOG_TRIVIAL(warning) << THREAD_ID
-#define LOG_ERROR_ASYNC   BOOST_LOG_TRIVIAL(error) << THREAD_ID
-#define LOG_DEBUG_ASYNC   BOOST_LOG_TRIVIAL(debug) << THREAD_ID
+#define LOG_ERROR_ASYNC   BOOST_LOG_TRIVIAL(error) << THREAD_ID << _TRACE_BACK_
+#define LOG_DEBUG_ASYNC   BOOST_LOG_TRIVIAL(debug) << THREAD_ID << _TRACE_BACK_
 
 } // namespace logger

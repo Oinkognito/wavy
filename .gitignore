@@ -10,11 +10,15 @@ docs/
 output*/
 build*/
 payload*/
+logs*/
 .cache/
 *.mp3
 *.wav
 *.flac
 *.m4a
-*/**/registry-create
+*.pcm
+*.raw
 */**/miniaudio.h
 */**/toml.hpp
+*/**/nuklear.h 
+*/**/stb_image.h
