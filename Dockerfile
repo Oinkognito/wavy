@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     make \
     bash \
     wget \
+    curl \
     boost-dev \
     openssl-dev \
     openssl \
