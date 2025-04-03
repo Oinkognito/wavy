@@ -27,9 +27,19 @@ jobs:
       - name: Run Container
         run: |
           docker run -d --name wavy-server -p 8080:8080 wavy-server-test
+          sleep 5  # Give time to initialize
 
-      - name: Get Container ID
-        run: echo "CONTAINER_ID=$(docker ps -q --filter "name=wavy")" >> $GITHUB_ENV
+      - name: Get Running Container ID
+        run: echo "CONTAINER_ID=$(docker inspect --format="{{.Id}}" wavy-server)" >> $GITHUB_ENV
+
+      - name: Verify Container is Running
+        run: |
+          RUNNING=$(docker inspect -f '{{.State.Running}}' $CONTAINER_ID)
+          if [ "$RUNNING" != "true" ]; then
+            echo "Container failed to start. Showing logs..."
+            docker logs $CONTAINER_ID
+            exit 1
+          fi
 
       - name: Test Server Response (Inside Container)
         run: |
