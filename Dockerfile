@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     wget \
     boost-dev \
     openssl-dev \
+    openssl \
     zstd \
     pkgconf \
     libarchive-dev
