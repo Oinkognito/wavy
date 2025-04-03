@@ -28,9 +28,12 @@ jobs:
         run: |
           docker run -d --name wavy-server -p 8080:8080 wavy-server-test
 
-      - name: Test Server Response
+      - name: Get Container ID
+        run: echo "CONTAINER_ID=$(docker ps -q --filter "name=wavy")" >> $GITHUB_ENV
+
+      - name: Test Server Response (Inside Container)
         run: |
-          RESPONSE=$(curl -k -sSf https://localhost:8080/hls/ping)
+          RESPONSE=$(docker exec $CONTAINER_ID curl -k -sSf https://localhost:8080/hls/ping)
           if [[ "$RESPONSE" == "pong" ]]; then
             echo "-- Server is running and responded with 'pong'!"
           else
