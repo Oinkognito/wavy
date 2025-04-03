@@ -27,6 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <cstdlib>
 #include <libwavy/ffmpeg/hls/entry.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>
@@ -47,6 +48,24 @@ void DBG_printBitrateVec(vector<int>& vec)
   for (const auto& i : vec)
     LOG_DEBUG << i;
   LOG_DEBUG << "Finished listing.";
+}
+
+auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<int> found_bitrates)
+  -> int
+{
+  libwavy::registry::RegisterAudio parser(filename, found_bitrates);
+  if (!parser.parse())
+  {
+    std::cerr << "Failed to parse audio file.\n";
+    return 1;
+  }
+
+  std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
+
+  parser.exportToTOML(macros::to_string(outputTOMLFile));
+  LOG_INFO << ENCODER_LOG << "TOML metadata exported to " << outputTOMLFile;
+
+  return 0;
 }
 
 auto main(int argc, char* argv[]) -> int
@@ -105,7 +124,7 @@ auto main(int argc, char* argv[]) -> int
   std::vector<int> bitrates = {64, 112, 128};        // Example bitrates in kbps
   /* This is a godawful way of doing it will fix. */ //[TODO]: Fix this command line argument
                                                      // structure
-  bool        use_flac   = (strcmp(argv[3], "flac") == 0);
+  bool use_flac = (strcmp(argv[3], "flac") == 0);    // This is to encode in lossless FLAC format
   std::string output_dir = std::string(argv[2]);
 
   if (fs::exists(output_dir))
@@ -126,9 +145,36 @@ auto main(int argc, char* argv[]) -> int
   }
 
   libwavy::hls::HLS_Segmenter seg;
-  libwavy::ffmpeg::Metadata   metadata;
-  vector<int>                 found_bitrates;
-  const char*                 output_file =
+
+  /*
+   * @NOTE:
+   *
+   * When HLS segmenting for FLAC files, the remuxing is great and no 
+   * problems when running this code.
+   *
+   * However, when checking the HLS segments or master playlists' metadata,
+   * the bitrate calculation can be miscalculated!!
+   *
+   * Rest assured, the data is LOSSLESS and bitrate does NOT change!
+   *
+   */
+  if (use_flac)
+  {
+    libwavy::ffmpeg::Metadata met;
+    int                       bitrate = met.fetchBitrate(argv[1]);
+    LOG_TRACE << "Found bitrate: " << bitrate;
+    const std::string hls_seg_name = output_dir + "/segment.m3u8";
+    LOG_TRACE << "Encoding HLS segments for FLAC in '" << hls_seg_name
+              << "'. Skipping transcoding...";
+    seg.encode_flac_variant(argv[1], hls_seg_name.c_str(),
+                            bitrate); // This will also create the master playlist
+    return exportTOMLFile(argv[1], output_dir,
+                          {}); // just give empty array as we are not transcoding to diff bitrates
+  }
+
+  libwavy::ffmpeg::Metadata metadata;
+  vector<int>               found_bitrates;
+  const char*               output_file =
     "output.mp3"; // this will constantly get re-written it can stay constant
   for (const auto& i : bitrates)
   {
@@ -150,17 +196,5 @@ auto main(int argc, char* argv[]) -> int
 
   seg.create_master_playlist(output_dir, output_dir, use_flac);
 
-  libwavy::registry::RegisterAudio parser(argv[1], found_bitrates);
-  if (!parser.parse())
-  {
-    std::cerr << "Failed to parse audio file.\n";
-    return 1;
-  }
-
-  std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
-
-  parser.exportToTOML(macros::to_string(outputTOMLFile));
-  LOG_INFO << ENCODER_LOG << "TOML metadata exported to " << outputTOMLFile;
-
-  return 0;
+  return exportTOMLFile(argv[1], output_dir, found_bitrates);
 }

@@ -37,9 +37,25 @@ extern "C"
 namespace libwavy::ffmpeg
 {
 
+/**
+ * @class Metadata
+ * @brief A class for extracting metadata from multimedia files using FFmpeg.
+ */
 class Metadata
 {
 public:
+  /**
+   * @brief Fetches the bitrate of the given multimedia file.
+   *
+   * This function opens the provided multimedia file using FFmpeg, extracts its
+   * metadata, and returns the bitrate in bits per second (bps).
+   *
+   * @param input_file The path to the multimedia file.
+   * @return The bitrate of the file in bps, or a negative value if an error occurs.
+   *
+   * @note If an error occurs while opening the file or extracting stream info,
+   *       a negative error code will be returned.
+   */
   auto fetchBitrate(const char* input_file) -> int
   {
     AVFormatContext*         fmt_ctx = nullptr;
