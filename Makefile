@@ -107,4 +107,8 @@ dispatch:
 server-cert:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 
+# Generates a default certificate and private key (no user input)
+server-cert-gen:
+	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
+
 .PHONY: default all encoder decoder server dispatcher client playback verbose clean cleanup format tidy init server-cert
