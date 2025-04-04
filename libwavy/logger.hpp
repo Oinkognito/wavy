@@ -76,6 +76,11 @@
 #define LOG_CATEGORIES                                   \
   X(DECODER, BOLD "#DECODER_LOG " RESET)                 \
   X(ENCODER, BOLD "#ENCODER_LOG " RESET)                 \
+  X(TRANSCODER, BOLD "#TRANSCODER_LOG" RESET)            \
+  X(LIBAV, BOLD "#LIBAV_LOG" RESET)                      \
+  X(NET, BOLD "#NETWORK_LOG" RESET)                      \
+  X(HLS, BOLD "#HLS_LOG" RESET)                          \
+  X(UNIX, BOLD "#UNIX_LOG" RESET)                        \
   X(DISPATCH, BOLD "#DISPATCH_LOG " RESET)               \
   X(SERVER, BOLD "#SERVER_LOG " RESET)                   \
   X(SERVER_DWNLD, BOLD "#SERVER_DWNLD_LOG " RESET)       \

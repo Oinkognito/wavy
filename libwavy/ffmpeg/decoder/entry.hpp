@@ -49,7 +49,7 @@ auto DBG_WriteTransportSegmentsToFile(const std::vector<std::string>& transport_
   std::ofstream output_file(filename, std::ios::binary);
   if (!output_file)
   {
-    LOG_ERROR << "Failed to open output file: " << filename;
+    LOG_ERROR << DECODER_LOG << "Failed to open output file: " << filename;
     return false;
   }
 
@@ -59,7 +59,7 @@ auto DBG_WriteTransportSegmentsToFile(const std::vector<std::string>& transport_
   }
 
   output_file.close();
-  LOG_INFO << "Successfully wrote transport streams to " << filename;
+  LOG_INFO << DECODER_LOG << "Successfully wrote transport streams to " << filename;
   return true;
 }
 
@@ -69,7 +69,7 @@ auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_seg
   std::ofstream output_file(filename, std::ios::binary);
   if (!output_file)
   {
-    LOG_ERROR << "Failed to open output file: " << filename << std::endl;
+    LOG_ERROR << DECODER_LOG << "Failed to open output file: " << filename << std::endl;
     return false;
   }
 
@@ -77,7 +77,7 @@ auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_seg
                     transport_segment.size());
 
   output_file.close();
-  LOG_INFO << "Successfully wrote decoded audio stream to " << filename << std::endl;
+  LOG_INFO << DECODER_LOG << "Successfully wrote decoded audio stream to " << filename << std::endl;
   return true;
 }
 
@@ -321,7 +321,7 @@ public:
     // Debugging: Write PCM output
     if (!DBG_WriteDecodedAudioToFile(output_audio, "final.pcm"))
     {
-      LOG_ERROR << "Error writing decoded stream to file";
+      LOG_ERROR << DECODER_LOG << "Error writing decoded stream to file";
       return false;
     }
 

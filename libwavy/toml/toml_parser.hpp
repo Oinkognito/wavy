@@ -42,7 +42,7 @@ namespace toml_fs = std::filesystem;
 #define PARENT_AUDIO_FIELD_PATH             "path"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT      "file_format"
 #define PARENT_AUDIO_FIELD_FILE_FORMAT_LONG "file_format_long"
-#define PARENT_AUDIO_FIELD_BITRATES         "bitrates"
+#define PARENT_AUDIO_FIELD_TRNS_BITRATES    "transcoded_bitrates"
 
 #define PARENT_METADATA                    "metadata"
 #define PARENT_METADATA_FIELD_TSRC         "TSRC"
@@ -127,7 +127,8 @@ inline auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> Audi
   result.file_format = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT].value_or(""s);
   result.file_format_long =
     metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT_LONG].value_or(""s);
-  if (auto bitrates_array = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_BITRATES].as_array())
+  if (auto bitrates_array =
+        metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_TRNS_BITRATES].as_array())
   {
     for (const auto& val : *bitrates_array)
     {

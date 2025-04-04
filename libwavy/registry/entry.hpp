@@ -95,7 +95,7 @@ public:
     tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION, metadata.duration);
     tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE, metadata.bitrate);
 
-    tomlGen.addTableArray(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATES, bitrates);
+    tomlGen.addTableArray(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_TRNS_BITRATES, bitrates);
 
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TITLE, metadata.title);
     tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ARTIST, metadata.artist);

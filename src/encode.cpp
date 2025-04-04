@@ -42,6 +42,8 @@
  *
  */
 
+constexpr const char* HELP_STR = " <input file> <output directory> <audio format> [--debug]";
+
 void DBG_printBitrateVec(vector<int>& vec)
 {
   LOG_DEBUG << "Printing Bitrate Vec...";
@@ -68,36 +70,47 @@ auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<
   return 0;
 }
 
-auto main(int argc, char* argv[]) -> int
+auto checkDebug(std::span<char*> args) -> bool
 {
-  logger::init_logging();
+  constexpr std::string_view debug_flag = "--debug";
 
-  if (argc < 4)
-  {
-    LOG_ERROR << "Usage: " << argv[0]
-              << " <input file> <output directory> <audio format> [--debug]";
-    return 1;
-  }
+#if __cpp_lib_ranges >= 201911L
+  // C++20 and above: use ranges
+  return std::ranges::any_of(args, [debug_flag](char* arg)
+                             { return std::string_view(arg) == debug_flag; });
+#else
+  // Pre-C++20 fallback
+  return std::any_of(args.begin(), args.end(),
+                     [debug_flag](char* arg) { return std::string_view(arg) == debug_flag; });
+#endif
+}
 
-  bool debug_mode = false;
-  for (int i = 4; i < argc; ++i)
-  {
-    if (strcmp(argv[i], "--debug") == 0)
-    {
-      debug_mode = true;
-      break;
-    }
-  }
-
+void DBG_logCheck(const bool& debug_mode)
+{
   if (debug_mode)
   {
-    LOG_INFO << "-- Debug mode enabled: AV_LOG will output verbose logs.";
+    LOG_INFO << ENCODER_LOG << "-- Debug mode enabled: AV_LOG will output verbose logs.";
     av_log_set_level(AV_LOG_DEBUG);
   }
   else
   {
     av_log_set_level(AV_LOG_ERROR); // Only critical errors
   }
+}
+
+auto main(int argc, char* argv[]) -> int
+{
+  logger::init_logging();
+
+  if (argc < 4)
+  {
+    LOG_ERROR << "Usage: " << argv[0] << HELP_STR;
+    return 1;
+  }
+
+  bool debug_mode = checkDebug(std::span(argv + 4, argc - 4));
+
+  DBG_logCheck(debug_mode);
 
   /*
    * @NOTE
@@ -162,12 +175,12 @@ auto main(int argc, char* argv[]) -> int
   {
     libwavy::ffmpeg::Metadata met;
     int                       bitrate = met.fetchBitrate(argv[1]);
-    LOG_TRACE << "Found bitrate: " << bitrate;
+    LOG_TRACE << ENCODER_LOG << "Found bitrate: " << bitrate;
     const std::string hls_seg_name = output_dir + "/segment.m3u8";
-    LOG_TRACE << "Encoding HLS segments for FLAC in '" << hls_seg_name
+    LOG_TRACE << ENCODER_LOG << "Encoding HLS segments for FLAC in '" << hls_seg_name
               << "'. Skipping transcoding...";
-    seg.encode_flac_variant(argv[1], hls_seg_name.c_str(),
-                            bitrate); // This will also create the master playlist
+    seg.createSegmentsFLAC(argv[1], hls_seg_name.c_str(),
+                           bitrate); // This will also create the master playlist
     return exportTOMLFile(argv[1], output_dir,
                           {}); // just give empty array as we are not transcoding to diff bitrates
   }
@@ -179,22 +192,23 @@ auto main(int argc, char* argv[]) -> int
   for (const auto& i : bitrates)
   {
     libwavy::ffmpeg::Transcoder trns;
-    LOG_INFO << "Encoding for bitrate: " << i * 1000;
+    LOG_INFO << ENCODER_LOG << "Encoding for bitrate: " << i * 1000;
     int result = trns.transcode_mp3(argv[1], output_file, i * 1000);
     if (result == 0)
     {
-      LOG_INFO << "Transcoding seems to be succesful. Creating HLS segmentes in '" << output_dir
-               << "'.";
-      found_bitrates = seg.create_hls_segments(output_file, output_dir.c_str());
+      LOG_INFO << ENCODER_LOG << "Transcoding seems to be succesful. Creating HLS segmentes in '"
+               << output_dir << "'.";
+      found_bitrates = seg.createSegments(output_file, output_dir.c_str());
     }
   }
   LOG_INFO
+    << ENCODER_LOG
     << "Total encoding seems to be complete. Going ahead with creating <master playlist> ...";
 
   // For debug if you want to sanity check the resultant bitrates
   DBG_printBitrateVec(found_bitrates);
 
-  seg.create_master_playlist(output_dir, output_dir, use_flac);
+  seg.createMasterPlaylistMP3(output_dir, output_dir);
 
   return exportTOMLFile(argv[1], output_dir, found_bitrates);
 }

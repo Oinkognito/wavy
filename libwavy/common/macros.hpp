@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -47,6 +48,33 @@
     (result) = static_cast<safe_type>(a) * static_cast<safe_type>(b);   \
   } while (0)
 
+#define WAVY__ASSERT(expr)                                 \
+  do                                                       \
+  {                                                        \
+    if (!(expr))                                           \
+    {                                                      \
+      ::wavy::assertion_failed(#expr, __FILE__, __LINE__); \
+      std::abort();                                        \
+    }                                                      \
+  } while (0)
+
+#define WAVY__TYPE_NAME(var) typeid(var).name()
+#define WAVY__IS_SAME(A, B)  std::is_same<A, B>::value
+
+#define WAVY__UNREACHABLE()                          \
+  do                                                 \
+  {                                                  \
+    ::wavy::unreachable_reached(__FILE__, __LINE__); \
+    std::abort();                                    \
+  } while (0)
+
+#define WAVY__NOT_IMPLEMENTED()                            \
+  do                                                       \
+  {                                                        \
+    ::wavy::not_implemented(__FILE__, __LINE__, __func__); \
+    std::abort();                                          \
+  } while (0)
+
 #define STRING_CONSTANTS(X)                                   \
   X(PLAYLIST_EXT, ".m3u8")                                    \
   X(PLAYLIST_GLOBAL_HEADER, "#EXTM3U")                        \
@@ -58,6 +86,7 @@
   X(ZSTD_FILE_EXT, "zst")                                     \
   X(TOML_FILE_EXT, ".toml")                                   \
   X(FLAC_CODEC, "CODECS=\"fLaC\"")                            \
+  X(MP3_CODEC, "CODECS=\"mp4a.40.2\"")                        \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
   X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")                 \
@@ -108,3 +137,11 @@ inline auto to_cstr(std::string_view sv) -> const char*
 }
 
 } // namespace macros
+
+namespace wavy
+{
+inline void assertion_failed(const char* expr, const char* file, int line)
+{
+  std::cerr << "Assertion failed: (" << expr << ") in " << file << " at line " << line << std::endl;
+}
+} // namespace wavy

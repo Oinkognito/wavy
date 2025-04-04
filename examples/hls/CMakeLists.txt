@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(make_hls LANGUAGES CXX)
+project(example_hls_seg LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -26,16 +26,16 @@ pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
 )
 
 # Executable
-add_executable(make_hls ${SOURCES})
+add_executable(example_hls_seg ${SOURCES})
 
 # Include directories
-target_include_directories(make_hls PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_hls_seg PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(make_hls PRIVATE 
+target_link_libraries(example_hls_seg PRIVATE 
     Boost::log Boost::log_setup Boost::system Boost::thread 
     PkgConfig::LIBAV
 )
 
 # Definitions (for BOOST_LOG_DLL if needed)
-target_compile_definitions(make_hls PRIVATE BOOST_LOG_DLL)
+target_compile_definitions(example_hls_seg PRIVATE BOOST_LOG_DLL)

@@ -96,14 +96,14 @@ public:
       }
       else if (ec)
       {
-        LOG_WARNING << RECEIVER_LOG << "Stream shutdown error: " << ec.message();
+        LOG_WARNING << NET_LOG << "Stream shutdown error: " << ec.message();
       }
 
       return response_data;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << RECEIVER_LOG << "HTTPS request failed: " << e.what();
+      LOG_ERROR << NET_LOG << "HTTPS request failed: " << e.what();
       return "";
     }
   }

@@ -78,7 +78,7 @@ public:
       throw std::runtime_error("Another instance is already running!");
     }
 
-    LOG_INFO << SERVER_LOG << "Lock acquired: " << socket_path_;
+    LOG_INFO << UNIX_LOG << "Lock acquired: " << socket_path_;
   }
 
   void cleanup()
@@ -87,7 +87,7 @@ public:
     {
       close(lock_fd_);
       unlink(socket_path_.c_str());
-      LOG_INFO << SERVER_LOG << "Lock file removed: " << socket_path_;
+      LOG_INFO << UNIX_LOG << "Lock file removed: " << socket_path_;
       lock_fd_ = -1;
     }
   }

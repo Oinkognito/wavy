@@ -81,7 +81,7 @@ public:
    * @param output_playlist The output HLS playlist path.
    * @return True on success, false on failure.
    */
-  auto encode_flac_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
+  auto createSegmentsFLAC(const char* input_file, const char* output_playlist, int bitrate) -> bool
   {
     AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
     AVStream *       in_stream = nullptr, *out_stream = nullptr;
@@ -159,7 +159,7 @@ public:
     }
 
     out_stream->codecpar->bit_rate = bitrate;
-    LOG_TRACE << "Setting output stream bitrate to: " << out_stream->codecpar->bit_rate;
+    LOG_TRACE << HLS_LOG << "Setting output stream bitrate to: " << out_stream->codecpar->bit_rate;
 
     // Open output file
     if (!(output_ctx->oformat->flags & AVFMT_NOFILE))
@@ -232,7 +232,7 @@ public:
    * @param use_flac Whether to use FLAC instead of MP3.
    * @return A vector of found bitrates.
    */
-  auto create_hls_segments(const char* input_file, const char* output_dir, bool use_flac = false)
+  auto createSegments(const char* input_file, const char* output_dir, bool use_flac = false)
     -> std::vector<int>
   {
     std::vector<std::string> playlist_files;
@@ -240,14 +240,15 @@ public:
     int bitrate = lbwMetadata.fetchBitrate(input_file);
     found_bitrates.emplace_back(bitrate);
 
-    LOG_TRACE << "Found bitrate: " << bitrate;
+    LOG_TRACE << HLS_LOG << "Found bitrate: " << bitrate;
 
     std::string codec_prefix    = use_flac ? "flac" : "mp3";
     std::string output_playlist = std::string(output_dir) + "/hls_" + codec_prefix + "_" +
                                   std::to_string(bitrate) + macros::to_string(macros::PLAYLIST_EXT);
     playlist_files.push_back(output_playlist);
 
-    bool success = use_flac ? encode_flac_variant(input_file, output_playlist.c_str(), bitrate)
+    bool success = use_flac ? createSegmentsFLAC(input_file, output_playlist.c_str(),
+                                                 bitrate) // creates master playlist on its own
                             : encode_variant(input_file, output_playlist.c_str(), bitrate);
 
     if (!success)
@@ -260,14 +261,12 @@ public:
   }
 
   /**
-   * @brief Creates a master playlist (.m3u8) for all available bitrates.
+   * @brief Creates a master playlist (.m3u8) for all available bitrates of a MP3 file.
    * 
    * @param input_dir Directory containing the segmented HLS playlists.
    * @param output_dir Directory where the master playlist will be created.
-   * @param use_flac Whether the master playlist references FLAC files.
    */
-  void create_master_playlist(const std::string& input_dir, const std::string& output_dir,
-                              bool use_flac)
+  void createMasterPlaylistMP3(const std::string& input_dir, const std::string& output_dir)
   {
     std::vector<std::string> playlists;
     std::vector<int>         bitrates;
@@ -307,18 +306,14 @@ public:
 
     for (size_t i = 0; i < playlists.size(); i++)
     {
-      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << bitrates[i] << ",CODECS=\""
-           << (use_flac ? "fLaC" : "mp4a.40.2") << "\"\n";
+      m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << bitrates[i] << "," << macros::MP3_CODEC << "\"\n";
       m3u8 << playlists[i] << "\n";
     }
 
     m3u8.close();
-    if (use_flac)
-      LOG_INFO << "Created HLS segments for FLAC with references written to: "
-               << macros::to_string(macros::MASTER_PLAYLIST);
-    else
-      LOG_INFO << "Created HLS segments for LOSSY with references written to master playlist: "
-               << macros::to_string(macros::MASTER_PLAYLIST);
+    LOG_INFO << HLS_LOG
+             << "Created HLS segments for LOSSY with references written to master playlist: "
+             << macros::to_string(macros::MASTER_PLAYLIST);
   }
 
 private:

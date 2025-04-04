@@ -84,18 +84,20 @@ public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
                         AVCodecContext* codec_ctx, const char* label)
   {
-    LOG_DEBUG << "========== " << label << " ===============";
-    LOG_DEBUG << "File: " << filename;
-    LOG_DEBUG << "Codec: " << codec_ctx->codec->long_name << " (" << codec_ctx->codec->name << ")";
-    LOG_DEBUG << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps";
-    LOG_DEBUG << "Sample Rate: " << codec_ctx->sample_rate << " Hz";
-    LOG_DEBUG << "Channels: " << codec_ctx->ch_layout.nb_channels;
-    LOG_DEBUG << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt);
-    LOG_DEBUG << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec";
+    LOG_TRACE << TRANSCODER_LOG << "========== " << label << " ===============";
+    LOG_TRACE << TRANSCODER_LOG << "File: " << filename;
+    LOG_TRACE << TRANSCODER_LOG << "Codec: " << codec_ctx->codec->long_name << " ("
+              << codec_ctx->codec->name << ")";
+    LOG_TRACE << TRANSCODER_LOG << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps";
+    LOG_TRACE << TRANSCODER_LOG << "Sample Rate: " << codec_ctx->sample_rate << " Hz";
+    LOG_TRACE << TRANSCODER_LOG << "Channels: " << codec_ctx->ch_layout.nb_channels;
+    LOG_TRACE << TRANSCODER_LOG
+              << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt);
+    LOG_TRACE << TRANSCODER_LOG << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec";
     char layout_desc[256];
     av_channel_layout_describe(&codec_ctx->ch_layout, layout_desc, sizeof(layout_desc));
-    LOG_DEBUG << "Channel Layout Description: " << layout_desc;
-    LOG_DEBUG << "=================================================";
+    LOG_TRACE << TRANSCODER_LOG << "Channel Layout Description: " << layout_desc;
+    LOG_TRACE << TRANSCODER_LOG << "=================================================";
   }
 
   inline auto soft_clip(float x) -> float
@@ -225,7 +227,8 @@ public:
 
     if (found_invalid)
     {
-      LOG_DEBUG << "[INFO] Sanitized invalid audio samples (NaN/Inf values) -> Format: " << format;
+      LOG_INFO << TRANSCODER_LOG
+               << "Sanitized invalid audio samples (NaN/Inf values) -> Format: " << format;
     }
   }
   // Main transcoding function - now more modular
@@ -282,11 +285,11 @@ public:
       // Print output file information
       print_audio_info(output_filename, out_format_ctx, out_codec_ctx, "Output File Info");
 
-      LOG_INFO << "==> [Transcoding completed successfully!]";
+      LOG_INFO << TRANSCODER_LOG << "==> [Transcoding completed successfully!]";
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "Transcoding error: " << e.what();
+      LOG_ERROR << TRANSCODER_LOG << "Transcoding error: " << e.what();
       ret = AVERROR_UNKNOWN;
     }
 
@@ -306,14 +309,14 @@ public:
     // Open input file
     if ((ret = avformat_open_input(in_format_ctx, input_filename, nullptr, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not open input file!";
+      LOG_ERROR << TRANSCODER_LOG << "Could not open input file!";
       return ret;
     }
 
     // Read stream information
     if ((ret = avformat_find_stream_info(*in_format_ctx, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not find stream info!";
+      LOG_ERROR << TRANSCODER_LOG << "Could not find stream info!";
       avformat_close_input(in_format_ctx);
       return ret;
     }
@@ -323,7 +326,7 @@ public:
       av_find_best_stream(*in_format_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     if (*audio_stream_index < 0)
     {
-      LOG_ERROR << "Could not find an audio stream";
+      LOG_ERROR << TRANSCODER_LOG << "Could not find an audio stream";
       avformat_close_input(in_format_ctx);
       return AVERROR_STREAM_NOT_FOUND;
     }
@@ -334,7 +337,8 @@ public:
     const AVCodec* in_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
     if (!in_codec)
     {
-      LOG_ERROR << "Decoder not found for codec ID: " << in_stream->codecpar->codec_id;
+      LOG_ERROR << TRANSCODER_LOG
+                << "Decoder not found for codec ID: " << in_stream->codecpar->codec_id;
       avformat_close_input(in_format_ctx);
       return AVERROR_DECODER_NOT_FOUND;
     }
@@ -345,7 +349,7 @@ public:
     *in_codec_ctx = avcodec_alloc_context3(in_codec);
     if (!*in_codec_ctx)
     {
-      LOG_ERROR << "Could not allocate a decoding context";
+      LOG_ERROR << TRANSCODER_LOG << "Could not allocate a decoding context";
       avformat_close_input(in_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -353,7 +357,7 @@ public:
     // Copy parameters from the input stream to the decoder context
     if ((ret = avcodec_parameters_to_context(*in_codec_ctx, in_stream->codecpar)) < 0)
     {
-      LOG_ERROR << "Failed to copy codec parameters to decoder context!";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to copy codec parameters to decoder context!";
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -365,7 +369,7 @@ public:
     // Open the decoder
     if ((ret = avcodec_open2(*in_codec_ctx, in_codec, nullptr)) < 0)
     {
-      LOG_ERROR << "Failed to open decoder!";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to open decoder!";
       avcodec_free_context(in_codec_ctx);
       avformat_close_input(in_format_ctx);
       return ret;
@@ -385,7 +389,7 @@ public:
     if ((ret = avformat_alloc_output_context2(out_format_ctx, nullptr, nullptr, output_filename)) <
         0)
     {
-      LOG_ERROR << "Could not create output context!";
+      LOG_ERROR << TRANSCODER_LOG << "Could not create output context!";
       return ret;
     }
 
@@ -393,18 +397,19 @@ public:
     const AVCodec* out_codec = avcodec_find_encoder(AV_CODEC_ID_MP3);
     if (!out_codec)
     {
-      LOG_ERROR << "MP3 encoder not found";
+      LOG_ERROR << TRANSCODER_LOG << "MP3 encoder not found";
       avformat_free_context(*out_format_ctx);
       return AVERROR_ENCODER_NOT_FOUND;
     }
 
-    LOG_INFO << "==> Encoding using MP3 (libmp3lame, ID: " << AV_CODEC_ID_MP3 << ")";
+    LOG_INFO << TRANSCODER_LOG << "Transcoding using MP3 (libmp3lame, ID: " << AV_CODEC_ID_MP3
+             << ")";
 
     // Create an audio stream in the output file
     *out_stream = avformat_new_stream(*out_format_ctx, nullptr);
     if (!*out_stream)
     {
-      LOG_ERROR << "Failed to create output stream";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to create output stream";
       avformat_free_context(*out_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -413,7 +418,7 @@ public:
     *out_codec_ctx = avcodec_alloc_context3(out_codec);
     if (!*out_codec_ctx)
     {
-      LOG_ERROR << "Could not allocate encoding context";
+      LOG_ERROR << TRANSCODER_LOG << "Could not allocate encoding context";
       avformat_free_context(*out_format_ctx);
       return AVERROR(ENOMEM);
     }
@@ -426,7 +431,7 @@ public:
     if (in_codec_ctx->sample_fmt == AV_SAMPLE_FMT_S16 ||
         in_codec_ctx->sample_fmt == AV_SAMPLE_FMT_S32)
     {
-      LOG_INFO << "FLAC input detected, converting to MP3-compatible format.";
+      LOG_INFO << TRANSCODER_LOG << "FLAC input detected, converting to MP3-compatible format.";
       (*out_codec_ctx)->sample_fmt = AV_SAMPLE_FMT_FLTP;
     }
     else
@@ -437,7 +442,7 @@ public:
     // Copy channel layout from input
     if ((ret = av_channel_layout_copy(&(*out_codec_ctx)->ch_layout, &in_codec_ctx->ch_layout)) < 0)
     {
-      LOG_ERROR << "Failed to copy input channel layout to output!";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to copy input channel layout to output!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -446,7 +451,8 @@ public:
     // MP3 has limitations on channel count
     if ((*out_codec_ctx)->ch_layout.nb_channels > 2)
     {
-      LOG_DEBUG << "Warning: MP3 typically supports only mono or stereo. Limiting to stereo.";
+      LOG_DEBUG << TRANSCODER_LOG
+                << "Warning: MP3 typically supports only mono or stereo. Limiting to stereo.";
       av_channel_layout_uninit(&(*out_codec_ctx)->ch_layout);
       av_channel_layout_default(&(*out_codec_ctx)->ch_layout, 2);
     }
@@ -460,8 +466,8 @@ public:
     // Set VBR quality - optional setting for better quality
     av_opt_set_int((*out_codec_ctx)->priv_data, "qscale", 1, 0); // Lower values = higher quality
 
-    LOG_DEBUG << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels;
-    LOG_DEBUG << "Output Channels: " << (*out_codec_ctx)->ch_layout.nb_channels;
+    LOG_DEBUG << TRANSCODER_LOG << "Input Channels: " << in_codec_ctx->ch_layout.nb_channels;
+    LOG_DEBUG << TRANSCODER_LOG << "Output Channels: " << (*out_codec_ctx)->ch_layout.nb_channels;
 
     // Some formats require global header
     if ((*out_format_ctx)->oformat->flags & AVFMT_GLOBALHEADER)
@@ -472,18 +478,18 @@ public:
     // Open the encoder
     if ((ret = avcodec_open2(*out_codec_ctx, out_codec, nullptr)) < 0)
     {
-      LOG_ERROR << "Could not open output codec!";
+      LOG_ERROR << TRANSCODER_LOG << "Could not open output codec!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
     }
 
-    LOG_INFO << "==> Opened encoder successfully";
+    LOG_DEBUG << TRANSCODER_LOG << "==> Opened encoder successfully";
 
     // Copy encoder parameters to output stream
     if ((ret = avcodec_parameters_from_context((*out_stream)->codecpar, *out_codec_ctx)) < 0)
     {
-      LOG_ERROR << "Failed to copy encoder parameters to output stream!";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to copy encoder parameters to output stream!";
       avcodec_free_context(out_codec_ctx);
       avformat_free_context(*out_format_ctx);
       return ret;
@@ -497,18 +503,18 @@ public:
     {
       if ((ret = avio_open(&(*out_format_ctx)->pb, output_filename, AVIO_FLAG_WRITE)) < 0)
       {
-        LOG_ERROR << "Could not open output file!";
+        LOG_ERROR << TRANSCODER_LOG << "Could not open output file!";
         avcodec_free_context(out_codec_ctx);
         avformat_free_context(*out_format_ctx);
         return ret;
       }
-      LOG_INFO << "==> Opened output file successfully";
+      LOG_INFO << TRANSCODER_LOG << "==> Opened output file successfully";
     }
 
     // Write file header
     if ((ret = avformat_write_header(*out_format_ctx, nullptr)) < 0)
     {
-      LOG_ERROR << "Error writing format header!";
+      LOG_ERROR << TRANSCODER_LOG << "Error writing format header!";
       if (!((*out_format_ctx)->oformat->flags & AVFMT_NOFILE))
       {
         avio_closep(&(*out_format_ctx)->pb);
@@ -518,7 +524,7 @@ public:
       return ret;
     }
 
-    LOG_INFO << "==> Successfully wrote format header";
+    LOG_DEBUG << TRANSCODER_LOG << "==> Successfully wrote format header";
 
     return 0;
   }
@@ -557,7 +563,7 @@ public:
       return ret;
     }
 
-    LOG_INFO << "==> Initialized resampler successfully";
+    LOG_DEBUG << "==> Initialized resampler successfully";
 
     return 0;
   }
@@ -599,7 +605,7 @@ public:
       return ret;
     }
 
-    LOG_INFO << "==> Allocated frame buffers successfully";
+    LOG_DEBUG << "==> Allocated frame buffers successfully";
 
     return 0;
   }
@@ -630,10 +636,9 @@ public:
       av_packet_unref(packet);
     }
 
-    LOG_DEBUG << "Finished processing all frames";
     if (samples_sanitized > 0)
     {
-      LOG_DEBUG << "Total frames with sanitized samples: " << samples_sanitized;
+      LOG_DEBUG << TRANSCODER_LOG << "Total frames with sanitized samples: " << samples_sanitized;
     }
 
     // Flush the resampler (ensure all buffered FLAC samples are output)
@@ -646,7 +651,7 @@ public:
     // Write file trailer
     if ((ret = av_write_trailer(out_format_ctx)) < 0)
     {
-      LOG_ERROR << "Error writing trailer!";
+      LOG_ERROR << TRANSCODER_LOG << "Error writing trailer!";
       return ret;
     }
 
@@ -802,14 +807,14 @@ public:
     int ret = avcodec_send_frame(codec_ctx, nullptr);
     if (ret < 0 && ret != AVERROR_EOF)
     {
-      LOG_ERROR << "Error sending null frame for flushing!";
+      LOG_ERROR << TRANSCODER_LOG << "Error sending null frame for flushing!";
       return ret;
     }
 
     AVPacket* out_packet = av_packet_alloc();
     if (!out_packet)
     {
-      LOG_ERROR << "Failed to allocate output packet";
+      LOG_ERROR << TRANSCODER_LOG << "Failed to allocate output packet";
       return AVERROR(ENOMEM);
     }
 
@@ -823,7 +828,7 @@ public:
       ret = av_interleaved_write_frame(format_ctx, out_packet);
       if (ret < 0)
       {
-        LOG_ERROR << "Error writing flushed packet!";
+        LOG_ERROR << TRANSCODER_LOG << "Error writing flushed packet!";
         av_packet_unref(out_packet);
         av_packet_free(&out_packet);
         return ret;
