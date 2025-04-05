@@ -54,6 +54,7 @@ To build and run **Wavy**, install the following dependencies:
 | **Base-devel** | Includes `g++` / `clang++` for C++ compilation |
 | **OpenSSL** | Secure communication using SSL/TLS |
 | **Boost C++** | Asynchronous networking & utility functions |
+| **Intel oneTBB** | Parallelism for Wavy operations |
 | **libzstd** | Lossless compression (Zstandard) |
 | **CMake & Make** | Build system tools |
 | **Pkg-Config** | Build system tools helper |
@@ -106,10 +107,10 @@ make remove      # Cleans up all generated transport streams and playlists
 make all         # Builds all components at once
 ```
 
-If you want to build the server without **FFmpeg**:
+If you want to build the server without **FFmpeg** and **oneTBB**:
 
 ```bash 
-make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON"
+make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON -DNO_TBB=ON"
 ```
 
 ### Containerized Server

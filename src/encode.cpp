@@ -27,11 +27,17 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <autogen/config.h>
+
 #include <cstdlib>
 #include <libwavy/ffmpeg/hls/entry.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>
 #include <libwavy/registry/entry.hpp>
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for_each.h>
+
+using namespace libwavy::ffmpeg;
 
 /*
  * @NOTE:
@@ -43,14 +49,6 @@
  */
 
 constexpr const char* HELP_STR = " <input file> <output directory> <audio format> [--debug]";
-
-void DBG_printBitrateVec(vector<int>& vec)
-{
-  LOG_DEBUG << "Printing Bitrate Vec...";
-  for (const auto& i : vec)
-    LOG_DEBUG << i;
-  LOG_DEBUG << "Finished listing.";
-}
 
 auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<int> found_bitrates)
   -> int
@@ -70,9 +68,9 @@ auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<
   return 0;
 }
 
-auto checkDebug(std::span<char*> args) -> bool
+auto checkAVDebug(std::span<char*> args) -> bool
 {
-  constexpr std::string_view debug_flag = "--debug";
+  constexpr std::string_view debug_flag = "--debug-libav";
 
 #if __cpp_lib_ranges >= 201911L
   // C++20 and above: use ranges
@@ -85,11 +83,26 @@ auto checkDebug(std::span<char*> args) -> bool
 #endif
 }
 
-void DBG_logCheck(const bool& debug_mode)
+auto checkFLACEncode(std::span<char*> args) -> bool
 {
-  if (debug_mode)
+  constexpr std::string_view flac_enc_flag = "--flac";
+
+#if __cpp_lib_ranges >= 201911L
+  // C++20 and above: use ranges
+  return std::ranges::any_of(args, [flac_enc_flag](char* arg)
+                             { return std::string_view(arg) == flac_enc_flag; });
+#else
+  // Pre-C++20 fallback
+  return std::any_of(args.begin(), args.end(),
+                     [flac_enc_flag](char* arg) { return std::string_view(arg) == flac_enc_flag; });
+#endif
+}
+
+void DBG_logCheck(const bool& avdebug_mode)
+{
+  if (avdebug_mode)
   {
-    LOG_INFO << ENCODER_LOG << "-- Debug mode enabled: AV_LOG will output verbose logs.";
+    LOG_INFO << ENCODER_LOG << "-- AV Debug mode enabled: AV_LOG will output verbose logs.";
     av_log_set_level(AV_LOG_DEBUG);
   }
   else
@@ -108,9 +121,15 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  bool debug_mode = checkDebug(std::span(argv + 4, argc - 4));
+  bool avdebug_mode = checkAVDebug(std::span(argv + 4, argc - 4));
+  bool use_flac =
+    checkFLACEncode(std::span(argv + 3, argc - 3)); // This is to encode in lossless FLAC format
 
-  DBG_logCheck(debug_mode);
+  Metadata met;
+  int      entryBitrate = met.fetchBitrate(argv[1]);
+  LOG_INFO << ENCODER_LOG << "Entry input file's bitrate: " << entryBitrate;
+
+  DBG_logCheck(avdebug_mode);
 
   /*
    * @NOTE
@@ -137,8 +156,7 @@ auto main(int argc, char* argv[]) -> int
   std::vector<int> bitrates = {64, 112, 128};        // Example bitrates in kbps
   /* This is a godawful way of doing it will fix. */ //[TODO]: Fix this command line argument
                                                      // structure
-  bool use_flac = (strcmp(argv[3], "flac") == 0);    // This is to encode in lossless FLAC format
-  std::string output_dir = std::string(argv[2]);
+  const std::string output_dir = std::string(argv[2]);
 
   if (fs::exists(output_dir))
   {
@@ -157,7 +175,7 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  libwavy::hls::HLS_Segmenter seg;
+  hls::HLS_Segmenter seg;
 
   /*
    * @NOTE:
@@ -173,40 +191,55 @@ auto main(int argc, char* argv[]) -> int
    */
   if (use_flac)
   {
-    libwavy::ffmpeg::Metadata met;
-    int                       bitrate = met.fetchBitrate(argv[1]);
-    LOG_TRACE << ENCODER_LOG << "Found bitrate: " << bitrate;
-    const std::string hls_seg_name = output_dir + "/segment.m3u8";
-    LOG_TRACE << ENCODER_LOG << "Encoding HLS segments for FLAC in '" << hls_seg_name
-              << "'. Skipping transcoding...";
-    seg.createSegmentsFLAC(argv[1], hls_seg_name.c_str(),
-                           bitrate); // This will also create the master playlist
+    LOG_INFO << ENCODER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
+    seg.createSegmentsFLAC(argv[1], "flac_segment.m3u8",
+                           entryBitrate); // This will also create the master playlist
     return exportTOMLFile(argv[1], output_dir,
                           {}); // just give empty array as we are not transcoding to diff bitrates
   }
 
-  libwavy::ffmpeg::Metadata metadata;
-  vector<int>               found_bitrates;
-  const char*               output_file =
-    "output.mp3"; // this will constantly get re-written it can stay constant
-  for (const auto& i : bitrates)
-  {
-    libwavy::ffmpeg::Transcoder trns;
-    LOG_INFO << ENCODER_LOG << "Encoding for bitrate: " << i * 1000;
-    int result = trns.transcode_mp3(argv[1], output_file, i * 1000);
-    if (result == 0)
-    {
-      LOG_INFO << ENCODER_LOG << "Transcoding seems to be succesful. Creating HLS segmentes in '"
-               << output_dir << "'.";
-      found_bitrates = seg.createSegments(output_file, output_dir.c_str());
-    }
-  }
-  LOG_INFO
-    << ENCODER_LOG
-    << "Total encoding seems to be complete. Going ahead with creating <master playlist> ...";
+  // Use oneTBB parallelizing for faster transcoding times
+  //
+  // On average it is 2x faster than sequential transcoding
 
-  // For debug if you want to sanity check the resultant bitrates
-  DBG_printBitrateVec(found_bitrates);
+  WAVY__ASSERT(
+    [&]()
+    {
+      for (const auto& i : bitrates)
+        if (i % 2 != 0)
+          return false;
+      return true;
+    }());
+
+  tbb::concurrent_vector<int> concurrent_found_bitrates;
+
+  tbb::parallel_for_each(
+    bitrates.begin(), bitrates.end(),
+    [&](int i)
+    {
+      std::string output_file_i = output_dir + "/output_" + std::to_string(i) + ".mp3";
+      Transcoder  trns;
+      LOG_INFO << ENCODER_LOG << "[Bitrate: " << i << "] Starting transcoding...";
+      int result = trns.transcode_mp3(argv[1], output_file_i.c_str(), i * 1000);
+      if (result == 0)
+      {
+        LOG_INFO << ENCODER_LOG << "[Bitrate: " << i
+                 << "] Transcoding OK. Creating HLS segments...";
+        std::vector<int> res = seg.createSegments(output_file_i.c_str(), output_dir.c_str());
+        for (int b : res)
+          concurrent_found_bitrates.push_back(b);
+      }
+      else
+      {
+        LOG_WARNING << ENCODER_LOG << "[Bitrate: " << i << "] Transcoding failed.";
+      }
+    });
+  LOG_INFO << ENCODER_LOG
+           << "Total TRANSCODING + HLS segmenting seems to be complete. Going ahead with creating "
+              "<master playlist> ...";
+
+  std::vector<int> found_bitrates(concurrent_found_bitrates.begin(),
+                                  concurrent_found_bitrates.end());
 
   seg.createMasterPlaylistMP3(output_dir, output_dir);
 

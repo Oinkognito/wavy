@@ -48,16 +48,6 @@
     (result) = static_cast<safe_type>(a) * static_cast<safe_type>(b);   \
   } while (0)
 
-#define WAVY__ASSERT(expr)                                 \
-  do                                                       \
-  {                                                        \
-    if (!(expr))                                           \
-    {                                                      \
-      ::wavy::assertion_failed(#expr, __FILE__, __LINE__); \
-      std::abort();                                        \
-    }                                                      \
-  } while (0)
-
 #define WAVY__TYPE_NAME(var) typeid(var).name()
 #define WAVY__IS_SAME(A, B)  std::is_same<A, B>::value
 
@@ -137,11 +127,3 @@ inline auto to_cstr(std::string_view sv) -> const char*
 }
 
 } // namespace macros
-
-namespace wavy
-{
-inline void assertion_failed(const char* expr, const char* file, int line)
-{
-  std::cerr << "Assertion failed: (" << expr << ") in " << file << " at line " << line << std::endl;
-}
-} // namespace wavy

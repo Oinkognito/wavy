@@ -38,7 +38,7 @@ auto main(int argc, char* argv[]) -> int
   {
     if (argc > 2)
     {
-      libwavy::hls::HLS_Segmenter seg;
+      libwavy::ffmpeg::hls::HLS_Segmenter seg;
       seg.createSegments(argv[1], argv[2]);
     }
     else

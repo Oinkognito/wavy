@@ -49,7 +49,7 @@ namespace fs = std::filesystem;
  * @namespace libwavy::hls
  * @brief Contains HLS segmenter functionality for encoding and playlist generation.
  */
-namespace libwavy::hls
+namespace libwavy::ffmpeg::hls
 {
 
 /**
@@ -458,4 +458,4 @@ private:
   }
 };
 
-} // namespace libwavy::hls
+} // namespace libwavy::ffmpeg::hls
