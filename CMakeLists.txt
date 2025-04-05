@@ -30,6 +30,7 @@ endif()
 
 option(BUILD_NINJA "Use Ninja to build the project" OFF)
 option(BUILD_EXAMPLES "Compile examples for the project" OFF)
+option(AUTOGEN_HEADER "Autogenerate Config Header for the project" ON)
 
 # Check if CMake is using Ninja
 if (DEFINED BUILD_NINJA AND BUILD_NINJA)
