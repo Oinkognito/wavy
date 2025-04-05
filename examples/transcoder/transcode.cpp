@@ -41,7 +41,7 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
   // Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
   libwavy::ffmpeg::Transcoder trns;
 

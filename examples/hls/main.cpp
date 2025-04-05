@@ -33,7 +33,7 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
   try
   {
     if (argc > 2)

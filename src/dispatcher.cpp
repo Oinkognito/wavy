@@ -31,11 +31,11 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
 
   if (argc < 5)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <server> <port> <directory> <master_playlist>";
+    LOG_ERROR << "Usage: " << argv[0] << " <server> <port> <payload-directory> <master_playlist>";
     return 1;
   }
 
@@ -50,15 +50,15 @@ auto main(int argc, char* argv[]) -> int
     if (!dispatcher.process_and_upload())
     {
       LOG_ERROR << DISPATCH_LOG << "Upload process failed.";
-      return 1;
+      return WAVY_RET_FAIL;
     }
 
     LOG_INFO << DISPATCH_LOG << "Upload successful.";
-    return 0;
+    return WAVY_RET_SUC;
   }
   catch (const std::exception& e)
   {
     LOG_ERROR << "[Main] Error: " << e.what();
-    return 1;
+    return WAVY_RET_SUC;
   }
 }

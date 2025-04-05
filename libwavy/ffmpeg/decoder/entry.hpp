@@ -82,7 +82,7 @@ auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_seg
 }
 
 // Custom AVIO read function
-static auto custom_read_packet(void* opaque, uint8_t* buf, int buf_size) -> int
+static auto readAVIO(void* opaque, uint8_t* buf, int buf_size) -> int
 {
   auto*         segments      = static_cast<std::vector<std::string>*>(opaque);
   static size_t segment_index = 0;
@@ -170,8 +170,8 @@ public:
     }
 
     // Select appropriate custom reader
-    avio_ctx = avio_alloc_context(avio_buffer, avio_buf, 0, &ts_segments, &custom_read_packet,
-                                  nullptr, nullptr);
+    avio_ctx =
+      avio_alloc_context(avio_buffer, avio_buf, 0, &ts_segments, &readAVIO, nullptr, nullptr);
     if (!avio_ctx)
     {
       av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO context\n");

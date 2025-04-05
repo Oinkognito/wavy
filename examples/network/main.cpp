@@ -47,7 +47,7 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
   if (argc < 3)
   {
     LOG_ERROR << argv[0] << " <server-ip>" << " <path>";

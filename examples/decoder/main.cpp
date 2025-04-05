@@ -30,6 +30,8 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 
+using namespace libwavy::ffmpeg;
+
 auto main() -> int
 {
   GlobalState gs;

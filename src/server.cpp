@@ -33,22 +33,23 @@
 
 #include <libwavy/server/server.hpp>
 
+namespace asio = boost::asio;
+namespace ssl  = asio::ssl;
+
 auto main() -> int
 {
   try
   {
-    logger::init_logging();
-    boost::asio::io_context   io_context;
-    boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23);
+    libwavy::log::init_logging();
+    asio::io_context io_context;
+    ssl::context     ssl_context(ssl::context::sslv23);
 
-    ssl_context.set_options(
-      boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 |
-      boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
+    ssl_context.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2 |
+                            ssl::context::no_sslv3 | ssl::context::single_dh_use);
 
-    ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT),
-                                     boost::asio::ssl::context::pem);
+    ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT), ssl::context::pem);
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
-                                     boost::asio::ssl::context::pem);
+                                     ssl::context::pem);
 
     libwavy::server::HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();

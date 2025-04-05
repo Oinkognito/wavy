@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(flac_metadata LANGUAGES CXX)
+project(example_flac_metadata LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -24,17 +24,17 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FLAC REQUIRED IMPORTED_TARGET flac++)
 
 # Executable
-add_executable(flac_metadata ${SOURCES})
+add_executable(example_flac_metadata ${SOURCES})
 
 # Include directories
-target_include_directories(flac_metadata PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_flac_metadata PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(flac_metadata PRIVATE 
+target_link_libraries(example_flac_metadata PRIVATE 
     Boost::log Boost::log_setup Boost::system Boost::filesystem 
     PkgConfig::FLAC 
     pthread
 )
 
 # Definitions (for BOOST_LOG_DLL if needed)
-target_compile_definitions(flac_metadata PRIVATE BOOST_LOG_DLL)
+target_compile_definitions(example_flac_metadata PRIVATE BOOST_LOG_DLL)

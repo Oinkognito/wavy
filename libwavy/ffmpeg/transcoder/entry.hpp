@@ -84,20 +84,20 @@ public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
                         AVCodecContext* codec_ctx, const char* label)
   {
-    LOG_TRACE << TRANSCODER_LOG << "========== " << label << " ===============";
-    LOG_TRACE << TRANSCODER_LOG << "File: " << filename;
-    LOG_TRACE << TRANSCODER_LOG << "Codec: " << codec_ctx->codec->long_name << " ("
+    LOG_DEBUG << TRANSCODER_LOG << "========== " << label << " ===============";
+    LOG_DEBUG << TRANSCODER_LOG << "File: " << filename;
+    LOG_DEBUG << TRANSCODER_LOG << "Codec: " << codec_ctx->codec->long_name << " ("
               << codec_ctx->codec->name << ")";
-    LOG_TRACE << TRANSCODER_LOG << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps";
-    LOG_TRACE << TRANSCODER_LOG << "Sample Rate: " << codec_ctx->sample_rate << " Hz";
-    LOG_TRACE << TRANSCODER_LOG << "Channels: " << codec_ctx->ch_layout.nb_channels;
-    LOG_TRACE << TRANSCODER_LOG
+    LOG_DEBUG << TRANSCODER_LOG << "Bitrate: " << codec_ctx->bit_rate / 1000 << " kbps";
+    LOG_DEBUG << TRANSCODER_LOG << "Sample Rate: " << codec_ctx->sample_rate << " Hz";
+    LOG_DEBUG << TRANSCODER_LOG << "Channels: " << codec_ctx->ch_layout.nb_channels;
+    LOG_DEBUG << TRANSCODER_LOG
               << "Sample Format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt);
-    LOG_TRACE << TRANSCODER_LOG << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec";
+    LOG_DEBUG << TRANSCODER_LOG << "Duration: " << format_ctx->duration / AV_TIME_BASE << " sec";
     char layout_desc[256];
     av_channel_layout_describe(&codec_ctx->ch_layout, layout_desc, sizeof(layout_desc));
-    LOG_TRACE << TRANSCODER_LOG << "Channel Layout Description: " << layout_desc;
-    LOG_TRACE << TRANSCODER_LOG << "=================================================";
+    LOG_DEBUG << TRANSCODER_LOG << "Channel Layout Description: " << layout_desc;
+    LOG_DEBUG << TRANSCODER_LOG << "=================================================";
   }
 
   inline auto soft_clip(float x) -> float

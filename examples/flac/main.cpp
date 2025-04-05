@@ -27,35 +27,36 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <iostream>
 #include <libwavy/codecs/flac/metadata.hpp>
-#include <sys/stat.h> // For file size
+#include <libwavy/logger.hpp>
 
 auto main(int argc, char* argv[]) -> int
 {
+  libwavy::log::init_logging();
+
   if (argc > 1)
   {
-    std::string file     = argv[1];
-    auto        metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
+    const std::string file     = argv[1];
+    auto              metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
 
-    std::cout << "Bitrate:         " << metadata.bitrate << " bps\n";
-    std::cout << "Total Samples:   " << metadata.total_samples << "\n";
-    std::cout << "Sample Rate:     " << metadata.sample_rate << " Hz\n";
-    std::cout << "Bits Per Sample: " << metadata.bits_per_sample << "\n";
-    std::cout << "Channels:        " << metadata.channels << "\n";
-    std::cout << "Duration:        " << metadata.duration << " sec\n";
-    std::cout << "File Size:       " << metadata.file_size << " bytes\n";
-    std::cout << "Vendor String:   " << metadata.vendor_string << "\n";
+    LOG_INFO << "Bitrate:         " << metadata.bitrate << " bps";
+    LOG_INFO << "Total Samples:   " << metadata.total_samples;
+    LOG_INFO << "Sample Rate:     " << metadata.sample_rate << " Hz";
+    LOG_INFO << "Bits Per Sample: " << metadata.bits_per_sample;
+    LOG_INFO << "Channels:        " << metadata.channels;
+    LOG_INFO << "Duration:        " << metadata.duration << " secs";
+    LOG_INFO << "File Size:       " << metadata.file_size << " bytes";
+    LOG_INFO << "Vendor String:   " << metadata.vendor_string;
 
-    std::cout << "\n--------- Tags: ----------\n";
+    LOG_INFO << "--------- Tags: ----------";
     for (const auto& [key, value] : metadata.tags)
     {
-      std::cout << "  " << key << ": " << value << "\n";
+      LOG_INFO << "  " << key << ": " << value;
     }
   }
   else
   {
-    std::cerr << argv[0] << " <input-flac-file> " << std::endl;
+    LOG_ERROR << argv[0] << " <input-flac-file> ";
   }
 
   return 0;

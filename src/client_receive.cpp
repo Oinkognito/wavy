@@ -293,7 +293,7 @@ void print_client_list(const std::vector<std::string>& clients)
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
 
   if (argc < 5)
   {

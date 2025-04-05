@@ -42,7 +42,7 @@ void signalHandler(int signal)
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
   if (argc != 2)
   {
     LOG_ERROR << "Usage: " << argv[0] << " <network-stream>";

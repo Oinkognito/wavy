@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -36,6 +35,10 @@
 #define WAVY_SERVER_PORT_NO          8080
 #define WAVY_SERVER_AUDIO_SIZE_LIMIT 200 // in MiBs
 #define WAVY_SERVER_PORT_NO_STR      "8080"
+
+#define WAVY_RET_SUC   0
+#define WAVY_RET_FAIL  1
+#define WAVY_RET_UNDEF -1
 
 #define WAVY__SAFE_MULTIPLY(a, b, result)                               \
   do                                                                    \
@@ -100,13 +103,13 @@
   X(SERVER_STORAGE_DIR, "/tmp/hls_storage") // this will use /tmp of the server's filesystem
 
 #define PROTOCOL_CONSTANTS(X)                                                              \
-  X(SERVER_ERROR_404, "HTTP/1.1 404 Not Found\r\n\r\nFile not found")                      \
-  X(SERVER_ERROR_500,                                                                      \
-    "HTTP/1.1 500 Internal Server Error\r\n\r\nUnable to read file (or) File write error") \
   X(SERVER_ERROR_400, "HTTP/1.1 400 Bad Request\r\n\r\nInvalid request format")            \
   X(SERVER_ERROR_401, "HTTP/1.1 401 Authentication Error\r\n\r\n")                         \
+  X(SERVER_ERROR_404, "HTTP/1.1 404 Not Found\r\n\r\nFile not found")                      \
   X(SERVER_ERROR_405, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")                           \
   X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large\r\n\r\n")                            \
+  X(SERVER_ERROR_500,                                                                      \
+    "HTTP/1.1 500 Internal Server Error\r\n\r\nUnable to read file (or) File write error") \
   X(SERVER_PONG_MSG, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\npong")
 
 namespace macros

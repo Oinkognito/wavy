@@ -68,21 +68,62 @@ To build and run **Wavy**, install the following dependencies:
 | **FLAC & FLAC++** | FLAC decoding and encoding for lossless streaming |
 | **Qt6** (_Core, Widgets_) | Required for GUI development. |
 
-> [!NOTE] 
+Here are the dependencies installation command for some common distributions:
+
+> [!NOTE]
 > 
-> Ensure that **FFmpeg** is installed with `libavformat`, `libavcodec`, `libavutil`, and `libswresample`
+> It is important that you need to download the **DEVELOPMENT** version 
+> of these packages for `pkg-config` to work! 
 > 
-> This is particular critical for Ubuntu / Debian: (FFmpeg and its dev libs are different packages)
+> If you are on `Arch Linux`, then ignore this.
 > 
-> ```bash 
-> sudo apt install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev
-> ```
+> So let us say you have `libboost` downloaded in your `Ubuntu` system.
+> `pkg-config` will **NOT** be able to find and link `libboost`!
 > 
-> On Arch Linux: 
-> ```bash 
-> sudo pacman -S ffmpeg # should be enough
-> ```
+> Hence, you would need to install `libboost-dev` and replace it with `libboost`.
 > 
+
+### **Arch Linux**
+
+```bash
+sudo pacman -S --needed \
+  ffmpeg base-devel openssl boost tbb-devel zstd cmake make pkgconf \
+  libarchive lame flac++
+```
+
+> **Note:** Qt6 (optional for GUI):
+```bash
+sudo pacman -S qt6-base qt6-tools
+```
+
+### **Ubuntu / Debian**
+
+```bash
+sudo apt update && sudo apt install -y \
+  ffmpeg build-essential libssl-dev libboost-all-dev libtbb-dev \
+  libzstd-dev cmake make pkg-config libarchive-dev \
+  libmp3lame-dev libflac++-dev
+```
+
+> **Optional GUI (Qt6):**
+```bash
+sudo apt install qt6-base-dev qt6-tools-dev
+```
+
+### **Fedora**
+
+```bash
+sudo dnf install -y \
+    @development-tools gcc-c++ flac-devel boost-devel openssl-devel \
+    ffmpeg-free-devel libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
+    zstd cmake make pkgconf \
+    libarchive-devel lame-devel git wget tbb-devel
+```
+
+> **Optional GUI (Qt6):**
+```bash
+sudo dnf install qt6-qtbase-devel qt6-qttools-devel
+```
 
 ## **Building**
 

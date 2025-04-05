@@ -27,6 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/common/macros.hpp"
 #include <autogen/config.h>
 
 #include <cstdlib>
@@ -57,7 +58,7 @@ auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<
   if (!parser.parse())
   {
     std::cerr << "Failed to parse audio file.\n";
-    return 1;
+    return WAVY_RET_FAIL;
   }
 
   std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
@@ -65,7 +66,7 @@ auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<
   parser.exportToTOML(macros::to_string(outputTOMLFile));
   LOG_INFO << ENCODER_LOG << "TOML metadata exported to " << outputTOMLFile;
 
-  return 0;
+  return WAVY_RET_SUC;
 }
 
 auto checkAVDebug(std::span<char*> args) -> bool
@@ -113,7 +114,7 @@ void DBG_logCheck(const bool& avdebug_mode)
 
 auto main(int argc, char* argv[]) -> int
 {
-  logger::init_logging();
+  libwavy::log::init_logging();
 
   if (argc < 4)
   {

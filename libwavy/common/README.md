@@ -14,7 +14,7 @@ The `logger.hpp` file provides a structured logging system for Wavy, leveraging 
 ## **1. Initialization**
 Before using the logger, call:
 ```cpp
-logger::init_logging();
+libwavy::log::init_logging();
 ```
 This initializes the logging system and configures console output formatting.
 
@@ -24,6 +24,7 @@ Four severity levels are available:
 - **WARNING**: Potential issues (`LOG_WARNING`)
 - **ERROR**: Critical errors that need immediate attention (`LOG_ERROR`)
 - **DEBUG**: Detailed debugging information (`LOG_DEBUG`)
+- **TRACE**: In case of viewing a hierarchial or graph like structure of execution, a trace of how events are being handled is ideal. (`LOG_TRACE`)
 
 ### **Example Usage**
 ```cpp
@@ -31,22 +32,35 @@ LOG_INFO << "Server started successfully";
 LOG_WARNING << "High memory usage detected";
 LOG_ERROR << "Failed to allocate buffer";
 LOG_DEBUG << "Packet received: size = " << packet_size;
+LOG_TRACE << "Received %s from transcoder.." << path;
 ```
+
+> [!NOTE]
+> 
+> If you want to view the **FUNCTION** and **LINE_NO** from where the log is being invoked,
+> 
+> Use `LOG_TRACE` or `LOG_DEBUG`!
+> 
 
 ## **3. Logging Categories**
 Each component of Wavy has a **log category**, making it easier to filter logs. The following categories are defined:
 
-| **Category**        | **Use Case** |
-|---------------------|-------------|
-| `DECODER_LOG`      | Logs related to audio decoding |
-| `ENCODER_LOG`      | Logs related to audio encoding |
-| `DISPATCH_LOG`     | Logs related to dispatching streams |
-| `SERVER_LOG`       | General server logs |
-| `SERVER_DWNLD_LOG` | Server handling downloads |
-| `SERVER_UPLD_LOG`  | Server handling uploads |
-| `SERVER_EXTRACT_LOG` | Extracting uploaded archive files |
-| `SERVER_VALIDATE_LOG` | Validation of uploaded files |
-| `RECEIVER_LOG`     | Logs related to receiving streams |
+| **Category**          | **Use Case**                          |
+|-----------------------|----------------------------------------|
+| `DECODER_LOG`         | Logs related to audio decoding         |
+| `ENCODER_LOG`         | Logs related to audio encoding         |
+| `TRANSCODER_LOG`      | Logs related to audio transcoding      |
+| `LIBAV_LOG`           | Logs related to FFmpeg/libav usage     |
+| `NETWORK_LOG`         | Logs for network operations            |
+| `HLS_LOG`             | Logs related to HLS processing         |
+| `UNIX_LOG`            | Logs for Unix-specific operations      |
+| `DISPATCH_LOG`        | Logs related to dispatching streams    |
+| `SERVER_LOG`          | General server logs                    |
+| `SERVER_DWNLD_LOG`    | Server handling downloads              |
+| `SERVER_UPLD_LOG`     | Server handling uploads                |
+| `SERVER_EXTRACT_LOG`  | Extracting uploaded archive files      |
+| `SERVER_VALIDATE_LOG` | Validation of uploaded files           |
+| `RECEIVER_LOG`        | Logs related to receiving streams      |
 
 ### **Example Usage**
 ```cpp
@@ -97,9 +111,10 @@ The log output is structured as follows:
 [12:34:56.789] [INFO]    #SERVER_LOG Client connected: ID = 12345
 [12:34:56.900] [WARNING] #ENCODER_LOG Encoding delay detected
 [12:34:57.101] [ERROR]   #DISPATCH_LOG Failed to open network socket
+[12:34:57.101] [TRACE] []   #DISPATCH_LOG Failed to open network socket
 ```
 - **INFO** logs are **green**.
 - **WARNING** logs are **yellow**.
 - **ERROR** logs are **red**.
 - **DEBUG** logs are **blue**.
-
+- **TRACE** logs are **purple**.

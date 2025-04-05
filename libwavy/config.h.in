@@ -54,6 +54,9 @@
 #cmakedefine01 WAVY__HAS_FUTURE
 #cmakedefine01 WAVY__HAS_CONDITION_VARIABLE
 #cmakedefine01 WAVY__HAS_CHRONO
+#cmakedefine01 WAVY__HAS_BARRIER
+#cmakedefine01 WAVY__HAS_LATCH
+#cmakedefine01 WAVY__HAS_SEMAPHORE
 
 // Modern C++ Additions
 #cmakedefine01 WAVY__HAS_RANDOM
@@ -69,6 +72,11 @@
 #cmakedefine01 WAVY__HAS_STOP_TOKEN
 #cmakedefine01 WAVY__HAS_NUMBERS
 #cmakedefine01 WAVY__HAS_BIT
+#cmakedefine01 WAVY__HAS_FORMAT
+#cmakedefine01 WAVY__HAS_EXPECTED
+#cmakedefine01 WAVY__HAS_STACKTRACE
+#cmakedefine01 WAVY__HAS_MDSPAN
+#cmakedefine01 WAVY__HAS_FLAT_MAP
 
 // I/O & Filesystem
 #cmakedefine01 WAVY__HAS_FILESYSTEM
@@ -107,7 +115,6 @@ inline void assertion_failed(const char* expr, const char* file, int line)
   } while (0)
 #endif
 
-// These macros are self-contained by C standard library ports to C++
 #define WAVY__TYPE_NAME(var) typeid(var).name()
 #define WAVY__IS_SAME(A, B)  std::is_same<A, B>::value
 
