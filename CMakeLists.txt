@@ -92,12 +92,12 @@ else()
     message(WARNING "pkg-config could not find Zstd")
 endif()
 
-find_package(TBB REQUIRED tbb)
 
 if (DEFINED NO_TBB AND NO_TBB)
   message(STATUS "Skippping module Intel-oneTBB...")
 
 else()
+  find_package(TBB REQUIRED tbb)
   pkg_check_modules(TBB REQUIRED tbb)
 endif()
 
