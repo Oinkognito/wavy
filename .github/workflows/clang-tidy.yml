@@ -30,7 +30,7 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev
+            libmp3lame-dev libtbb-dev
 
     - name: Compile Wavy for x86-64 Ubuntu
       run: |

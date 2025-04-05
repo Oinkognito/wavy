@@ -95,15 +95,9 @@ endif()
 
 if (DEFINED NO_TBB AND NO_TBB)
   message(STATUS "Skippping module Intel-oneTBB...")
-
 else()
   find_package(TBB REQUIRED tbb)
   pkg_check_modules(TBB REQUIRED tbb)
-endif()
-
-if (TBB_FOUND)
-    include_directories(${TBB_INCLUDE_DIRS})
-    link_directories(${TBB_LIBRARY_DIRS})
 endif()
 
 function(add_custom_executable name src_file)
@@ -119,9 +113,14 @@ function(add_custom_executable_ffmpeg name src_file)
     target_link_libraries(${name} PRIVATE ${FFMPEG_LIBRARIES})
 endfunction()
 
-add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
-target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb)
+if (TBB_FOUND)
+    message(STATUS "Found oneTBB: ${TBB_LIBRARIES}")
+    include_directories(${TBB_INCLUDE_DIRS})
+    link_directories(${TBB_LIBRARY_DIRS})
 
+    add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
+    target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb)
+endif()
 
 add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
 message(STATUS "<< Client compilation with std-C++20... >>")
