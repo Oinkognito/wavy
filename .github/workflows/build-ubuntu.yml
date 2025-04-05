@@ -1,4 +1,4 @@
-name: "Building Wavy in Ubuntu (x86-64 arch - GCC)"
+name: "Wavy CI / Ubuntu Build (x86-64 arch - GCC)"
 
 on:
   push:

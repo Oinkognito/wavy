@@ -1,4 +1,4 @@
-name: C++ Formatting Check for Wavy
+name: "Wavy CI / C++ Formatting"
 
 on:
   push:

@@ -145,15 +145,3 @@ Error Handling Flow
 .. note::
 
    All errors are returned with human-readable messages, delimited using ``\r\n\r\n`` for text separation in network layers.
-
-Authentication
-==============
-
-Certain endpoints (like `/hls/logs`) require secure authentication. Upon failure, the server returns:
-
-``HTTP/1.1 401 Authentication Error\r\n\r\n``
-
-The authentication scheme can be extended in future releases (e.g., using JWT or token-based mechanisms).
-
----
-

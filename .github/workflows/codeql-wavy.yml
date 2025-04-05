@@ -1,4 +1,4 @@
-name: "CodeQL Analysis for Wavy in Ubuntu (x86 arch - GCC)"
+name: "Wavy CI / CodeQL Analysis in Ubuntu (x86 arch - GCC)"
 
 on:
   push:

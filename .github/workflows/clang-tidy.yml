@@ -1,4 +1,4 @@
-name: Clang Tidy Check for Wavy (x86-64 arch Ubuntu)
+name: "Wavy CI / Clang-Tidy (x86-64 arch Ubuntu)"
 
 on:
   push:

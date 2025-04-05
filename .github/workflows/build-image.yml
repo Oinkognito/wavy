@@ -1,4 +1,4 @@
-name: Docker Build & Test for Wavy
+name: "Wavy CI / Docker Image"
 
 on:
   push:
