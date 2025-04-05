@@ -102,11 +102,8 @@ else()
 endif()
 
 if (TBB_FOUND)
-    message(STATUS "Found TBB with pkg-config")
     include_directories(${TBB_INCLUDE_DIRS})
     link_directories(${TBB_LIBRARY_DIRS})
-else()
-    message(FATAL_ERROR "TBB not found via pkg-config")
 endif()
 
 function(add_custom_executable name src_file)
