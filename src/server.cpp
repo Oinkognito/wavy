@@ -48,8 +48,10 @@ auto main() -> int
                             ssl::context::no_sslv3 | ssl::context::single_dh_use);
 
     ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT), ssl::context::pem);
+    LOG_TRACE << "Loaded server certificate: " << macros::SERVER_CERT;
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
                                      ssl::context::pem);
+    LOG_TRACE << "Loaded private key file: " << macros::SERVER_PRIVATE_KEY;
 
     libwavy::server::HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();

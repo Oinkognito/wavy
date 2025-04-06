@@ -36,16 +36,16 @@
 #include <stdexcept>
 #include <vector>
 
-#define SAMPLE_RATE 44100
-#define CHANNELS    2
-
 /*****************************************************************
  * @NOTE:
  *
  * MP3 -> No issues
- * FLAC -> s16, s24, s32
+ * FLAC -> s16, s24, s32 (works for all)
  *
  *****************************************************************/
+
+namespace libwavy::audio
+{
 
 class AudioPlayer
 {
@@ -55,6 +55,8 @@ private:
   std::vector<unsigned char> audioMemory;
   bool                       isPlaying;
   bool                       flac_stream;
+  int                        userSampleRate;
+  int                        userChannels;
 
   static void lossyDataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
                                 ma_uint32 frameCount)
@@ -67,8 +69,8 @@ private:
 
     if (framesRead < frameCount)
     {
-      ma_silence_pcm_frames(output + (framesRead * CHANNELS), frameCount - framesRead,
-                            ma_format_f32, CHANNELS);
+      ma_silence_pcm_frames(output + (framesRead * pDevice->playback.channels),
+                            frameCount - framesRead, ma_format_f32, pDevice->playback.channels);
       player->isPlaying = false;
     }
   }
@@ -78,9 +80,11 @@ private:
   {
     static size_t offset = 0;
     auto*         player = (AudioPlayer*)pDevice->pUserData;
-    size_t        bytesToCopy; // 16-bit FLAC
+    size_t        bytesToCopy;
+
     WAVY__SAFE_MULTIPLY(frameCount, pDevice->playback.channels, bytesToCopy);
-    WAVY__SAFE_MULTIPLY(bytesToCopy, 2, bytesToCopy);
+    WAVY__SAFE_MULTIPLY(bytesToCopy, ma_get_bytes_per_sample(pDevice->playback.format),
+                        bytesToCopy);
 
     if (offset + bytesToCopy > player->audioMemory.size())
     {
@@ -99,30 +103,31 @@ private:
   }
 
 public:
-  AudioPlayer(const std::vector<unsigned char>& audioInput, const bool flac_found)
-      : audioMemory(audioInput), isPlaying(false), flac_stream(flac_found)
+  AudioPlayer(const std::vector<unsigned char>& audioInput, const bool flac_found,
+              int preferredSampleRate = 0, int preferredChannels = 0)
+      : audioMemory(audioInput), isPlaying(false), flac_stream(flac_found),
+        userSampleRate(preferredSampleRate), userChannels(preferredChannels)
   {
-    LOG_INFO << "Initializing AudioPlayer with " << audioMemory.size() << " bytes of audio data.";
+    LOG_INFO << AUDIO_LOG << "Initializing AudioPlayer with " << audioMemory.size() << " bytes of audio data.";
+    LOG_DEBUG << AUDIO_LOG << "User preferences - Sample Rate: " << userSampleRate
+             << ", Channels: " << userChannels;
 
-    // First, probe the format by initializing the decoder without a predefined format.
     ma_decoder_config decoderConfig = ma_decoder_config_init_default();
 
     if (ma_decoder_init_memory(audioMemory.data(), audioMemory.size(), &decoderConfig, &decoder) !=
         MA_SUCCESS)
     {
-      LOG_ERROR << "Failed to initialize decoder from memory.";
-      LOG_WARNING << "Still proceeding to attempt playback...";
+      LOG_ERROR << AUDIO_LOG << "Failed to initialize decoder from memory.";
+      LOG_WARNING << AUDIO_LOG << "Still proceeding to attempt playback...";
     }
 
-    // Dynamically adjust config based on detected format
-    decoderConfig.format   = decoder.outputFormat;
-    decoderConfig.channels = decoder.outputChannels > 0 ? decoder.outputChannels : CHANNELS;
-    decoderConfig.sampleRate =
-      decoder.outputSampleRate > 0 ? decoder.outputSampleRate : SAMPLE_RATE;
+    decoderConfig.format     = decoder.outputFormat;
+    decoderConfig.channels   = (userChannels > 0) ? userChannels : decoder.outputChannels;
+    decoderConfig.sampleRate = (userSampleRate > 0) ? userSampleRate : decoder.outputSampleRate;
 
-    LOG_INFO << "Detected Format - Format: " << decoderConfig.format
-             << ", Channels: " << decoderConfig.channels
-             << ", Sample Rate: " << decoderConfig.sampleRate;
+    LOG_DEBUG << AUDIO_LOG << "Detected Format - Format: " << decoder.outputFormat
+             << ", Channels: " << decoder.outputChannels
+             << ", Sample Rate: " << decoder.outputSampleRate;
 
     ma_uint64 totalFrames;
     if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) == MA_SUCCESS &&
@@ -134,77 +139,60 @@ public:
     }
     else
     {
-      LOG_WARNING << "Could not determine audio duration using standard method.";
-
-      // Estimate duration from raw file size if decoding format is known
-      size_t bytesPerSample = (decoder.outputFormat == ma_format_s16)   ? 2
-                              : (decoder.outputFormat == ma_format_s24) ? 3
-                              : (decoder.outputFormat == ma_format_s32) ? 4
-                                                                        : 0;
-
+      size_t bytesPerSample = ma_get_bytes_per_sample(decoder.outputFormat);
       if (bytesPerSample > 0 && decoder.outputChannels > 0)
       {
         size_t totalSamples      = audioMemory.size() / (bytesPerSample * decoder.outputChannels);
         double estimatedDuration = static_cast<double>(totalSamples) / decoder.outputSampleRate;
 
-        LOG_INFO << "Estimated Audio Duration: " << std::fixed << std::setprecision(2)
+        LOG_INFO << AUDIO_LOG << "Estimated Duration: " << std::fixed << std::setprecision(2)
                  << estimatedDuration << " seconds (calculated from file size)";
       }
       else
       {
-        LOG_WARNING << "Failed to estimate audio duration.";
+        LOG_WARNING << AUDIO_LOG << "Failed to estimate duration.";
       }
     }
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.pUserData        = this;
 
-    // Ensure decoder properties are properly set
-    config.playback.channels = decoder.outputChannels > 0 ? decoder.outputChannels : CHANNELS;
-    config.sampleRate = decoder.outputSampleRate > 0 ? decoder.outputSampleRate : SAMPLE_RATE;
+    config.sampleRate        = (userSampleRate > 0) ? userSampleRate : decoder.outputSampleRate;
+    config.playback.channels = (userChannels > 0) ? userChannels : decoder.outputChannels;
 
-    // Dynamically determine format based on decoder's output format
-    LOG_DEBUG << "[Decoder] " << decoder.outputFormat;
-    LOG_DEBUG << "ma_format_s16: " << ma_format_s16;
-    LOG_DEBUG << "ma_format_s24: " << ma_format_s24;
-    LOG_DEBUG << "ma_format_s32: " << ma_format_s32;
-    LOG_DEBUG << "ma_format_f32: " << ma_format_f32;
     switch (decoder.outputFormat)
     {
       case ma_format_s16:
-        LOG_INFO << "Using FLAC (16-bit) callback.";
+        LOG_INFO << AUDIO_LOG << "Using FLAC (16-bit) callback.";
         config.dataCallback    = flacDataCallback;
         config.playback.format = ma_format_s16;
         break;
-
       case ma_format_s24:
-        LOG_INFO << "Using FLAC (24-bit) callback.";
+        LOG_INFO << AUDIO_LOG << "Using FLAC (24-bit) callback.";
         config.dataCallback    = flacDataCallback;
         config.playback.format = ma_format_s24;
         break;
-
       case ma_format_f32:
         if (flac_stream)
         {
-          LOG_INFO << "Using FLAC (32-bit) callback.";
+          LOG_INFO << AUDIO_LOG << "Using FLAC (32-bit) callback.";
           config.dataCallback = flacDataCallback;
         }
         else
         {
-          LOG_INFO << "Using MP3 (floating-point) callback.";
+          LOG_INFO << AUDIO_LOG << "Using MP3 (floating-point) callback.";
           config.dataCallback = lossyDataCallback;
         }
         config.playback.format = ma_format_f32;
         break;
-
       default:
-        LOG_WARNING << "Unknown format detected, defaulting to 16-bit FLAC.";
+        LOG_WARNING << AUDIO_LOG << "Unknown format detected, defaulting to FLAC 16-bit.";
         config.dataCallback    = flacDataCallback;
         config.playback.format = ma_format_s16;
         break;
     }
 
-    LOG_INFO << "Playback Configuration - Format: " << config.playback.format
+    LOG_TRACE << AUDIO_LOG << "Playback Config - Format: " << config.playback.format
              << ", Channels: " << config.playback.channels
              << ", Sample Rate: " << config.sampleRate;
 
@@ -212,7 +200,7 @@ public:
     {
       LOG_ERROR << "Failed to initialize audio device.";
       ma_decoder_uninit(&decoder);
-      throw std::runtime_error("Failed to initialize audio device");
+      throw std::runtime_error("Audio device initialization failed");
     }
 
     LOG_INFO << "Audio device initialized successfully.";
@@ -220,18 +208,18 @@ public:
 
   ~AudioPlayer()
   {
-    LOG_INFO << "Shutting down AudioPlayer.";
+    LOG_INFO << AUDIO_LOG << "Shutting down AudioPlayer.";
     ma_device_uninit(&device);
     ma_decoder_uninit(&decoder);
   }
 
   void play()
   {
-    LOG_INFO << "Starting playback.";
+    LOG_INFO << AUDIO_LOG << "Starting playback.";
     if (ma_device_start(&device) != MA_SUCCESS)
     {
-      LOG_ERROR << "Failed to start audio device.";
-      throw std::runtime_error("Failed to start audio device");
+      LOG_ERROR << AUDIO_LOG << "Failed to start audio device.";
+      throw std::runtime_error("Audio device start failed");
     }
 
     isPlaying = true;
@@ -244,3 +232,5 @@ public:
     LOG_INFO << "Playback completed.";
   }
 };
+
+} // namespace libwavy::audio

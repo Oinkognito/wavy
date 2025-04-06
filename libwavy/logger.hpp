@@ -74,15 +74,15 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
 #define FILENAME \
   (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
-#define GET_HOME_OR_RETURN(var)                                       \
-  do                                                                  \
-  {                                                                   \
-    var = std::getenv("HOME");                                        \
-    if (!(var))                                                       \
-    {                                                                 \
-      std::cerr << "ERROR: Unable to determine HOME directory.\n";    \
-      return;                                                         \
-    }                                                                 \
+#define GET_HOME_OR_RETURN(var)                                    \
+  do                                                               \
+  {                                                                \
+    var = std::getenv("HOME");                                     \
+    if (!(var))                                                    \
+    {                                                              \
+      std::cerr << "ERROR: Unable to determine HOME directory.\n"; \
+      return;                                                      \
+    }                                                              \
   } while (0)
 
 // Define log categories
@@ -91,7 +91,9 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
   X(ENCODER, BOLD "#ENCODER_LOG " RESET)                 \
   X(TRANSCODER, BOLD "#TRANSCODER_LOG " RESET)           \
   X(LIBAV, BOLD "#LIBAV_LOG " RESET)                     \
+  X(AUDIO, BOLD "#AUDIO_LOG " RESET)                     \
   X(NET, BOLD "#NETWORK_LOG " RESET)                     \
+  X(FETCH, BOLD "#TSFETCH_LOG " RESET)                   \
   X(HLS, BOLD "#HLS_LOG " RESET)                         \
   X(UNIX, BOLD "#UNIX_LOG " RESET)                       \
   X(DISPATCH, BOLD "#DISPATCH_LOG " RESET)               \
@@ -156,7 +158,7 @@ void init_logging()
                   << expr::if_(expr::attr<Severity>("Severity") ==
                                trivial::info)[stream << GREEN << "[INFO]    "]
                   << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::warning)[stream << YELLOW << "[WARNING] "]
+                               trivial::warning)[stream << YELLOW << "[WARN] "]
                   << expr::if_(expr::attr<Severity>("Severity") ==
                                trivial::error)[stream << RED << "[ERROR]   "]
                   << expr::if_(expr::attr<Severity>("Severity") ==

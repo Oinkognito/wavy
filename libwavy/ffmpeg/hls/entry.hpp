@@ -81,17 +81,18 @@ public:
    * @param output_playlist The output HLS playlist path.
    * @return True on success, false on failure.
    */
-  auto createSegmentsFLAC(const char* input_file, const char* output_playlist, int bitrate) -> bool
+  auto createSegmentsFLAC(const char* input_file, const std::string& output_dir,
+                          const char* output_playlist, int bitrate) -> bool
   {
-    AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
-    AVStream *       in_stream = nullptr, *out_stream = nullptr;
-    AVPacket*        pkt = nullptr;
-    int              ret, audio_stream_idx = -1;
-    std::string      output_playlist_str = output_playlist;
-    size_t           last_slash          = output_playlist_str.find_last_of('/');
-    std::string      out_dir =
-      (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
-    std::string segment_filename_format = out_dir + "/hls_flac_%d.m4s";
+    AVFormatContext * input_ctx = nullptr, *output_ctx = nullptr;
+    AVStream *        in_stream = nullptr, *out_stream = nullptr;
+    AVPacket*         pkt = nullptr;
+    int               ret, audio_stream_idx = -1;
+    const std::string segment_file_format = output_dir + "/hls_flac_%d.m4s";
+    const std::string output_playlist_str = output_dir + "/" + output_playlist;
+
+    LOG_DEBUG << HLS_LOG << "Segments format: " << segment_file_format;
+    LOG_DEBUG << HLS_LOG << "Playlist destination: " << output_playlist_str;
 
     // Open input file
     if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)
@@ -124,7 +125,7 @@ public:
     }
 
     // Create output context
-    avformat_alloc_output_context2(&output_ctx, nullptr, "hls", output_playlist);
+    avformat_alloc_output_context2(&output_ctx, nullptr, "hls", output_playlist_str.c_str());
     if (!output_ctx)
     {
       fprintf(stderr, "Error creating output context\n");
@@ -137,9 +138,9 @@ public:
     av_opt_set(output_ctx->priv_data, "hls_playlist_type", "vod", 0);
     av_opt_set(output_ctx->priv_data,
                macros::to_string(macros::CODEC_HLS_SEGMENT_FILENAME_FIELD).c_str(),
-               segment_filename_format.c_str(), 0);
-    av_opt_set(output_ctx->priv_data, "master_pl_name",
-               macros::to_string(macros::MASTER_PLAYLIST).c_str(), 0);
+               segment_file_format.c_str(), 0);
+    av_opt_set(output_ctx->priv_data, "master_pl_name", macros::to_cstr(macros::MASTER_PLAYLIST),
+               0);
 
     // Create output stream
     out_stream = avformat_new_stream(output_ctx, nullptr);
@@ -247,7 +248,7 @@ public:
                                   std::to_string(bitrate) + macros::to_string(macros::PLAYLIST_EXT);
     playlist_files.push_back(output_playlist);
 
-    bool success = use_flac ? createSegmentsFLAC(input_file, output_playlist.c_str(),
+    bool success = use_flac ? createSegmentsFLAC(input_file, output_dir, output_playlist.c_str(),
                                                  bitrate) // creates master playlist on its own
                             : encode_variant(input_file, output_playlist.c_str(), bitrate);
 
@@ -289,7 +290,7 @@ public:
 
     if (playlists.empty())
     {
-      std::cerr << "No playlists found in directory: " << input_dir << "\n";
+      LOG_ERROR << HLS_LOG << "No playlists found in directory: " << input_dir << "\n";
       return;
     }
 

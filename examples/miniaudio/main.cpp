@@ -45,7 +45,7 @@ auto main() -> int
 
   try
   {
-    AudioPlayer player(audioData, flac_found);
+    libwavy::audio::AudioPlayer player(audioData, flac_found);
     player.play();
   }
   catch (const std::exception& e)

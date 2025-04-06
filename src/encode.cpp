@@ -27,8 +27,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy/common/macros.hpp"
 #include <autogen/config.h>
+#include <libwavy/common/macros.hpp>
 
 #include <cstdlib>
 #include <libwavy/ffmpeg/hls/entry.hpp>
@@ -193,7 +193,7 @@ auto main(int argc, char* argv[]) -> int
   if (use_flac)
   {
     LOG_INFO << ENCODER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
-    seg.createSegmentsFLAC(argv[1], "flac_segment.m3u8",
+    seg.createSegmentsFLAC(argv[1], output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
     return exportTOMLFile(argv[1], output_dir,
                           {}); // just give empty array as we are not transcoding to diff bitrates

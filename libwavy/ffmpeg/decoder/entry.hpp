@@ -119,7 +119,9 @@ namespace libwavy::ffmpeg
 class MediaDecoder
 {
 public:
-  MediaDecoder() = default;
+  MediaDecoder() { avformat_network_init(); }
+
+  ~MediaDecoder() { avformat_network_deinit(); }
 
   auto is_lossless_codec(AVCodecID codec_id) -> bool
   {
@@ -127,8 +129,7 @@ public:
             codec_id == AV_CODEC_ID_WAVPACK);
   }
 
-  void print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams,
-                            int audioStreamIndex)
+  void print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams)
   {
     LOG_DEBUG << DECODER_LOG << "Audio File Metadata:";
     LOG_DEBUG << DECODER_LOG << "Codec: " << avcodec_get_name(codecParams->codec_id);
@@ -137,130 +138,107 @@ public:
     LOG_DEBUG << DECODER_LOG << "Channels: " << codecParams->ch_layout.nb_channels;
     LOG_DEBUG << DECODER_LOG << "Format: " << formatCtx->iformat->long_name;
 
-    if (is_lossless_codec(codecParams->codec_id))
-    {
-      LOG_DEBUG << DECODER_LOG << "This is a lossless codec";
-    }
-    else
-    {
-      LOG_DEBUG << DECODER_LOG << "This is a lossy codec";
-    }
+    LOG_DEBUG << DECODER_LOG
+              << (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
+                                                           : "This is a lossy codec");
   }
 
-  /**
-   * @brief Decodes TS content to raw audio output
-   * @param ts_segments Vector of transport stream segments
-   * @return true if successful, false otherwise
-   */
   auto decode(std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
     -> bool
   {
-    avformat_network_init();
-    AVFormatContext* input_ctx = avformat_alloc_context();
-    AVIOContext*     avio_ctx  = nullptr;
-    int              ret;
-    size_t           avio_buf = 32768;
+    AVFormatContext* input_ctx        = nullptr;
+    AVCodecContext*  codec_ctx        = nullptr;
+    int              audio_stream_idx = -1;
 
-    // Buffer for custom AVIO
-    auto* avio_buffer = static_cast<unsigned char*>(av_malloc(avio_buf));
-    if (!avio_buffer)
+    if (!init_input_context(ts_segments, input_ctx))
+      return false;
+
+    detect_format(input_ctx);
+
+    if (!find_audio_stream(input_ctx, audio_stream_idx))
     {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO buffer\n");
+      cleanup(input_ctx);
       return false;
     }
 
-    // Select appropriate custom reader
-    avio_ctx =
-      avio_alloc_context(avio_buffer, avio_buf, 0, &ts_segments, &readAVIO, nullptr, nullptr);
+    AVCodecParameters* codec_params = input_ctx->streams[audio_stream_idx]->codecpar;
+    print_audio_metadata(input_ctx, codec_params);
+
+    if (!setup_codec(codec_params, codec_ctx))
+    {
+      cleanup(input_ctx);
+      return false;
+    }
+
+    if (!process_packets(input_ctx, codec_ctx, audio_stream_idx, codec_params, output_audio))
+    {
+      cleanup(input_ctx, codec_ctx);
+      return false;
+    }
+
+    DBG_WriteDecodedAudioToFile(output_audio, "final.pcm");
+
+    cleanup(input_ctx, codec_ctx);
+    return true;
+  }
+
+private:
+  auto init_input_context(std::vector<std::string>& ts_segments, AVFormatContext*& ctx) -> bool
+  {
+    ctx                   = avformat_alloc_context();
+    const size_t avio_buf = 32768;
+    auto*        buffer   = static_cast<unsigned char*>(av_malloc(avio_buf));
+    if (!buffer)
+      return false;
+
+    AVIOContext* avio_ctx =
+      avio_alloc_context(buffer, avio_buf, 0, &ts_segments, &readAVIO, nullptr, nullptr);
     if (!avio_ctx)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to allocate AVIO context\n");
-      av_free(avio_buffer);
       return false;
-    }
 
-    input_ctx->pb = avio_ctx;
-
-    // Open input
-    if ((ret = avformat_open_input(&input_ctx, nullptr, nullptr, nullptr)) < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Cannot open input from memory buffer\n");
-      av_free(avio_ctx->buffer);
-      avio_context_free(&avio_ctx);
-      avformat_free_context(input_ctx);
+    ctx->pb = avio_ctx;
+    if (avformat_open_input(&ctx, nullptr, nullptr, nullptr) < 0)
       return false;
-    }
-
-    // Get stream information
-    if ((ret = avformat_find_stream_info(input_ctx, nullptr)) < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Cannot find stream info\n");
-      avformat_close_input(&input_ctx);
+    if (avformat_find_stream_info(ctx, nullptr) < 0)
       return false;
-    }
 
-    // Detect format
-    bool is_mpegts = strcmp(input_ctx->iformat->name, "mpegts") == 0;
-    bool is_m4s    = strstr(input_ctx->iformat->name, "mp4") != nullptr;
+    return true;
+  }
 
-    if (is_mpegts)
-    {
+  void detect_format(AVFormatContext* ctx)
+  {
+    std::string fmt = ctx->iformat->name;
+    if (fmt == macros::MPEG_TS)
       av_log(nullptr, AV_LOG_DEBUG, "Input is an MPEG transport stream\n");
-    }
-    else if (is_m4s)
-    {
-      av_log(nullptr, AV_LOG_DEBUG, "Input is a fragmented MP4 (m4s) file\n");
-    }
+    else if (fmt.find(macros::MP4_TS) != std::string::npos)
+      av_log(nullptr, AV_LOG_DEBUG, "Input is a fragmented MP4 (m4s)\n");
     else
-    {
       av_log(nullptr, AV_LOG_WARNING, "Unknown or unsupported format detected\n");
-    }
+  }
 
-    // Find audio stream
-    int                audio_stream_idx = -1;
-    AVCodecParameters* codec_params     = nullptr;
-
-    for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
+  auto find_audio_stream(AVFormatContext* ctx, int& index) -> bool
+  {
+    for (unsigned int i = 0; i < ctx->nb_streams; i++)
     {
-      if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      if (ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        audio_stream_idx = i;
-        codec_params     = input_ctx->streams[i]->codecpar;
-        break;
+        index = i;
+        return true;
       }
     }
+    av_log(nullptr, AV_LOG_ERROR, "Cannot find audio stream\n");
+    return false;
+  }
 
-    if (audio_stream_idx < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Cannot find audio stream\n");
-      avformat_close_input(&input_ctx);
-      return false;
-    }
-
-    // Check if the codec is FLAC
-    bool is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
-    if (is_m4s && is_flac)
-    {
-      LOG_DEBUG << DECODER_LOG << "Detected FLAC encoding in fragmented MP4 (m4s)";
-    }
-
-    print_audio_metadata(input_ctx, codec_params, audio_stream_idx);
-
+  auto setup_codec(AVCodecParameters* codec_params, AVCodecContext*& codec_ctx) -> bool
+  {
     const AVCodec* codec = avcodec_find_decoder(codec_params->codec_id);
     if (!codec)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Unsupported codec\n");
-      avformat_close_input(&input_ctx);
       return false;
-    }
 
-    AVCodecContext* codec_ctx = avcodec_alloc_context3(codec);
+    codec_ctx = avcodec_alloc_context3(codec);
     if (!codec_ctx)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to allocate codec context\n");
-      avformat_close_input(&input_ctx);
       return false;
-    }
 
     if (codec_params->extradata_size > 0)
     {
@@ -270,75 +248,66 @@ public:
       codec_ctx->extradata_size = codec_params->extradata_size;
     }
 
-    if ((ret = avcodec_parameters_to_context(codec_ctx, codec_params)) < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to copy codec parameters to context\n");
-      avcodec_free_context(&codec_ctx);
-      avformat_close_input(&input_ctx);
+    if (avcodec_parameters_to_context(codec_ctx, codec_params) < 0)
       return false;
-    }
-
-    if ((ret = avcodec_open2(codec_ctx, codec, nullptr)) < 0)
-    {
-      av_log(nullptr, AV_LOG_ERROR, "Failed to open codec\n");
-      avcodec_free_context(&codec_ctx);
-      avformat_close_input(&input_ctx);
+    if (avcodec_open2(codec_ctx, codec, nullptr) < 0)
       return false;
-    }
 
-    // Extract raw audio data
-    AVPacket* packet = av_packet_alloc();
-    AVFrame*  frame  = av_frame_alloc();
+    return true;
+  }
 
-    while (av_read_frame(input_ctx, packet) >= 0)
+  auto process_packets(AVFormatContext* ctx, AVCodecContext* codec_ctx, int stream_idx,
+                       AVCodecParameters* codec_params, std::vector<unsigned char>& output) -> bool
+  {
+    AVPacket* packet  = av_packet_alloc();
+    AVFrame*  frame   = av_frame_alloc();
+    bool      is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
+
+    while (av_read_frame(ctx, packet) >= 0)
     {
-      if (packet->stream_index == audio_stream_idx)
+      if (packet->stream_index != stream_idx)
       {
-        if (!is_flac)
+        av_packet_unref(packet);
+        continue;
+      }
+
+      if (!is_flac)
+      {
+        output.insert(output.end(), packet->data, packet->data + packet->size);
+      }
+      else
+      {
+        if (avcodec_send_packet(codec_ctx, packet) == 0)
         {
-          // Directly append MP3/AAC data
-          output_audio.insert(output_audio.end(), packet->data, packet->data + packet->size);
-        }
-        else
-        {
-          // Decode FLAC to PCM
-          if (avcodec_send_packet(codec_ctx, packet) == 0)
+          while (avcodec_receive_frame(codec_ctx, frame) == 0)
           {
-            while (avcodec_receive_frame(codec_ctx, frame) == 0)
-            {
-              int    sampleSize = av_get_bytes_per_sample(codec_ctx->sample_fmt);
-              size_t dataSize;
-              WAVY__SAFE_MULTIPLY(frame->nb_samples, codec_ctx->ch_layout.nb_channels, dataSize);
-              WAVY__SAFE_MULTIPLY(dataSize, sampleSize, dataSize);
-              output_audio.insert(output_audio.end(), frame->data[0], frame->data[0] + dataSize);
-            }
+            int    sampleSize = av_get_bytes_per_sample(codec_ctx->sample_fmt);
+            size_t dataSize;
+            WAVY__SAFE_MULTIPLY(frame->nb_samples, codec_ctx->ch_layout.nb_channels, dataSize);
+            WAVY__SAFE_MULTIPLY(dataSize, sampleSize, dataSize);
+            output.insert(output.end(), frame->data[0], frame->data[0] + dataSize);
           }
         }
       }
+
       av_packet_unref(packet);
     }
 
-    // Debugging: Write PCM output
-    if (!DBG_WriteDecodedAudioToFile(output_audio, "final.pcm"))
-    {
-      LOG_ERROR << DECODER_LOG << "Error writing decoded stream to file";
-      return false;
-    }
-
-    // Cleanup
     av_frame_free(&frame);
     av_packet_free(&packet);
-    avcodec_free_context(&codec_ctx);
-    if (input_ctx)
-    {
-      avformat_close_input(&input_ctx);
-    }
-    if (avio_ctx && !(input_ctx && input_ctx->pb == avio_ctx))
-    { // Ensure it's not freed twice
-      avio_context_free(&avio_ctx);
-    }
-
     return true;
+  }
+
+  void cleanup(AVFormatContext* ctx, AVCodecContext* codec_ctx = nullptr)
+  {
+    if (codec_ctx)
+      avcodec_free_context(&codec_ctx);
+    if (ctx)
+    {
+      if (ctx->pb)
+        avio_context_free(&ctx->pb);
+      avformat_close_input(&ctx);
+    }
   }
 };
 
