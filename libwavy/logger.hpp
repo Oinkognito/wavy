@@ -158,7 +158,7 @@ void init_logging()
                   << expr::if_(expr::attr<Severity>("Severity") ==
                                trivial::info)[stream << GREEN << "[INFO]    "]
                   << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::warning)[stream << YELLOW << "[WARN] "]
+                               trivial::warning)[stream << YELLOW << "[WARN]    "]
                   << expr::if_(expr::attr<Severity>("Severity") ==
                                trivial::error)[stream << RED << "[ERROR]   "]
                   << expr::if_(expr::attr<Severity>("Severity") ==

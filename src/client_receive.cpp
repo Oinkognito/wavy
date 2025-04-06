@@ -27,12 +27,12 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy/logger.hpp"
 #if __cplusplus < 202002L
 #error "Wavy-Client requires C++20 or later."
 #endif
 
 #include <iostream>
+#include <libwavy/logger.hpp>
 #include <libwavy/playback.hpp>
 #include <libwavy/tsfetcher/entry.hpp>
 
@@ -80,7 +80,7 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
 {
   if (gs.transport_segments.empty())
   {
-    LOG_ERROR << "No transport stream segments provided";
+    LOG_ERROR << DECODER_LOG << "No transport stream segments provided";
     return false;
   }
 
@@ -90,19 +90,19 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
   std::vector<unsigned char>    decoded_audio;
   if (!decoder.decode(gs.transport_segments, decoded_audio))
   {
-    LOG_ERROR << "Decoding failed";
+    LOG_ERROR << DECODER_LOG << "Decoding failed";
     return false;
   }
 
   try
   {
-    LOG_INFO << "Starting audio playback...";
+    LOG_INFO << RECEIVER_LOG << "Starting audio playback...";
     libwavy::audio::AudioPlayer player(decoded_audio, flac_found);
     player.play();
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "Audio playback error: " << e.what();
+    LOG_ERROR << AUDIO_LOG << "Audio playback error: " << e.what();
     return false;
   }
 

@@ -108,9 +108,10 @@ public:
       : audioMemory(audioInput), isPlaying(false), flac_stream(flac_found),
         userSampleRate(preferredSampleRate), userChannels(preferredChannels)
   {
-    LOG_INFO << AUDIO_LOG << "Initializing AudioPlayer with " << audioMemory.size() << " bytes of audio data.";
+    LOG_INFO << AUDIO_LOG << "Initializing AudioPlayer with " << audioMemory.size()
+             << " bytes of audio data.";
     LOG_DEBUG << AUDIO_LOG << "User preferences - Sample Rate: " << userSampleRate
-             << ", Channels: " << userChannels;
+              << ", Channels: " << userChannels;
 
     ma_decoder_config decoderConfig = ma_decoder_config_init_default();
 
@@ -126,8 +127,8 @@ public:
     decoderConfig.sampleRate = (userSampleRate > 0) ? userSampleRate : decoder.outputSampleRate;
 
     LOG_DEBUG << AUDIO_LOG << "Detected Format - Format: " << decoder.outputFormat
-             << ", Channels: " << decoder.outputChannels
-             << ", Sample Rate: " << decoder.outputSampleRate;
+              << ", Channels: " << decoder.outputChannels
+              << ", Sample Rate: " << decoder.outputSampleRate;
 
     ma_uint64 totalFrames;
     if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) == MA_SUCCESS &&
@@ -193,8 +194,8 @@ public:
     }
 
     LOG_TRACE << AUDIO_LOG << "Playback Config - Format: " << config.playback.format
-             << ", Channels: " << config.playback.channels
-             << ", Sample Rate: " << config.sampleRate;
+              << ", Channels: " << config.playback.channels
+              << ", Sample Rate: " << config.sampleRate;
 
     if (ma_device_init(nullptr, &config, &device) != MA_SUCCESS)
     {

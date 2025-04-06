@@ -1,5 +1,5 @@
-#include "MainWindow.hpp"
 #include <QApplication>
+#include <libquwrof/window/entry.hpp>
 
 auto main(int argc, char* argv[]) -> int
 {

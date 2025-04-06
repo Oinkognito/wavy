@@ -6,4 +6,4 @@ These wrapper APIs are pretty powerful and are used throughout the Wavy project.
 
 By looking into these examples, it should be more clear how the project works on a better level.
 
-Each example is an isolated file that only performs one *major* task that directly fetches class and methods from `include/` directory of the Wavy project.
+Each example is an isolated file that only performs one *major* task that directly fetches class and methods from `libwavy` directory of the Wavy project.
