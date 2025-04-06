@@ -27,8 +27,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <algorithm>
 #include <autogen/config.h>
 #include <libwavy/common/macros.hpp>
+#include <unordered_set>
 
 #include <cstdlib>
 #include <libwavy/ffmpeg/hls/entry.hpp>
@@ -234,13 +236,17 @@ auto main(int argc, char* argv[]) -> int
       {
         LOG_WARNING << ENCODER_LOG << "[Bitrate: " << i << "] Transcoding failed.";
       }
+
+      std::remove(output_file_i.c_str());
     });
   LOG_INFO << ENCODER_LOG
            << "Total TRANSCODING + HLS segmenting seems to be complete. Going ahead with creating "
               "<master playlist> ...";
 
-  std::vector<int> found_bitrates(concurrent_found_bitrates.begin(),
-                                  concurrent_found_bitrates.end());
+  std::unordered_set<int> unique_set(
+    concurrent_found_bitrates.begin(),
+    concurrent_found_bitrates.end()); // to retain unique values (fallback to concurrent_vector)
+  std::vector<int> found_bitrates(unique_set.begin(), unique_set.end());
 
   seg.createMasterPlaylistMP3(output_dir, output_dir);
 

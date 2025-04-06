@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdlib>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <libwavy/common/macros.hpp>
@@ -17,10 +19,12 @@ namespace libwavy::fetch
 class TSegFetcher
 {
 public:
-  TSegFetcher(const std::string& server)
-      : ioc_(), ctx_(ssl::context::tlsv12_client), client_(ioc_, ctx_, server)
+  TSegFetcher(std::string server)
+      : ioc_(std::make_shared<asio::io_context>()),
+        ctx_(std::make_shared<ssl::context>(ssl::context::tlsv12_client)),
+        server_(std::move(server))
   {
-    ctx_.set_verify_mode(ssl::verify_none);
+    ctx_->set_verify_mode(ssl::verify_none);
   }
 
   auto fetch(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
@@ -35,7 +39,7 @@ public:
     if (master_playlist.empty())
       return false;
 
-    auto content = select_playlist(master_playlist, desired_bandwidth);
+    auto content = select_playlist(ip_id, audio_id, master_playlist, desired_bandwidth);
     if (content.empty())
       return false;
 
@@ -64,15 +68,21 @@ public:
   }
 
 private:
-  asio::io_context              ioc_;
-  ssl::context                  ctx_;
-  libwavy::network::HttpsClient client_;
+  std::shared_ptr<asio::io_context> ioc_;
+  std::shared_ptr<ssl::context>     ctx_;
+  std::string                       server_;
+
+  auto make_client() -> std::unique_ptr<libwavy::network::HttpsClient>
+  {
+    return std::make_unique<libwavy::network::HttpsClient>(*ioc_, *ctx_, server_);
+  }
 
   auto fetch_master_playlist(const std::string& ip_id, const std::string& audio_id) -> std::string
   {
     std::string path =
       "/hls/" + ip_id + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
-    std::string content = client_.get(path);
+    auto        client  = make_client();
+    std::string content = client->get(path);
     if (content.empty())
     {
       LOG_ERROR << FETCH_LOG << "Failed to fetch master playlist for " << ip_id << "/" << audio_id;
@@ -80,8 +90,10 @@ private:
     return content;
   }
 
-  auto select_playlist(const std::string& content, int desired_bandwidth) -> std::string
+  auto select_playlist(const std::string& ip_id, const std::string& audio_id,
+                       const std::string& content, int desired_bandwidth) -> std::string
   {
+    std::string playlist_path = "/hls/" + ip_id + "/" + audio_id + "/";
     if (content.find(macros::PLAYLIST_VARIANT_TAG) == std::string::npos)
       return content;
 
@@ -122,8 +134,11 @@ private:
       LOG_WARNING << FETCH_LOG << "Exact match not found. Using max bitrate: " << max_bandwidth;
     }
 
-    LOG_INFO << FETCH_LOG << "Selected bitrate playlist: " << selected;
-    return client_.get(selected);
+    playlist_path += selected;
+    LOG_INFO << FETCH_LOG << "Selected bitrate playlist: " << playlist_path;
+
+    auto client = make_client();
+    return client->get(playlist_path);
   }
 
   auto process_segments(const std::string& playlist, const std::string& ip_id,
@@ -143,9 +158,11 @@ private:
       }
     }
 
+    auto client = make_client();
+
     if (has_m4s)
     {
-      init_mp4_data = client_.get("/hls/" + ip_id + "/" + audio_id + "/init.mp4");
+      init_mp4_data = client->get("/hls/" + ip_id + "/" + audio_id + "/init.mp4");
       if (init_mp4_data.empty())
       {
         LOG_ERROR << FETCH_LOG << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
@@ -160,8 +177,9 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        std::string url  = "/hls/" + ip_id + "/" + audio_id + "/" + line;
-        std::string data = client_.get(url);
+        std::string url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+        LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
+        std::string data = client->get(url);
 
         if (!data.empty())
         {

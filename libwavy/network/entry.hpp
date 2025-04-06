@@ -50,8 +50,8 @@ namespace libwavy::network
 class HttpsClient
 {
 public:
-  HttpsClient(asio::io_context& ioc, ssl::context& ctx, std::string server)
-      : resolver_(ioc), stream_(ioc, ctx), server_(std::move(server))
+  HttpsClient(asio::io_context& ioc, ssl::context& ssl_ctx, std::string server)
+      : ioc_(ioc), ssl_ctx_(ssl_ctx), server_(std::move(server))
   {
   }
 
@@ -64,39 +64,45 @@ public:
   {
     try
     {
-      // Resolve the server
-      auto const results = resolver_.resolve(server_, WAVY_SERVER_PORT_NO_STR);
+      // Create a new resolver and SSL stream for each request
+      tcp::resolver                  resolver{ioc_};
+      beast::ssl_stream<tcp::socket> stream{ioc_, ssl_ctx_};
 
-      // Establish TCP connection
-      asio::connect(stream_.next_layer(), results.begin(), results.end());
+      // Resolve the host
+      auto const results = resolver.resolve(server_, WAVY_SERVER_PORT_NO_STR);
+
+      // Connect the socket
+      asio::connect(stream.next_layer(), results.begin(), results.end());
 
       // Perform SSL handshake
-      stream_.handshake(ssl::stream_base::client);
+      stream.handshake(ssl::stream_base::client);
 
-      // Create and send the HTTP request
+      // Set up HTTP GET request
       http::request<http::string_body> req{http::verb::get, target, 11};
       req.set(http::field::host, server_);
       req.set(http::field::user_agent, "WavyClient");
-      http::write(stream_, req);
 
-      // Read the response
+      // Send the request
+      http::write(stream, req);
+
+      // Buffer and response container
       beast::flat_buffer                 buffer;
       http::response<http::dynamic_body> res;
-      http::read(stream_, buffer, res);
+      http::read(stream, buffer, res);
 
       // Convert response body to string
       std::string response_data = boost::beast::buffers_to_string(res.body().data());
 
-      // Properly close the stream
+      // Gracefully shutdown SSL stream
       beast::error_code ec;
-      stream_.shutdown(ec);
+      stream.shutdown(ec);
       if (ec == asio::error::eof)
       {
-        ec.clear();
+        ec.clear(); // This is expected
       }
       else if (ec)
       {
-        LOG_WARNING << NET_LOG << "Stream shutdown error: " << ec.message();
+        LOG_WARNING << NET_LOG << "Stream shutdown warning: " << ec.message();
       }
 
       return response_data;
@@ -109,9 +115,9 @@ public:
   }
 
 private:
-  tcp::resolver                  resolver_;
-  beast::ssl_stream<tcp::socket> stream_;
-  std::string                    server_;
+  asio::io_context& ioc_;
+  ssl::context&     ssl_ctx_;
+  std::string       server_;
 };
 
 } // namespace libwavy::network
