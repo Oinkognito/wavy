@@ -30,6 +30,7 @@ endif()
 
 option(BUILD_NINJA "Use Ninja to build the project" OFF)
 option(BUILD_EXAMPLES "Compile examples for the project" OFF)
+option(BUILD_UI "Build Wavy-UI using libquwrof" OFF)
 option(AUTOGEN_HEADER "Autogenerate Config Header for the project" ON)
 
 # Check if CMake is using Ninja
@@ -171,6 +172,13 @@ if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
   add_subdirectory(examples/decoder)
 endif()
 
+if (DEFINED BUILD_UI AND BUILD_UI)
+  message(STATUS "${PURPLE}Building Wavy-UI with libquwrof...${RESET}")
+  add_subdirectory(ui/)
+else()
+  message(STATUS "${BLUE}Skipping Wavy-UI build...${RESET}")
+endif()
+
 if(DEFINED BUILD_TARGET)
     set(TARGET_BUILT ${BUILD_TARGET})
 else()
@@ -279,6 +287,8 @@ message(STATUS "│ Compiler                : ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_
 message(STATUS "│ Compiler Flags          : ${CMAKE_CXX_FLAGS}")
 message(STATUS "│ Libwavy Dest            : ${CMAKE_SOURCE_DIR}/libwavy/")
 message(STATUS "│ Executable Names        : ${ENCODER_BIN}, ${CLIENT_BIN}, ${SERVER_BIN}, ${DISPATCHER_BIN}")
+message(STATUS "│ libquwrof               : ${CMAKE_SOURCE_DIR}/libquwrof/")
+message(STATUS "│ Build Wavy-UI           : ${BUILD_UI}")
 message(STATUS "│ C++ Standard            : ${CMAKE_CXX_STANDARD}")
 message(STATUS "│ FFmpeg Libraries        : ${FFMPEG_LIBRARIES}")
 message(STATUS "│ Boost Libraries         : Boost::log, Boost::system, Boost::thread, etc.")
