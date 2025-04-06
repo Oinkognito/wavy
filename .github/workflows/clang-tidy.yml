@@ -34,7 +34,7 @@ jobs:
 
     - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
       run: |
-        make "-DBUILD_UI=ON"
+        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON"
 
     - name: Strip erroneous compilation flags
       run: |
