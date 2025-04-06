@@ -78,7 +78,7 @@ verbose:
 
 # Code formatting
 format:
-	@find src libwavy examples libquwrof -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
+	@find src libwavy examples libquwrof examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
 
 # Code linting/fixing
 tidy:

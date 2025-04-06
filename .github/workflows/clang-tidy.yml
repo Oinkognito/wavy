@@ -19,7 +19,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Install clang-tidy
-      run: sudo apt-get install -y clang-tidy make wget
+      run: sudo apt-get install -y clang-tidy make wget jq bash
 
     - name: Install dependencies for Wavy
       run: |
@@ -30,11 +30,15 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev
+            libmp3lame-dev libtbb-dev qt6-base-dev
 
-    - name: Compile Wavy for x86-64 Ubuntu
+    - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
       run: |
-        make
+        make "-DBUILD_UI=ON"
+
+    - name: Strip erroneous compilation flags
+      run: |
+        ./scripts/compiler-flags-fix.sh
 
     - name: Run Clang Tidy check for Wavy
       run: |

@@ -46,8 +46,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
   palette.setColor(QPalette::HighlightedText, QColor(Gruvbox::HighlightText));
   setPalette(palette);
 
-  centralWidget       = new QWidget(this);
-  QVBoxLayout* layout = new QVBoxLayout(centralWidget);
+  centralWidget = new QWidget(this);
+  auto* layout  = new QVBoxLayout(centralWidget);
 
   titleLabel = new QLabel("Wavy", this);
   titleLabel->setAlignment(Qt::AlignTop);
@@ -99,4 +99,4 @@ void MainWindow::openFileDialog()
   }
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() = default;
