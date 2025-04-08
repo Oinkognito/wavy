@@ -127,41 +127,22 @@ sudo dnf install qt6-qtbase-devel qt6-qttools-devel
 
 ## **Building**
 
-The Wavy Project uses a simple Makefile to run simple and straightforward functions that acts as a wrapper around the CMake Build System 
-that currently creates and links different binaries that are **NOT** integrated yet!
+Wavy has a lot of targets that can be built with a lot of customizability.
 
-To initialize the project:
-
-```bash 
-make init
-```
-
-To compile the different components, run:
-
-```bash
-make encoder     # Builds encode.cpp
-make decoder     # Builds decode.cpp
-make dispatcher  # Builds dispatcher for stream management
-make server      # Builds the Wavy streaming server
-make remove      # Cleans up all generated transport streams and playlists
-
-make all         # Builds all components at once
-```
-
-If you want to build the server without **FFmpeg** and **oneTBB**:
+In general if you want things to just work: 
 
 ```bash 
-make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON -DNO_TBB=ON"
+make all # assuming you have setup all the required deps 
 ```
 
-### Containerized Server
-
-To run the Wavy server in a **Docker** container:
+If you want to configure dependencies and build the project: (For **Ubuntu**, **Fedora** and **Arch**)
 
 ```bash 
-docker build -t wavy-server . # to build the container
-docker run -d -p 8080:8080 --name wavy-server-test wavy-server
+./build.sh 
+# When a prompt comes up for which target to build just hit enter or type all
 ```
+
+For more information on targets and in depth building details check out [BUILD.md](https://github.com/Oinkognito/wavy/blob/main/BUILD.md)
 
 > [!IMPORTANT]
 > 

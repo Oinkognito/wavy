@@ -10,7 +10,6 @@ ENCODER_BIN := hls_encoder
 DECODER_BIN := hls_decoder
 SERVER_BIN := hls_server
 DISPATCHER_BIN := hls_dispatcher
-PLAYBACK_BIN := hls_playback
 CLIENT_BIN := hls_client
 
 # Third-party dependencies
@@ -54,10 +53,6 @@ encoder:
 decoder:
 	$(call configure,Decoder Only,Release)
 	@$(MAKE) -C $(BUILD_DIR) $(DECODER_BIN)
-
-playback:
-	$(call configure,Playback Only,Release)
-	@$(MAKE) -C $(BUILD_DIR) $(PLAYBACK_BIN)
 
 server:
 	$(call configure,Server Only,Release)
@@ -111,4 +106,4 @@ server-cert:
 server-cert-gen:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 
-.PHONY: default all encoder decoder server dispatcher client playback verbose clean cleanup format tidy init server-cert
+.PHONY: default all encoder decoder server dispatcher client verbose clean cleanup format tidy init server-cert
