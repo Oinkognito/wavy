@@ -241,6 +241,122 @@ Why are we compressing data? Simple. It saves time to transfer as the data size 
 
 The reason for why we went for ZSTD compression is quite straightforward and better explained here in [dispatch header](https://github.com/oinkognito/wavy/blob/main/libwavy/dispatch/entry.hpp) along with some FAQs (will update it in this file soon)
 
-## Server
+## **Server**
+
+The **Wavy-Server** allows **secure** transport stream handling over HTTPS.
+
+The Server Storage Organization is indexed below: 
+
+```text 
+hls_storage/
+├── 192.168.1.10/                                    # IP Address 192.168.1.10 (example)
+│   ├── 1435f431-a69a-4027-8661-44c31cd11ef6/        # Randomly generated audio id
+│   │   ├── index.m3u8
+│   │   ├── hls_mp3_64.m3u8                          # HLS MP3 encoded playlist (64-bit)
+│   │   ├── hls_mp3_64_0.ts                          # First transport stream of hls_mp3_64 playlist                
+│   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+│   │   ├── metadata.toml                            # Metadata and other song information
+│   ├── e5fdeca5-57c8-47b4-b9c6-60492ddf11ae/
+│   │   ├── index.m3u8
+│   │   ├── hls_flac_64.m3u8                         # HLS FLAC encoded playlist (64-bit)
+│   │   ├── hls_flac_64_0.ts                         # First transport stream of hls_mp3_64 playlist 
+│   │   ├── ...                                      # Similarly for 128 and 256 bitrates
+│   │   ├── metadata.toml                            # Metadata and other song information
+│    
+```
+
+The server does not delete these indices after the server dies. The server allows for **PERSISTENT STORAGE**.
+
+This makes it so that every owner can index multiple audio files under a clean directory structure that is logical to query and playback.
+
+So the capability of the server totally depends on **YOUR** filesystem. This gives you full power to manage your server library to the fullest.
+
+**Current Routes**:
+
+1. `/hls/clients`: Gives a neat hierarchial structure of each Owner-IP-ID with their uploaded audio ids.
+2. `/hls/audio-info/`: Provides a neat hierarchial structure of every Audio ID's provided metadata (from their uploaded metadata.toml)
+3. `/hls/ping`: A basic route to check if the server is "alive" (sends `pong` if running)
+
+If you want to get the metadata for a single audio-id, you can always just query it like so:
+
+```bash
+curl -k -X GET https://<server-ip>:8080/<ip-id>/<audio-id>/metadata.toml 
+```
+
+> [!NOTE]
+> 
+> The Server Architecture and Organization is made in such a manner
+> that you will **NEVER** require FFmpeg libraries to be present.
+> 
+> This reduces any dependencies and complications in your server,
+> and overall reduces load of operations.
+> 
+> It will only require the following:
+> 
+> 1. Standard C/C++ libs (should be there already)
+> 2. Boost C++ (preferably above 1.70)
+> 3. OpenSSL 
+> 4. ZSTD 
+> 
+
+### **Flexibility**
+
+The architecture is designed in a way to make it more flexible in the future.
+
+The server's importance in the overall flow of operations is always kept at a minimum, to ensure that if we were to implement a P2P solution for this someday, the transition and implementation would lead to no heads being bashed into a wall.
+
+### **Generating SSL Certificates**
+To generate a **self-signed certificate**, run:
+
+```bash
+openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
+```
+
+Or use the **Makefile shortcut**:
+
+```bash
+make server-cert
+```
+
+> [!NOTE] 
+> 
+> Place `server.crt` and `server.key` in the **current working directory** before starting the server.
+> 
+
+> [!WARNING] 
+> 
+> This is a **self-signed certificate**.  
+> - Use `-k` flag in **cURL** to bypass SSL validation.
+> - Accept the self-signed certificate when using **VLC/MPV**.
+> 
+
+---
+
+## **Usage**
+### **Starting the Server**
+Once compiled, start the server:
+
+```bash
+make run-server
+```
+
+It will:
+1. Accept secure `.m3u8` & `.ts` uploads.  
+2. Assign **UUIDs** to clients for session tracking.  
+3. Serve stored playlists via `GET /hls/<ip-id>/<client_id>/<filename>`.
+
+### **Uploading a Playlist**
+To upload a **compressed HLS playlist**:
+
+```bash
+curl -X POST -F "file=@playlist.tar.gz" https://localhost:8080/upload -k
+```
+
+### **Fetching a Client List**
+```bash
+curl https://localhost:8443/hls/clients -k
+```
+
+## Client 
 
 Coming soon
