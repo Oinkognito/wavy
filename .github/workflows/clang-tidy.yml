@@ -36,7 +36,7 @@ jobs:
       run: |
         make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON"
 
-    - name: Strip erroneous compilation flags
+    - name: Strip errorneous compilation flags
       run: |
         ./scripts/compiler-flags-fix.sh
 

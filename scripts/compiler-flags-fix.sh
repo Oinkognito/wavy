@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILD_DIR="../build"
+BUILD_DIR="/build"
 COMPILE_DB="$BUILD_DIR/compile_commands.json"
 TEMP_DB="$BUILD_DIR/compile_commands.fixed.json"
 FLAG="-mno-direct-extern-access"
