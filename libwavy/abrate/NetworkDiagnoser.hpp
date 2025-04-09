@@ -28,14 +28,12 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy/network/entry.hpp"
-#include <boost/asio.hpp>
-#include <boost/asio/steady_timer.hpp>
 #include <chrono>
 #include <cmath>
 #include <future>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/logger.hpp>
+#include <libwavy/network/entry.hpp>
 #include <vector>
 
 namespace libwavy::abr

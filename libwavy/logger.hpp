@@ -95,6 +95,7 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
   X(NET, BOLD "#NETWORK_LOG " RESET)                     \
   X(FETCH, BOLD "#TSFETCH_LOG " RESET)                   \
   X(HLS, BOLD "#HLS_LOG " RESET)                         \
+  X(M3U8_PARSER, BOLD "#M3U8_PARSER_LOG " RESET)         \
   X(UNIX, BOLD "#UNIX_LOG " RESET)                       \
   X(DISPATCH, BOLD "#DISPATCH_LOG " RESET)               \
   X(SERVER, BOLD "#SERVER_LOG " RESET)                   \
@@ -112,12 +113,13 @@ LOG_CATEGORIES
 namespace libwavy::log
 {
 
+// In priority order
 enum SeverityLevel
 {
+  ERROR,
+  WARNING,
   TRACE,
   INFO,
-  WARNING,
-  ERROR,
   DEBUG
 };
 
@@ -214,6 +216,29 @@ void init_logging()
 }
 
 inline void flush_logs() { boost::log::core::get()->flush(); }
+
+inline void set_log_level(SeverityLevel level)
+{
+  namespace trivial = boost::log::trivial;
+
+  static const std::map<SeverityLevel, trivial::severity_level> level_map = {
+    {ERROR,   trivial::error},
+    {WARNING, trivial::warning},
+    {TRACE,   trivial::trace},
+    {INFO,    trivial::info},
+    {DEBUG,   trivial::debug},
+  };
+
+  auto it = level_map.find(level);
+  if (it != level_map.end())
+  {
+    boost::log::core::get()->set_filter(trivial::severity >= it->second);
+  }
+  else
+  {
+    std::cerr << "Unknown log level specified.\n";
+  }
+}
 
 // Macros for logging
 #define THREAD_ID    BOLD << "[Worker " << boost::this_thread::get_id() << "] " << RESET

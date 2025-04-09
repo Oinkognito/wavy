@@ -170,6 +170,7 @@ if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
   add_subdirectory(examples/network)
   add_subdirectory(examples/abr)
   add_subdirectory(examples/decoder)
+  add_subdirectory(examples/m3u8parser)
 endif()
 
 if (DEFINED BUILD_UI AND BUILD_UI)

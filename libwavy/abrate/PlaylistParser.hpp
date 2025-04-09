@@ -28,13 +28,13 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/beast.hpp>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/logger.hpp>
+#include <libwavy/network/entry.hpp>
+#include <libwavy/parser/ast/entry.hpp>
+#include <libwavy/parser/entry.hpp>
+#include <libwavy/parser/macros.hpp>
 #include <map>
-#include <sstream>
 #include <string>
 #include <utility>
 
@@ -45,13 +45,16 @@ namespace beast = boost::beast;
 namespace http  = beast::http;
 namespace net   = boost::asio;
 namespace ssl   = boost::asio::ssl;
+namespace bfs   = boost::filesystem;
 using tcp       = net::ip::tcp;
+
+using namespace libwavy::hls::parser;
 
 class PlaylistParser
 {
 public:
   PlaylistParser(net::io_context& ioc, ssl::context& ssl_ctx, std::string url)
-      : resolver_(ioc), stream_(ioc, ssl_ctx), master_url_(std::move(url))
+      : ioc_(ioc), ssl_ctx_(ssl_ctx), master_url_(std::move(url))
   {
   }
 
@@ -60,44 +63,87 @@ public:
     std::string host, port, target;
     parseUrl(master_url_, host, port, target);
 
-    LOG_INFO << "Fetching master playlist from: " << master_url_;
+    LOG_INFO << "Fetching master playlist from: " << target;
 
     try
     {
+      libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
       LOG_INFO << "Resolving host: " << host << " on port " << port;
-      auto const results = resolver_.resolve(host, port);
+      std::string body = client_.get(target);
 
-      LOG_INFO << "Connecting to: " << host << ":" << port;
-      beast::get_lowest_layer(stream_).connect(results);
-      stream_.handshake(ssl::stream_base::client);
-
-      http::request<http::string_body> req{http::verb::get, target, 11};
-      req.set(http::field::host, host);
-      req.set(http::field::user_agent, "Boost.Beast");
-
-      LOG_INFO << "Sending HTTP GET request...";
-      http::write(stream_, req);
-
-      beast::flat_buffer                 buffer;
-      http::response<http::dynamic_body> res;
-      http::read(stream_, buffer, res);
-
-      LOG_INFO << "Received HTTP Response. Status: " << res.result_int();
-      beast::error_code ec;
-      stream_.shutdown(ec);
-      if (ec && ec != beast::errc::not_connected)
+      try
       {
-        LOG_WARNING << "SSL Shutdown failed: " << ec.message();
+        LOG_INFO << "Parsing master playlist using template HLS parser";
+        std::string base_url = getBaseUrl(master_url_);
+        master_playlist_     = M3U8Parser::parseMasterPlaylist(body, base_url);
+
+        updateBitratePlaylistsFromAst();
+
+        // Print the AST for debugging
+        printAST(master_playlist_);
+
+        return true;
       }
-
-      std::string body = beast::buffers_to_string(res.body().data());
-
-      parsePlaylist(body);
-      return true;
+      catch (const std::exception& e)
+      {
+        LOG_ERROR << "Failed to parse master playlist: " << e.what();
+        return false;
+      }
     }
     catch (const std::exception& e)
     {
       LOG_ERROR << "Error fetching master playlist: " << e.what();
+      return false;
+    }
+  }
+
+  auto fetchMediaPlaylist(int bitrate) -> bool
+  {
+    auto it = bitrate_playlists_.find(bitrate);
+    if (it == bitrate_playlists_.end())
+    {
+      LOG_ERROR << "No playlist found for bitrate: " << bitrate;
+      return false;
+    }
+
+    std::string url = it->second;
+    // Handle relative URLs
+    if (!url.starts_with("http"))
+    {
+      std::string base_url = getBaseUrl(master_url_);
+      url                  = base_url + (url.starts_with("/") ? "" : "/") + url;
+    }
+
+    std::string host, port, target;
+    parseUrl(url, host, port, target);
+
+    LOG_INFO << "Fetching media playlist for bitrate " << bitrate << " from: " << target;
+
+    try
+    {
+      libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
+      LOG_INFO << "Resolving host: " << host << " on port " << port;
+      std::string body = client_.get(target);
+
+      try
+      {
+        LOG_INFO << "Parsing media playlist using template HLS parser";
+        std::string base_url      = getBaseUrl(url);
+        media_playlists_[bitrate] = M3U8Parser::parseMediaPlaylist(body, bitrate, base_url);
+
+        printAST(media_playlists_[bitrate]);
+
+        return true;
+      }
+      catch (const std::exception& e)
+      {
+        LOG_ERROR << "Failed to parse media playlist: " << e.what();
+        return false;
+      }
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR << "Error fetching media playlist: " << e.what();
       return false;
     }
   }
@@ -107,11 +153,62 @@ public:
     return bitrate_playlists_;
   }
 
+  [[nodiscard]] auto getMasterPlaylist() const -> const libwavy::hls::parser::ast::MasterPlaylist&
+  {
+    return master_playlist_;
+  }
+
+  [[nodiscard]] auto getMediaPlaylist(int bitrate) const
+    -> std::optional<libwavy::hls::parser::ast::MediaPlaylist>
+  {
+    auto it = media_playlists_.find(bitrate);
+    if (it != media_playlists_.end())
+    {
+      return it->second;
+    }
+    return std::nullopt;
+  }
+
 private:
-  net::ip::tcp::resolver         resolver_;
-  ssl::stream<beast::tcp_stream> stream_;
-  std::string                    master_url_;
-  std::map<int, std::string>     bitrate_playlists_;
+  net::io_context&                                        ioc_;
+  ssl::context&                                           ssl_ctx_;
+  std::string                                             master_url_;
+  std::map<int, std::string>                              bitrate_playlists_;
+  libwavy::hls::parser::ast::MasterPlaylist               master_playlist_;
+  std::map<int, libwavy::hls::parser::ast::MediaPlaylist> media_playlists_;
+
+  auto getBaseUrl(const std::string& url) -> std::string
+  {
+    size_t pos      = url.find("//");
+    size_t start    = (pos == std::string::npos) ? 0 : pos + 2;
+    size_t path_pos = url.find('/', start);
+
+    if (path_pos == std::string::npos)
+    {
+      return url;
+    }
+
+    // Find last slash to get the directory
+    size_t last_slash = url.rfind('/');
+    if (last_slash != std::string::npos)
+    {
+      return url.substr(0, last_slash);
+    }
+
+    return url.substr(0, path_pos);
+  }
+
+  void updateBitratePlaylistsFromAst()
+  {
+    for (const auto& variant : master_playlist_.variants)
+    {
+      if (variant.bitrate > 0)
+      {
+        bitrate_playlists_[variant.bitrate] = variant.uri;
+        LOG_INFO << "Added bitrate playlist from AST: " << variant.bitrate << " -> " << variant.uri;
+      }
+    }
+  }
 
   void parseUrl(const std::string& url, std::string& host, std::string& port, std::string& target)
   {
@@ -135,65 +232,6 @@ private:
 
     target = (end == std::string::npos) ? "/" : url.substr(end);
     LOG_DEBUG << "Parsed Host: " << host << ", Port: " << port << ", Target: " << target;
-  }
-
-  void parsePlaylist(const std::string& playlist)
-  {
-    std::istringstream ss(playlist);
-    std::string        line;
-    int                current_bitrate = 0;
-
-    while (std::getline(ss, line))
-    {
-      if (line.find("#EXT-X-STREAM-INF") != std::string::npos)
-      {
-        size_t bitrate_pos = line.find("BANDWIDTH=");
-        if (bitrate_pos != std::string::npos)
-        {
-          size_t start = bitrate_pos + 9;       // Position after "BANDWIDTH="
-          size_t end   = line.find(',', start); // Find next comma
-
-          std::string bitrate_str = line.substr(start, end - start);
-
-          // Remove any '=' sign if it appears (edge case)
-          std::erase(bitrate_str, '=');
-
-          LOG_DEBUG << "Extracted Bitrate String: '" << bitrate_str << "'";
-
-          // Ensure it's numeric
-          if (!bitrate_str.empty() && std::ranges::all_of(bitrate_str, ::isdigit))
-          {
-            try
-            {
-              current_bitrate = std::stoi(bitrate_str);
-              LOG_INFO << "Parsed Bitrate: " << current_bitrate << " kbps";
-            }
-            catch (const std::exception& e)
-            {
-              LOG_ERROR << "Failed to parse bitrate: " << e.what();
-              continue;
-            }
-          }
-          else
-          {
-            LOG_ERROR << "Invalid bitrate format: '" << bitrate_str << "'";
-            continue;
-          }
-        }
-      }
-      else if (!line.empty() && line[0] != '#')
-      {
-        if (current_bitrate > 0)
-        {
-          bitrate_playlists_[current_bitrate] = line;
-          LOG_INFO << "Added bitrate playlist: " << current_bitrate << " -> " << line;
-        }
-        else
-        {
-          LOG_ERROR << "Playlist URL found but no valid bitrate!";
-        }
-      }
-    }
   }
 };
 
