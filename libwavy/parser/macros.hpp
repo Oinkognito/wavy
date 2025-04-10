@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <string_view>
 
 #define HLS_KEYWORDS(MACRO)                      \

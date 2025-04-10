@@ -222,11 +222,8 @@ inline void set_log_level(SeverityLevel level)
   namespace trivial = boost::log::trivial;
 
   static const std::map<SeverityLevel, trivial::severity_level> level_map = {
-    {ERROR,   trivial::error},
-    {WARNING, trivial::warning},
-    {TRACE,   trivial::trace},
-    {INFO,    trivial::info},
-    {DEBUG,   trivial::debug},
+    {ERROR, trivial::error}, {WARNING, trivial::warning}, {TRACE, trivial::trace},
+    {INFO, trivial::info},   {DEBUG, trivial::debug},
   };
 
   auto it = level_map.find(level);

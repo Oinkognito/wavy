@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
