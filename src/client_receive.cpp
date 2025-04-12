@@ -94,7 +94,8 @@ auto main(int argc, char* argv[]) -> int
   if (argc < 5)
   {
     LOG_ERROR << "Usage: " << argv[0]
-              << " <ip-id> <index> <server-ip> <bitrate-stream> [--fetchMode=<mode>]";
+              << " <ip-id> <index> <server-ip> <bitrate-stream> [--fetchMode=<mode>] "
+                 "[--fetchLib=<so_file>]";
     return WAVY_RET_FAIL;
   }
 
@@ -105,6 +106,7 @@ auto main(int argc, char* argv[]) -> int
 
   std::string plugin_path = "";
   std::string fetch_mode  = "default"; // Default mode if not specified
+  std::string fetch_lib   = "";        // Custom fetch library path
 
   // Parse command-line arguments to get fetch mode and plugin path
   for (int i = 5; i < argc; ++i)
@@ -114,6 +116,10 @@ auto main(int argc, char* argv[]) -> int
     {
       fetch_mode = arg.substr(12); // Extract the mode from the argument
     }
+    else if (arg.starts_with("--fetchLib="))
+    {
+      fetch_lib = arg.substr(11); // Extract the library file name from the argument
+    }
     else
     {
       LOG_ERROR << "Unknown argument: " << arg;
@@ -121,10 +127,19 @@ auto main(int argc, char* argv[]) -> int
     }
   }
 
-  // Check if the fetch mode is "aggr" and set the plugin path
-  //
-  // Only aggressive mode of fetching is available currently.
-  if (fetch_mode == "aggr")
+  // Check if fetch mode is custom and fetchLib is provided
+  if (fetch_mode == "custom")
+  {
+    if (fetch_lib.empty())
+    {
+      LOG_ERROR << "You must specify --fetchLib=<so file name> when using --fetchMode=custom";
+      return WAVY_RET_FAIL;
+    }
+
+    // Set the plugin path to the custom library
+    plugin_path = std::string(WAVY_PLUGIN_OUTPUT_PATH) + "/" + fetch_lib;
+  }
+  else if (fetch_mode == "aggr")
   {
     plugin_path = std::string(WAVY_PLUGIN_OUTPUT_PATH) + "/libwavy_aggr_fetch_plugin.so";
   }
@@ -142,6 +157,7 @@ auto main(int argc, char* argv[]) -> int
 
   try
   {
+    // Attempt to load the plugin dynamically based on the path
     fetcher = libwavy::fetch::plugin::FetcherFactory::create(plugin_path, ip_id);
   }
   catch (const std::exception& e)
@@ -150,21 +166,30 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  const std::vector<std::string> clients  = fetcher->fetch_client_list(server, ip_id);
-  std::string                    audio_id = clients[index];
+  // Fetch client list and audio ID
+  const std::vector<std::string> clients = fetcher->fetch_client_list(server, ip_id);
+  if (clients.empty())
+  {
+    LOG_ERROR << "Failed to fetch clients. Exiting...";
+    return WAVY_RET_FAIL;
+  }
+  std::string audio_id = clients[index];
 
+  // Validate the index
   if (index < 0 || index >= static_cast<int>(clients.size()))
   {
     LOG_ERROR << RECEIVER_LOG << "Invalid index. Available range: 0 to " << clients.size() - 1;
     return WAVY_RET_FAIL;
   }
 
+  // Fetch the transport stream
   if (!fetcher->fetch(ip_id, audio_id, gs, bitrate, flac_found))
   {
     LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
     return EXIT_FAILURE;
   }
 
+  // Decode and play the fetched stream
   if (!decodeAndPlay(gs, flac_found))
   {
     return WAVY_RET_FAIL;

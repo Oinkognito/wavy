@@ -104,6 +104,9 @@ public:
 
     std::string response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
 
+    if (response.empty())
+      return {};
+
     std::istringstream       iss(response);
     std::string              line;
     std::string              current_ip_id;
