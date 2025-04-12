@@ -1,11 +1,11 @@
 set(PLUGIN_TYPE "Aggressive")
 
-message(STATUS "  >>> Building FETCH PLUGIN: ${PLUGIN_TYPE}")
-message(STATUS "  >>> Target: wavy_aggr_fetch_plugin")
-message(STATUS "  >>> Output Directory: ${CMAKE_BINARY_DIR}/plugins")
-
 set(PLUGIN_NAME wavy_aggr_fetch_plugin)
 set(PLUGIN_SRC src/entry.cpp)
+
+message(STATUS "  >>> Building FETCH PLUGIN: ${PLUGIN_TYPE}")
+message(STATUS "  >>> Target: ${PLUGIN_NAME}")
+message(STATUS "  >>> Output Directory: ${CMAKE_BINARY_DIR}/plugins\n")
 
 add_library(${PLUGIN_NAME} SHARED ${PLUGIN_SRC})
 target_include_directories(${PLUGIN_NAME} PRIVATE ${CMAKE_SOURCE_DIR} ${ZSTD_INCLUDE_DIRS})

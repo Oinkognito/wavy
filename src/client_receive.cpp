@@ -32,43 +32,8 @@
 #endif
 
 #include <iostream>
-#include <libwavy/ffmpeg/decoder/entry.hpp>
-#include <libwavy/logger.hpp>
-#include <libwavy/playback.hpp>
 #include <libwavy/tsfetcher/plugin/entry.hpp>
-
-auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
-{
-  if (gs.transport_segments.empty())
-  {
-    LOG_ERROR << DECODER_LOG << "No transport stream segments provided";
-    return false;
-  }
-
-  LOG_INFO << "Decoding transport stream segments...";
-
-  libwavy::ffmpeg::MediaDecoder decoder;
-  std::vector<unsigned char>    decoded_audio;
-  if (!decoder.decode(gs.transport_segments, decoded_audio))
-  {
-    LOG_ERROR << DECODER_LOG << "Decoding failed";
-    return false;
-  }
-
-  try
-  {
-    LOG_INFO << RECEIVER_LOG << "Starting audio playback...";
-    libwavy::audio::AudioPlayer player(decoded_audio, flac_found);
-    player.play();
-  }
-  catch (const std::exception& e)
-  {
-    LOG_ERROR << AUDIO_LOG << "Audio playback error: " << e.what();
-    return false;
-  }
-
-  return true;
-}
+#include <libwavy/utils/audio/entry.hpp>
 
 void print_client_list(const std::vector<std::string>& clients)
 {
@@ -186,7 +151,7 @@ auto main(int argc, char* argv[]) -> int
   if (!fetcher->fetch(ip_id, audio_id, gs, bitrate, flac_found))
   {
     LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
-    return EXIT_FAILURE;
+    return WAVY_RET_FAIL;
   }
 
   // Decode and play the fetched stream
