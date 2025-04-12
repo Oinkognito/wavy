@@ -94,6 +94,7 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
   X(AUDIO, BOLD "#AUDIO_LOG " RESET)                     \
   X(NET, BOLD "#NETWORK_LOG " RESET)                     \
   X(FETCH, BOLD "#TSFETCH_LOG " RESET)                   \
+  X(PLUGIN, BOLD "#PLUGIN_LOG " RESET)                   \
   X(HLS, BOLD "#HLS_LOG " RESET)                         \
   X(M3U8_PARSER, BOLD "#M3U8_PARSER_LOG " RESET)         \
   X(UNIX, BOLD "#UNIX_LOG " RESET)                       \

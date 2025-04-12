@@ -124,6 +124,15 @@ if (TBB_FOUND)
     target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb)
 endif()
 
+########################### ADD FETCHER PLUGINS HERE #########################################
+set(WAVY_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins)
+message(STATUS "${BLUE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n==================[ WAVY FETCH PLUGIN BUILD ]==================")
+add_subdirectory(libwavy/tsfetcher/methods/aggr)
+# Add more here ...
+message(NOTICE "===============================================================\n")
+########################### END FETCHER PLUGINS HERE #########################################
+
 add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
 message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
@@ -155,7 +164,6 @@ add_custom_target(remove COMMAND rm -f *.ts *.m3u8)
 # Individual build targets
 add_custom_target(build_encoder COMMAND ${CMAKE_COMMAND} --build . --target ${ENCODER_BIN})
 add_custom_target(build_decoder COMMAND ${CMAKE_COMMAND} --build . --target ${DECODER_BIN})
-add_custom_target(build_playback COMMAND ${CMAKE_COMMAND} --build . --target ${PLAYBACK_BIN})
 add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SERVER_BIN})
 add_custom_target(build_dispatcher COMMAND ${CMAKE_COMMAND} --build . --target ${DISPATCHER_BIN})
 add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLIENT_BIN})

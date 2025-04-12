@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/tsfetcher/interface.hpp>
 #include <cstdlib>
 #include <memory>
 #include <sstream>
@@ -44,7 +45,7 @@
 namespace libwavy::fetch
 {
 
-class TSegFetcher
+class TSegFetcher : public ISegmentFetcher
 {
 public:
   TSegFetcher(std::string server)
@@ -56,7 +57,7 @@ public:
   }
 
   auto fetch(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
-             int desired_bandwidth, bool& flac_found) -> bool
+             int desired_bandwidth, bool& flac_found) -> bool override
   {
     LOG_INFO << FETCH_LOG << "Request Owner: " << ip_id;
     LOG_INFO << FETCH_LOG << "Audio-ID: " << audio_id;
@@ -93,6 +94,46 @@ public:
 
     LOG_INFO << FETCH_LOG << "Stored " << gs.transport_segments.size() << " transport segments.";
     return true;
+  }
+
+  auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
+    -> std::vector<std::string> override
+  {
+    asio::io_context ioc;
+    ssl::context     ctx(ssl::context::tlsv12_client);
+    ctx.set_verify_mode(ssl::verify_none);
+    libwavy::network::HttpsClient client(ioc, ctx, server);
+
+    std::string response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
+
+    std::istringstream       iss(response);
+    std::string              line;
+    std::string              current_ip_id;
+    std::vector<std::string> clients;
+
+    while (std::getline(iss, line))
+    {
+      if (line.empty())
+        continue;
+
+      if (line.find(':') != std::string::npos)
+      {
+        current_ip_id = line.substr(0, line.find(':')); // Extract the IP-ID
+        continue;
+      }
+
+      if (current_ip_id == target_ip_id) // Filter by the provided IP-ID
+      {
+        size_t pos = line.find("- ");
+        if (pos != std::string::npos)
+        {
+          std::string client_id = line.substr(pos + 2); // Extract client ID
+          clients.push_back(client_id);
+        }
+      }
+    }
+
+    return clients;
   }
 
 private:

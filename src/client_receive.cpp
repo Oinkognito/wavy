@@ -32,49 +32,10 @@
 #endif
 
 #include <iostream>
+#include <libwavy/ffmpeg/decoder/entry.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/playback.hpp>
-#include <libwavy/tsfetcher/entry.hpp>
-
-auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
-  -> std::vector<std::string>
-{
-  asio::io_context ioc;
-  ssl::context     ctx(ssl::context::tlsv12_client);
-  ctx.set_verify_mode(ssl::verify_none);
-  libwavy::network::HttpsClient client(ioc, ctx, server);
-
-  std::string response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
-
-  std::istringstream       iss(response);
-  std::string              line;
-  std::string              current_ip_id;
-  std::vector<std::string> clients;
-
-  while (std::getline(iss, line))
-  {
-    if (line.empty())
-      continue;
-
-    if (line.find(':') != std::string::npos)
-    {
-      current_ip_id = line.substr(0, line.find(':')); // Extract the IP-ID
-      continue;
-    }
-
-    if (current_ip_id == target_ip_id) // Filter by the provided IP-ID
-    {
-      size_t pos = line.find("- ");
-      if (pos != std::string::npos)
-      {
-        std::string client_id = line.substr(pos + 2); // Extract client ID
-        clients.push_back(client_id);
-      }
-    }
-  }
-
-  return clients;
-}
+#include <libwavy/tsfetcher/plugin/entry.hpp>
 
 auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
 {
@@ -127,10 +88,13 @@ void print_client_list(const std::vector<std::string>& clients)
 auto main(int argc, char* argv[]) -> int
 {
   libwavy::log::init_logging();
+  libwavy::log::set_log_level(
+    libwavy::log::INFO); // anything with INFO and above priority will be printed
 
   if (argc < 5)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <ip-id> <index> <server-ip> <bitrate-stream>";
+    LOG_ERROR << "Usage: " << argv[0]
+              << " <ip-id> <index> <server-ip> <bitrate-stream> [--fetchMode=<mode>]";
     return WAVY_RET_FAIL;
   }
 
@@ -139,7 +103,55 @@ auto main(int argc, char* argv[]) -> int
   const std::string server  = argv[3];
   const int         bitrate = std::stoi(argv[4]);
 
-  const std::vector<std::string> clients = fetch_client_list(server, ip_id);
+  std::string plugin_path = "";
+  std::string fetch_mode  = "default"; // Default mode if not specified
+
+  // Parse command-line arguments to get fetch mode and plugin path
+  for (int i = 5; i < argc; ++i)
+  {
+    std::string arg = argv[i];
+    if (arg.starts_with("--fetchMode="))
+    {
+      fetch_mode = arg.substr(12); // Extract the mode from the argument
+    }
+    else
+    {
+      LOG_ERROR << "Unknown argument: " << arg;
+      return WAVY_RET_FAIL;
+    }
+  }
+
+  // Check if the fetch mode is "aggr" and set the plugin path
+  //
+  // Only aggressive mode of fetching is available currently.
+  if (fetch_mode == "aggr")
+  {
+    plugin_path = std::string(WAVY_PLUGIN_OUTPUT_PATH) + "/libwavy_aggr_fetch_plugin.so";
+  }
+  else
+  {
+    LOG_ERROR << PLUGIN_LOG << "Plugin not found for fetch mode: " << fetch_mode;
+    return WAVY_RET_FAIL;
+  }
+
+  bool        flac_found = false;
+  GlobalState gs;
+  std::unique_ptr<libwavy::fetch::ISegmentFetcher,
+                  std::function<void(libwavy::fetch::ISegmentFetcher*)>>
+    fetcher;
+
+  try
+  {
+    fetcher = libwavy::fetch::plugin::FetcherFactory::create(plugin_path, ip_id);
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR << PLUGIN_LOG << "Plugin error: " << e.what();
+    return WAVY_RET_FAIL;
+  }
+
+  const std::vector<std::string> clients  = fetcher->fetch_client_list(server, ip_id);
+  std::string                    audio_id = clients[index];
 
   if (index < 0 || index >= static_cast<int>(clients.size()))
   {
@@ -147,12 +159,7 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  std::string                 audio_id   = clients[index];
-  bool                        flac_found = false;
-  GlobalState                 gs;
-  libwavy::fetch::TSegFetcher fetcher(ip_id);
-
-  if (!fetcher.fetch(ip_id, audio_id, gs, bitrate, flac_found))
+  if (!fetcher->fetch(ip_id, audio_id, gs, bitrate, flac_found))
   {
     LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
     return EXIT_FAILURE;
