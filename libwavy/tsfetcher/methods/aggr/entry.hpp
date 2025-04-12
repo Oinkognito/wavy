@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <libwavy/tsfetcher/interface.hpp>
 #include <cstdlib>
 #include <memory>
 #include <sstream>
@@ -37,10 +36,9 @@
 #include <vector>
 
 #include <libwavy/common/macros.hpp>
-#include <libwavy/common/state.hpp>
-#include <libwavy/ffmpeg/decoder/entry.hpp>
-#include <libwavy/logger.hpp>
 #include <libwavy/network/entry.hpp>
+#include <libwavy/tsfetcher/interface.hpp>
+#include <libwavy/utils/io/dbg/entry.hpp>
 
 namespace libwavy::fetch
 {
@@ -86,7 +84,7 @@ public:
                                    std::make_move_iterator(m4s_segments.end()));
     }
 
-    if (!DBG_WriteTransportSegmentsToFile(gs.transport_segments, "audio.raw"))
+    if (!libwavy::dbg::FileWriter<std::string>::write(gs.transport_segments, "audio.raw"))
     {
       LOG_ERROR << FETCH_LOG << "Error writing transport segments to file";
       return false;

@@ -28,10 +28,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <fstream>
-#include <iostream>
 #include <libwavy/common/macros.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/utils/io/dbg/entry.hpp>
 #include <vector>
 
 extern "C"
@@ -41,44 +39,6 @@ extern "C"
 #include <libavutil/audio_fifo.h>
 #include <libavutil/mem.h>
 #include <libavutil/opt.h>
-}
-
-auto DBG_WriteTransportSegmentsToFile(const std::vector<std::string>& transport_segments,
-                                      const std::string&              filename) -> bool
-{
-  std::ofstream output_file(filename, std::ios::binary);
-  if (!output_file)
-  {
-    LOG_ERROR << DECODER_LOG << "Failed to open output file: " << filename;
-    return false;
-  }
-
-  for (const auto& segment : transport_segments)
-  {
-    output_file.write(segment.data(), segment.size());
-  }
-
-  output_file.close();
-  LOG_INFO << DECODER_LOG << "Successfully wrote transport streams to " << filename;
-  return true;
-}
-
-auto DBG_WriteDecodedAudioToFile(const std::vector<unsigned char>& transport_segment,
-                                 const std::string&                filename) -> bool
-{
-  std::ofstream output_file(filename, std::ios::binary);
-  if (!output_file)
-  {
-    LOG_ERROR << DECODER_LOG << "Failed to open output file: " << filename << std::endl;
-    return false;
-  }
-
-  output_file.write(reinterpret_cast<const char*>(transport_segment.data()),
-                    transport_segment.size());
-
-  output_file.close();
-  LOG_INFO << DECODER_LOG << "Successfully wrote decoded audio stream to " << filename << std::endl;
-  return true;
 }
 
 // Custom AVIO read function
@@ -176,7 +136,7 @@ public:
       return false;
     }
 
-    DBG_WriteDecodedAudioToFile(output_audio, "final.pcm");
+    libwavy::dbg::FileWriter<unsigned char>::write(output_audio, "final.pcm");
 
     cleanup(input_ctx, codec_ctx);
     return true;
