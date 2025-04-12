@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <autogen/config.h>
 #include <dlfcn.h>
 #include <functional>

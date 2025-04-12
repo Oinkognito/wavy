@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <libwavy/common/state.hpp>
 #include <string>
 

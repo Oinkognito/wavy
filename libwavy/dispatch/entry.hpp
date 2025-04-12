@@ -126,10 +126,10 @@
 
 namespace beast = boost::beast;
 namespace http  = beast::http;
-namespace net   = boost::asio;
+namespace asio  = boost::asio;
 namespace ssl   = boost::asio::ssl;
 namespace fs    = std::filesystem;
-using tcp       = net::ip::tcp;
+using tcp       = asio::ip::tcp;
 
 namespace libwavy::dispatch
 {
@@ -156,7 +156,7 @@ public:
     }
 
     ssl_ctx_.set_default_verify_paths();
-    stream_.set_verify_mode(boost::asio::ssl::verify_none); // [TODO]: Improve SSL verification
+    stream_.set_verify_mode(ssl::verify_none); // [TODO]: Improve SSL verification
   }
 
   auto process_and_upload() -> bool
@@ -216,7 +216,7 @@ public:
   }
 
 private:
-  net::io_context                context_;
+  asio::io_context               context_;
   PlaylistFormat                 playlist_format = PlaylistFormat::UNKNOWN;
   ssl::context                   ssl_ctx_;
   tcp::resolver                  resolver_;
@@ -482,7 +482,7 @@ private:
     try
     {
       auto const results = resolver_.resolve(server_, port_);
-      net::connect(stream_.next_layer(), results.begin(), results.end());
+      asio::connect(stream_.next_layer(), results.begin(), results.end());
       stream_.handshake(ssl::stream_base::client);
 
       send_http_request("POST", archive_path);
@@ -490,7 +490,7 @@ private:
       // **Proper SSL stream shutdown**
       boost::system::error_code ec;
       stream_.shutdown(ec);
-      if (ec == boost::asio::error::eof)
+      if (ec == asio::error::eof)
       {
         // Expected, means server closed the connection cleanly
         ec.clear();
@@ -512,8 +512,8 @@ private:
 
   void send_http_request(const std::string& method, const std::string& archive_path)
   {
-    beast::error_code                         ec;
-    boost::beast::http::file_body::value_type body;
+    beast::error_code                  ec;
+    beast::http::file_body::value_type body;
     body.open(archive_path.c_str(), beast::file_mode::scan, ec);
     if (ec)
     {
