@@ -31,6 +31,6 @@ It should be fairly easy to understand and get started. Any issues in understand
 
 ### What is expected from a plugin?
 
-This section is a **MUST READ** for people who are willing to make their own plugin for Wavy.
+This section is a **MUST READ** for people who are willing to make their own plugin for Wavy. 
 
-**What is 
+**Coming soon**
