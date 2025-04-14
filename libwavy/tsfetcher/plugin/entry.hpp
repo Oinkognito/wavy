@@ -46,7 +46,7 @@ public:
   {
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);
 
-    LOG_INFO << PLUGIN_LOG << "Found plugin path: " << WAVY_PLUGIN_OUTPUT_PATH;
+    LOG_INFO << PLUGIN_LOG << "Found plugin path: " << WAVY_FETCHER_PLUGIN_OUTPUT_PATH;
 
     LOG_INFO << PLUGIN_LOG << "Attempting to load plugin from: " << plugin_path;
 

@@ -47,11 +47,14 @@ public:
     using BackendCreateFunc = IAudioBackend* (*)();
     using MetadataFunc      = const char* (*)();
 
-    LOG_INFO << PLUGIN_LOG << "Attempting to load audio backend plugin: " << plugin_path;
+    LOG_INFO << PLUGIN_LOG << "Found plugin path: " << WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH;
+
+    LOG_INFO << PLUGIN_LOG << "Attempting to load plugin from: " << plugin_path;
 
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
     if (!handle)
     {
+      LOG_ERROR << PLUGIN_LOG << "Failed to load audio plugin: " << dlerror();
       throw std::runtime_error(std::string("Failed to load audio plugin: ") + dlerror());
     }
 

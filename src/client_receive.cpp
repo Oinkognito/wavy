@@ -102,11 +102,11 @@ auto main(int argc, char* argv[]) -> int
     }
 
     // Set the plugin path to the custom library
-    plugin_path = std::string(WAVY_PLUGIN_OUTPUT_PATH) + "/" + fetch_lib;
+    plugin_path = std::string(WAVY_FETCHER_PLUGIN_OUTPUT_PATH) + "/" + fetch_lib;
   }
   else if (fetch_mode == "aggr")
   {
-    plugin_path = std::string(WAVY_PLUGIN_OUTPUT_PATH) + "/libwavy_aggr_fetch_plugin.so";
+    plugin_path = std::string(WAVY_FETCHER_PLUGIN_OUTPUT_PATH) + "/libwavy_aggr_fetch_plugin.so";
   }
   else
   {

@@ -125,11 +125,11 @@ if (TBB_FOUND)
 endif()
 
 ########################### ADD FETCHER PLUGINS HERE #########################################
-set(WAVY_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins)
-set(WAVY_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/tsfetcher/methods)
+set(WAVY_FETCHER_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/fetcher)
+set(WAVY_FETCHER_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/tsfetcher/methods)
 message(STATUS "${BLUE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n==================[ WAVY FETCH PLUGIN BUILD ]==================")
-add_subdirectory(${WAVY_PLUGIN_PATH}/aggr)
+add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
 # Add more here ...
 message(NOTICE "===============================================================\n")
 ########################### END FETCHER PLUGINS HERE #########################################
