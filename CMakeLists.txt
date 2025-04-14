@@ -134,6 +134,16 @@ add_subdirectory(${WAVY_PLUGIN_PATH}/aggr)
 message(NOTICE "===============================================================\n")
 ########################### END FETCHER PLUGINS HERE #########################################
 
+########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
+set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
+set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/audio/backends)
+message(STATUS "${BLUE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]==================")
+add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/miniaudio)
+# Add more here ...
+message(NOTICE "=========================================================================\n")
+########################### END AUDIO BACKEND PLUGINS HERE #########################################
+
 add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
 message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)

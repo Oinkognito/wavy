@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/audio/plugin/entry.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 #include <libwavy/logger.hpp>
@@ -51,11 +52,21 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
     return false;
   }
 
+  const std::string defaultAudioBackend = std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) +
+                                          "/libwavy_audio_backend_miniaudio_plugin.so";
+
+  LOG_INFO << RECEIVER_LOG << "Attempting to start audio playback...";
   try
   {
-    LOG_INFO << RECEIVER_LOG << "Starting audio playback...";
-    libwavy::audio::AudioPlayer player(decoded_audio, flac_found);
-    player.play();
+    // load audio backend plugin here
+    LOG_INFO << PLUGIN_LOG << "Loading audio backend plugin...";
+    std::unique_ptr<libwavy::audio::IAudioBackend,
+                    std::function<void(libwavy::audio::IAudioBackend*)>>
+      backend;
+    backend = libwavy::audio::plugin::WavyAudioBackend::load(defaultAudioBackend);
+    backend->initialize(decoded_audio, flac_found);
+    LOG_TRACE << PLUGIN_LOG << "Loaded: " << backend->name();
+    backend->play();
   }
   catch (const std::exception& e)
   {
