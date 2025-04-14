@@ -27,8 +27,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <autogen/config.h>
 #include <iostream>
-#include <libwavy/playback.hpp>
+#include <libwavy/audio/interface.hpp>
+#include <libwavy/audio/plugin/entry.hpp>
 
 auto main() -> int
 {
@@ -43,10 +45,21 @@ auto main() -> int
 
   bool flac_found = false;
 
+  // default audio backend (miniaudio)
+  const std::string defaultAudioBackend = std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) +
+                                          "/libwavy_audio_backend_miniaudio_plugin.so";
+
   try
   {
-    libwavy::audio::AudioPlayer player(audioData, flac_found);
-    player.play();
+    LOG_INFO << PLUGIN_LOG << "Loading audio backend plugin...";
+    std::unique_ptr<libwavy::audio::IAudioBackend,
+                    std::function<void(libwavy::audio::IAudioBackend*)>>
+      backend;
+    backend = libwavy::audio::plugin::WavyAudioBackend::load(defaultAudioBackend);
+    backend->initialize(audioData,
+                        flac_found); // can give preferred sample rate and channels as well
+    LOG_TRACE << PLUGIN_LOG << "Loaded: " << backend->name();
+    backend->play();
   }
   catch (const std::exception& e)
   {

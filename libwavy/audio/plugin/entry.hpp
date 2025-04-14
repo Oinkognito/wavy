@@ -47,7 +47,7 @@ public:
     using BackendCreateFunc = IAudioBackend* (*)();
     using MetadataFunc      = const char* (*)();
 
-    LOG_INFO << AUDIO_LOG << "Attempting to load audio plugin: " << plugin_path;
+    LOG_INFO << PLUGIN_LOG << "Attempting to load audio backend plugin: " << plugin_path;
 
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
     if (!handle)
@@ -55,7 +55,7 @@ public:
       throw std::runtime_error(std::string("Failed to load audio plugin: ") + dlerror());
     }
 
-    LOG_INFO << AUDIO_LOG << "Plugin loaded. Resolving symbols...";
+    LOG_INFO << PLUGIN_LOG << "Audio Backend Plugin loaded. Resolving symbols...";
 
     auto create_fn = reinterpret_cast<BackendCreateFunc>(dlsym(handle, "create_audio_backend"));
     auto meta_fn   = reinterpret_cast<MetadataFunc>(dlsym(handle, "get_plugin_metadata"));
@@ -67,7 +67,7 @@ public:
     }
 
     const char* metadata = meta_fn();
-    LOG_INFO << AUDIO_LOG << "Loaded audio backend plugin: " << metadata;
+    LOG_INFO << PLUGIN_LOG << "Loaded audio backend plugin: " << metadata;
 
     IAudioBackend* backend_ptr = create_fn();
     if (!backend_ptr)

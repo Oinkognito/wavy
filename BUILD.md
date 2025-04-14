@@ -2,6 +2,16 @@
 
 This document outlines how to build, configure, and customize the **Wavy** project using its `Makefile` wrapper over CMake. It describes all supported build targets, custom flags, dependency setup, and runtime options.
 
+> [!WARNING]
+> 
+> It is **HIGHLY** recommended **NOT** to attempt to install 
+> Wavy and its architectural components globally. 
+> 
+> The provided `Makefile` and `CMake` build system **DO NOT** support it for a reason. 
+> 
+> Only attempt to do so if you know what you are doing. 
+> 
+
 ## Overview
 
 Wavy is modular and split into six major components:

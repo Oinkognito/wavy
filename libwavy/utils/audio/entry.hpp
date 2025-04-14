@@ -31,8 +31,6 @@
 #include <libwavy/audio/plugin/entry.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
-#include <libwavy/logger.hpp>
-#include <libwavy/playback.hpp>
 
 auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
 {
