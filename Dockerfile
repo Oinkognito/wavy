@@ -14,7 +14,8 @@ RUN apk add --no-cache \
     openssl \
     zstd \
     pkgconf \
-    libarchive-dev
+    libarchive-dev \
+    libpulse-dev
 
 COPY . /app
 

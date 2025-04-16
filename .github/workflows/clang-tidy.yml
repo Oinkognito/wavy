@@ -32,6 +32,10 @@ jobs:
             libarchive-dev \
             libmp3lame-dev libtbb-dev qt6-base-dev
 
+    - name: Install Default Audio Backend Dependencies
+      run: |
+        apt-get install libpulse-dev
+
     - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
       run: |
         make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON"

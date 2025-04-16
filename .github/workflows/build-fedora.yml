@@ -22,6 +22,10 @@ jobs:
           zstd cmake make pkgconf \
           libarchive-devel lame-devel git wget tbb-devel
 
+    - name: Install Default Audio Backend Dependencies
+      run: |
+        dnf install pulseaudio-libs-devel
+
     - name: Checkout repository
       uses: actions/checkout@v3
 

@@ -20,6 +20,10 @@ jobs:
           base-devel flac boost wget openssl \
           ffmpeg zstd cmake make pkgconf \
           libarchive lame git onetbb
+    
+    - name: Install Default Audio Backend Dependencies
+      run: |
+        pacman -S libpulse
 
     - name: Checkout repository
       uses: actions/checkout@v3
