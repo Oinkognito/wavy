@@ -231,26 +231,36 @@ private:
         continue;
       }
 
-      if (!is_flac)
+      if (avcodec_send_packet(codec_ctx, packet) == 0)
       {
-        output.insert(output.end(), packet->data, packet->data + packet->size);
-      }
-      else
-      {
-        if (avcodec_send_packet(codec_ctx, packet) == 0)
+        while (avcodec_receive_frame(codec_ctx, frame) == 0)
         {
-          while (avcodec_receive_frame(codec_ctx, frame) == 0)
+          AVSampleFormat fmt        = codec_ctx->sample_fmt;
+          int            channels   = codec_ctx->ch_layout.nb_channels;
+          int            nb_samples = frame->nb_samples;
+
+          if (av_sample_fmt_is_planar(fmt))
           {
-            int    sampleSize = av_get_bytes_per_sample(codec_ctx->sample_fmt);
+            int bytesPerSample = av_get_bytes_per_sample(fmt);
+            for (int i = 0; i < nb_samples; ++i)
+            {
+              for (int ch = 0; ch < channels; ++ch)
+              {
+                uint8_t* src = frame->data[ch] + i * bytesPerSample;
+                output.insert(output.end(), src, src + bytesPerSample);
+              }
+            }
+          }
+          else
+          {
+            int    bytesPerSample = av_get_bytes_per_sample(fmt);
             size_t dataSize;
-            WAVY__SAFE_MULTIPLY(frame->nb_samples, codec_ctx->ch_layout.nb_channels, dataSize);
-            WAVY__SAFE_MULTIPLY(dataSize, sampleSize, dataSize);
+            WAVY__SAFE_MULTIPLY(nb_samples, channels, dataSize);
+            WAVY__SAFE_MULTIPLY(dataSize, bytesPerSample, dataSize);
             output.insert(output.end(), frame->data[0], frame->data[0] + dataSize);
           }
         }
       }
-
-      av_packet_unref(packet);
     }
 
     av_frame_free(&frame);

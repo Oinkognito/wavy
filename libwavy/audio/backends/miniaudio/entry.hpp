@@ -32,61 +32,49 @@
 #include <cstring>
 #include <libwavy/audio/interface.hpp>
 #include <libwavy/common/macros.hpp>
-#include <libwavy/logger.hpp>
 #include <libwavy/miniaudio.h>
+#include <libwavy/utils/io/log/entry.hpp>
 #include <stdexcept>
 #include <vector>
+
+// This is undergoing revamp!!!
 
 namespace libwavy::audio
 {
 
+constexpr const char* _AUDIO_BACKEND_TYPE_ = "MiniAudioBackend";
+
 class MiniAudioBackend : public IAudioBackend
 {
 private:
-  ma_device                  device{};
-  ma_decoder                 decoder{};
-  std::vector<unsigned char> audioMemory;
-  bool                       isPlaying{false};
-  bool                       flacStream{false};
+  ma_device          device{};
+  std::vector<float> pcmBuffer; // Raw PCM buffer to hold decoded data
+  bool               isPlaying{false};
 
-  static void flacDataCallback(ma_device* pDevice, void* pOutput, const void*, ma_uint32 frameCount)
-  {
-    static size_t offset  = 0;
-    auto*         backend = (MiniAudioBackend*)pDevice->pUserData;
-    size_t        bytesToCopy;
-
-    WAVY__SAFE_MULTIPLY(frameCount, pDevice->playback.channels, bytesToCopy);
-    WAVY__SAFE_MULTIPLY(bytesToCopy, ma_get_bytes_per_sample(pDevice->playback.format),
-                        bytesToCopy);
-
-    if (offset + bytesToCopy > backend->audioMemory.size())
-    {
-      bytesToCopy = backend->audioMemory.size() - offset;
-    }
-
-    std::memcpy(pOutput, &backend->audioMemory[offset], bytesToCopy);
-    offset += bytesToCopy;
-
-    if (offset >= backend->audioMemory.size())
-    {
-      backend->isPlaying = false;
-    }
-  }
-
-  static void lossyDataCallback(ma_device* pDevice, void* pOutput, const void*,
-                                ma_uint32 frameCount)
+  // Callback to handle raw PCM playback (direct PCM data)
+  static void pcmDataCallback(ma_device* pDevice, void* pOutput, const void*, ma_uint32 frameCount)
   {
     auto* backend = (MiniAudioBackend*)pDevice->pUserData;
     auto* output  = (float*)pOutput;
 
-    ma_uint64 framesRead;
-    ma_decoder_read_pcm_frames(&backend->decoder, output, frameCount, &framesRead);
+    size_t framesToCopy    = frameCount * pDevice->playback.channels;
+    size_t availableFrames = backend->pcmBuffer.size();
 
-    if (framesRead < frameCount)
+    if (availableFrames < framesToCopy)
     {
-      ma_silence_pcm_frames(output + (framesRead * pDevice->playback.channels),
-                            frameCount - framesRead, ma_format_f32, pDevice->playback.channels);
-      backend->isPlaying = false;
+      // Not enough data, silence the rest
+      std::memcpy(output, backend->pcmBuffer.data(), availableFrames * sizeof(float));
+      ma_silence_pcm_frames(output + (availableFrames * pDevice->playback.channels),
+                            framesToCopy - availableFrames, ma_format_f32,
+                            pDevice->playback.channels);
+      backend->isPlaying = false; // End playback if data is exhausted
+    }
+    else
+    {
+      // Enough data, just copy it
+      std::memcpy(output, backend->pcmBuffer.data(), framesToCopy * sizeof(float));
+      backend->pcmBuffer.erase(backend->pcmBuffer.begin(),
+                               backend->pcmBuffer.begin() + framesToCopy);
     }
   }
 
@@ -94,48 +82,44 @@ public:
   auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
                   int preferredSampleRate, int preferredChannels) -> bool override
   {
-    flacStream  = isFlac;
-    audioMemory = audioInput;
-
-    ma_decoder_config decoderConfig = ma_decoder_config_init_default();
-    if (ma_decoder_init_memory(audioMemory.data(), audioMemory.size(), &decoderConfig, &decoder) !=
-        MA_SUCCESS)
+    // Check if audio input is valid
+    if (audioInput.empty())
     {
-      LOG_ERROR << AUDIO_LOG << "Decoder init failed.";
+      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_TYPE_) << "Audio input is empty.";
       return false;
     }
 
-    decoderConfig.format   = decoder.outputFormat;
-    decoderConfig.channels = (preferredChannels > 0) ? preferredChannels : decoder.outputChannels;
-    decoderConfig.sampleRate =
-      (preferredSampleRate > 0) ? preferredSampleRate : decoder.outputSampleRate;
+    // Convert input to PCM (assuming the input is already PCM-encoded)
+    size_t pcmSize = audioInput.size() / sizeof(float); // Assuming 32-bit float PCM data
+    pcmBuffer.resize(pcmSize);
 
-    ma_device_config config  = ma_device_config_init(ma_device_type_playback);
-    config.pUserData         = this;
-    config.sampleRate        = decoderConfig.sampleRate;
-    config.playback.channels = decoderConfig.channels;
+    // Copy the audio input data into the PCM buffer
+    std::memcpy(pcmBuffer.data(), audioInput.data(), audioInput.size());
 
-    switch (decoder.outputFormat)
+    // Configure playback device
+    ma_device_config config = ma_device_config_init(ma_device_type_playback);
+    config.pUserData        = this;
+    config.sampleRate = preferredSampleRate > 0 ? preferredSampleRate : 48000; // Default to 48kHz
+    config.playback.channels = preferredChannels > 0 ? preferredChannels : 2;  // Default to stereo
+
+    // Set the playback format based on FLAC or MP3 input
+    if (isFlac)
     {
-      case ma_format_s16:
-      case ma_format_s24:
-        config.playback.format = decoder.outputFormat;
-        config.dataCallback    = flacDataCallback;
-        break;
-      case ma_format_f32:
-        config.playback.format = decoder.outputFormat;
-        config.dataCallback    = (flacStream ? flacDataCallback : lossyDataCallback);
-        break;
-      default:
-        config.playback.format = ma_format_s16;
-        config.dataCallback    = flacDataCallback;
-        break;
+      // FLAC typically uses 16-bit or 24-bit PCM
+      config.playback.format = ma_format_s16; // Default to 16-bit PCM for FLAC
+    }
+    else
+    {
+      // MP3 is typically decoded to 32-bit float PCM
+      config.playback.format = ma_format_f32; // Default to 32-bit PCM for MP3
     }
 
+    config.dataCallback = pcmDataCallback;
+
+    // Initialize the audio playback device
     if (ma_device_init(nullptr, &config, &device) != MA_SUCCESS)
     {
-      LOG_ERROR << AUDIO_LOG << "Device init failed.";
-      ma_decoder_uninit(&decoder);
+      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_TYPE_) << "Device init failed.";
       return false;
     }
 
@@ -147,13 +131,14 @@ public:
     isPlaying = true;
     if (ma_device_start(&device) != MA_SUCCESS)
     {
-      LOG_ERROR << AUDIO_LOG << "Failed to start device.";
+      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_TYPE_) << "Failed to start device.";
       throw std::runtime_error("Device start failed");
     }
 
+    // Play the audio data (wait while it's playing)
     while (isPlaying)
     {
-      ma_sleep(100);
+      ma_sleep(10); // Sleep for a shorter time to improve responsiveness
     }
   }
 
@@ -161,9 +146,8 @@ public:
 
   ~MiniAudioBackend() override
   {
-    LOG_INFO << AUDIO_LOG << "Cleaning up MiniAudioBackend.";
+    PLUGIN_LOG_INFO(_AUDIO_BACKEND_TYPE_) << "Cleaning up MiniAudioBackend.";
     ma_device_uninit(&device);
-    ma_decoder_uninit(&decoder);
   }
 };
 

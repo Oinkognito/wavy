@@ -171,8 +171,15 @@ auto main(int argc, char* argv[]) -> int
     LOG_INFO << OWNER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
     seg.createSegmentsFLAC(input_file, output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
-    return exportTOMLFile(input_file.c_str(), output_dir,
+    int ret = exportTOMLFile(input_file.c_str(), output_dir,
                           {}); // just give empty array as we are not transcoding to diff bitrates
+    if (ret == 0)
+    {
+      return dispatch(server, output_dir);
+    }
+
+    LOG_ERROR << OWNER_LOG << "Failed to export metadata. Quiting dispatch JOB.";
+    return WAVY_RET_FAIL;
   }
 
   // Use oneTBB parallelizing for faster transcoding times

@@ -57,10 +57,10 @@ auto main(int argc, char* argv[]) -> int
   libwavy::log::set_log_level(
     libwavy::log::INFO); // anything with INFO and above priority will be printed
 
-  std::string usage =
-    std::string(argv[0]) +
-    ": --ipAddr=<ip-id> --index=<index> --serverIP=<server-ip> "
-    "--bitrate-stream=<bitrate-stream> [--tsfetchMode=<mode>] [--tsfetchLib=<so_file>]";
+  std::string usage = std::string(argv[0]) +
+                      ": --ipAddr=<ip-id> --index=<index> --serverIP=<server-ip> "
+                      "--bitrate-stream=<bitrate-stream> --tsfetchMode=<mode> "
+                      "[--tsfetchLib=<so_file>] --audioBackendLibPath=<so_file>";
 
   libwavy::util::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
 
@@ -69,6 +69,9 @@ auto main(int argc, char* argv[]) -> int
   const std::string server              = parser.get("serverIP");
   const int         bitrate             = parser.get_int("bitrate-stream", 0);
   const std::string audioBackendLibPath = parser.get("audioBackendLibPath");
+  const std::string fetch_mode =
+    parser.get("fetchMode", "default");                     // Default to "default" if not specified
+  const std::string fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
 
   parser.requireMinArgs(5, argc);
 
@@ -86,9 +89,6 @@ auto main(int argc, char* argv[]) -> int
   }
 
   std::string plugin_path = "";
-  std::string fetch_mode =
-    parser.get("fetchMode", "default");               // Default to "default" if not specified
-  std::string fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
 
   // Check if fetch mode is custom and fetchLib is provided
   if (fetch_mode == "custom")
@@ -112,7 +112,7 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  bool flac_found = false;
+  bool flac_found = parser.get("--playFlac") == "true" ? true : false;
 
   libwavy::components::client::WavyClient wavyClient(ip_id, server, plugin_path, bitrate,
                                                      audioBackendLibPath);

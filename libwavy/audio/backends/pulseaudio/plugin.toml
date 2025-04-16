@@ -1,0 +1,12 @@
+[plugin]
+name = "PulseAudio"
+version = "0.1"
+description = "PulseAudio (PA) backend for decoded PCM from segments from Wavy-Server."
+
+[dependencies]
+dependencies = [
+    "libpulse",
+]
+
+[metadata]
+author = "nots1dd"

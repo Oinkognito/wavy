@@ -126,7 +126,7 @@ endif()
 ########################### ADD FETCHER PLUGINS HERE #########################################
 set(WAVY_FETCHER_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/fetcher)
 set(WAVY_FETCHER_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/tsfetcher/methods)
-message(NOTICE "\n${BLUE}${BOLD} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY FETCH PLUGIN BUILD ]==================${RESET}")
 add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
 # Add more here ...
@@ -136,10 +136,10 @@ message(NOTICE "${GREEN}${BOLD}=================================================
 ########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
 set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
 set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/audio/backends)
-message(NOTICE "\n${BLUE}${BOLD} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/miniaudio)
-# add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
+add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}=========================================================================${RESET}\n")
 ########################### END AUDIO BACKEND PLUGINS HERE #########################################
