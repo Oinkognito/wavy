@@ -32,7 +32,10 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 
-auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
+auto decodeAndPlay(GlobalState& gs, bool& flac_found,
+                   const std::string& customAudioBackendLibPath = "")
+
+  -> bool
 {
   if (gs.transport_segments.empty())
   {
@@ -50,8 +53,10 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
     return false;
   }
 
-  const std::string defaultAudioBackend = std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) +
-                                          "/libwavy_audio_backend_miniaudio_plugin.so";
+  const std::string audioBackendLibPath = customAudioBackendLibPath.empty()
+                                            ? std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) +
+                                                "/libwavy_audio_backend_miniaudio_plugin.so"
+                                            : customAudioBackendLibPath;
 
   LOG_INFO << RECEIVER_LOG << "Attempting to start audio playback...";
   try
@@ -61,10 +66,17 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found) -> bool
     std::unique_ptr<libwavy::audio::IAudioBackend,
                     std::function<void(libwavy::audio::IAudioBackend*)>>
       backend;
-    backend = libwavy::audio::plugin::WavyAudioBackend::load(defaultAudioBackend);
-    backend->initialize(decoded_audio, flac_found);
-    LOG_TRACE << PLUGIN_LOG << "Loaded: " << backend->name();
-    backend->play();
+    backend = libwavy::audio::plugin::WavyAudioBackend::load(audioBackendLibPath);
+    if (backend->initialize(decoded_audio, flac_found))
+    {
+      LOG_TRACE << PLUGIN_LOG << "Loaded: " << backend->name();
+      backend->play();
+    }
+    else
+    {
+      LOG_ERROR << PLUGIN_LOG << "Error while loading plugin: " << audioBackendLibPath;
+      return false;
+    }
   }
   catch (const std::exception& e)
   {

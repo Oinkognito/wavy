@@ -33,6 +33,8 @@
 
 #include <iostream>
 #include <libwavy/components/client/daemon.hpp>
+#include <libwavy/logger.hpp>
+#include <libwavy/utils/cmd-line/parser.hpp>
 
 void print_client_list(const std::vector<std::string>& clients)
 {
@@ -55,41 +57,36 @@ auto main(int argc, char* argv[]) -> int
   libwavy::log::set_log_level(
     libwavy::log::INFO); // anything with INFO and above priority will be printed
 
-  if (argc < 5)
+  std::string usage =
+    std::string(argv[0]) +
+    ": --ipAddr=<ip-id> --index=<index> --serverIP=<server-ip> "
+    "--bitrate-stream=<bitrate-stream> [--tsfetchMode=<mode>] [--tsfetchLib=<so_file>]";
+
+  libwavy::util::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
+
+  const std::string ip_id               = parser.get("ipAddr");
+  const int         index               = parser.get_int("index", -1); // Safe parsing of integer
+  const std::string server              = parser.get("serverIP");
+  const int         bitrate             = parser.get_int("bitrate-stream", 0);
+  const std::string audioBackendLibPath = parser.get("audioBackendLibPath");
+
+  // Check if index or bitrate is valid
+  if (index == -1)
   {
-    LOG_ERROR << "Usage: " << argv[0]
-              << " <ip-id> <index> <server-ip> <bitrate-stream> [--fetchMode=<mode>] "
-                 "[--fetchLib=<so_file>]";
+    LOG_ERROR << "Invalid or missing index argument.";
     return WAVY_RET_FAIL;
   }
 
-  const std::string ip_id   = argv[1];
-  const int         index   = std::stoi(argv[2]);
-  const std::string server  = argv[3];
-  const int         bitrate = std::stoi(argv[4]);
+  if (bitrate == 0)
+  {
+    LOG_ERROR << "Invalid or missing bitrate-stream argument.";
+    return WAVY_RET_FAIL;
+  }
 
   std::string plugin_path = "";
-  std::string fetch_mode  = "default"; // Default mode if not specified
-  std::string fetch_lib   = "";        // Custom fetch library path
-
-  // Parse command-line arguments to get fetch mode and plugin path
-  for (int i = 5; i < argc; ++i)
-  {
-    std::string arg = argv[i];
-    if (arg.starts_with("--fetchMode="))
-    {
-      fetch_mode = arg.substr(12); // Extract the mode from the argument
-    }
-    else if (arg.starts_with("--fetchLib="))
-    {
-      fetch_lib = arg.substr(11); // Extract the library file name from the argument
-    }
-    else
-    {
-      LOG_ERROR << "Unknown argument: " << arg;
-      return WAVY_RET_FAIL;
-    }
-  }
+  std::string fetch_mode =
+    parser.get("fetchMode", "default");               // Default to "default" if not specified
+  std::string fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
 
   // Check if fetch mode is custom and fetchLib is provided
   if (fetch_mode == "custom")
@@ -115,7 +112,8 @@ auto main(int argc, char* argv[]) -> int
 
   bool flac_found = false;
 
-  libwavy::components::client::WavyClient wavyClient(ip_id, server, plugin_path, bitrate);
+  libwavy::components::client::WavyClient wavyClient(ip_id, server, plugin_path, bitrate,
+                                                     audioBackendLibPath);
 
   return wavyClient.start(flac_found, index);
 }

@@ -8,7 +8,7 @@ When creating new headers ensure that you follow the code of conduct.
 
 Also:
 
-1. **ALWAYS ADD LOGGING!** (check out [logging](https://github.com/oinkognito/wavy/blob/main/include/libwavy-common/README.md) for more)
+1. **ALWAYS ADD LOGGING!** (check out [logging](https://github.com/oinkognito/wavy/blob/main/libwavy/LOGGING.md) for more)
 2. **FORMAT AND TIDY YOUR CODE!**
 3. **ADD AMPLE DOCS!** (Not AI slop, just your logic and intention is enough)
 4. **ONE FUNCTION, ONE TASK!** (This is more of an highly recommended advice than a mandation)
