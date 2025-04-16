@@ -139,7 +139,7 @@ set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/audio/bac
 message(NOTICE "\n${BLUE}${BOLD} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/miniaudio)
-add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
+# add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}=========================================================================${RESET}\n")
 ########################### END AUDIO BACKEND PLUGINS HERE #########################################
