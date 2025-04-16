@@ -32,8 +32,7 @@
 #endif
 
 #include <iostream>
-#include <libwavy/tsfetcher/plugin/entry.hpp>
-#include <libwavy/utils/audio/entry.hpp>
+#include <libwavy/components/client/daemon.hpp>
 
 void print_client_list(const std::vector<std::string>& clients)
 {
@@ -114,51 +113,9 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  bool        flac_found = false;
-  GlobalState gs;
-  std::unique_ptr<libwavy::fetch::ISegmentFetcher,
-                  std::function<void(libwavy::fetch::ISegmentFetcher*)>>
-    fetcher;
+  bool flac_found = false;
 
-  try
-  {
-    // Attempt to load the plugin dynamically based on the path
-    fetcher = libwavy::fetch::plugin::FetcherFactory::create(plugin_path, ip_id);
-  }
-  catch (const std::exception& e)
-  {
-    LOG_ERROR << PLUGIN_LOG << "Plugin error: " << e.what();
-    return WAVY_RET_FAIL;
-  }
+  libwavy::components::client::WavyClient wavyClient(ip_id, server, plugin_path, bitrate);
 
-  // Fetch client list and audio ID
-  const std::vector<std::string> clients = fetcher->fetch_client_list(server, ip_id);
-  if (clients.empty())
-  {
-    LOG_ERROR << "Failed to fetch clients. Exiting...";
-    return WAVY_RET_FAIL;
-  }
-  std::string audio_id = clients[index];
-
-  // Validate the index
-  if (index < 0 || index >= static_cast<int>(clients.size()))
-  {
-    LOG_ERROR << RECEIVER_LOG << "Invalid index. Available range: 0 to " << clients.size() - 1;
-    return WAVY_RET_FAIL;
-  }
-
-  // Fetch the transport stream
-  if (!fetcher->fetch(ip_id, audio_id, gs, bitrate, flac_found))
-  {
-    LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
-    return WAVY_RET_FAIL;
-  }
-
-  // Decode and play the fetched stream
-  if (!decodeAndPlay(gs, flac_found))
-  {
-    return WAVY_RET_FAIL;
-  }
-
-  return WAVY_RET_SUC;
+  return wavyClient.start(flac_found, index);
 }

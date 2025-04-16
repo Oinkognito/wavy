@@ -6,11 +6,9 @@ CMAKE := cmake
 MAKE := make
 
 # Targets
-ENCODER_BIN := hls_encoder
-DECODER_BIN := hls_decoder
-SERVER_BIN := hls_server
-DISPATCHER_BIN := hls_dispatcher
-CLIENT_BIN := hls_client
+OWNER_BIN := wavy_owner
+SERVER_BIN := wavy_server
+CLIENT_BIN := wavy_client
 
 # Third-party dependencies
 MINIAUDIO_URL := https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h
@@ -46,21 +44,13 @@ rebuild:
 	@$(MAKE) -C $(BUILD_DIR)
 
 # Build individual components
-encoder:
-	$(call configure,Encoder Only,Release)
-	@$(MAKE) -C $(BUILD_DIR) $(ENCODER_BIN)
-
-decoder:
-	$(call configure,Decoder Only,Release)
-	@$(MAKE) -C $(BUILD_DIR) $(DECODER_BIN)
+owner:
+	$(call configure,Owner Only,Release)
+	@$(MAKE) -C $(BUILD_DIR) $(OWNER_BIN)
 
 server:
 	$(call configure,Server Only,Release)
 	@$(MAKE) -C $(BUILD_DIR) $(SERVER_BIN)
-
-dispatcher:
-	$(call configure,Dispatcher Only,Release)
-	@$(MAKE) -C $(BUILD_DIR) $(DISPATCHER_BIN)
 
 client:
 	$(call configure,Client Only,Release)
@@ -89,12 +79,13 @@ clean:
 
 cleanup:
 	@rm -f *.ts *.m3u8
+	@echo -e "-- Removed files matching regex `*.m3u8 and *.ts`."
 
 run-server:
 	./$(BUILD_DIR)/$(SERVER_BIN)
 
-run-encoder:
-	./$(BUILD_DIR)/$(ENCODER_BIN) $(ARGS)
+run-owner:
+	./$(BUILD_DIR)/$(OWNER_BIN) $(ARGS)
 
 dispatch:
 	./$(BUILD_DIR)/$(DISPATCHER_BIN) $(ARGS)
@@ -106,4 +97,4 @@ server-cert:
 server-cert-gen:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 
-.PHONY: default all encoder decoder server dispatcher client verbose clean cleanup format tidy init server-cert
+.PHONY: default all owner server client run-owner run-server verbose clean cleanup format tidy init server-cert

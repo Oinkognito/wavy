@@ -144,9 +144,9 @@ enum class PlaylistFormat
 class Dispatcher
 {
 public:
-  Dispatcher(std::string server, std::string port, std::string directory, std::string playlist_name)
+  Dispatcher(std::string server, std::string directory, std::string playlist_name)
       : ssl_ctx_(ssl::context::sslv23), resolver_(context_), stream_(context_, ssl_ctx_),
-        server_(std::move(server)), port_(std::move(port)), directory_(std::move(directory)),
+        server_(std::move(server)), directory_(std::move(directory)),
         playlist_name_(std::move(playlist_name))
   {
     if (!fs::exists(directory_))
@@ -221,7 +221,7 @@ private:
   ssl::context                   ssl_ctx_;
   tcp::resolver                  resolver_;
   beast::ssl_stream<tcp::socket> stream_;
-  std::string                    server_, port_, directory_, playlist_name_;
+  std::string                    server_, directory_, playlist_name_;
 
   std::unordered_map<std::string, std::vector<std::string>> reference_playlists_;
   std::vector<std::string>                                  transport_streams_;
@@ -481,7 +481,7 @@ private:
   {
     try
     {
-      auto const results = resolver_.resolve(server_, port_);
+      auto const results = resolver_.resolve(server_, WAVY_SERVER_PORT_NO_STR);
       asio::connect(stream_.next_layer(), results.begin(), results.end());
       stream_.handshake(ssl::stream_base::client);
 

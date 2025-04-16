@@ -32,6 +32,7 @@
 #include <libwavy/common/macros.hpp>
 #include <unordered_set>
 
+#include "helpers/dispatcher.hpp"
 #include <cstdlib>
 #include <libwavy/ffmpeg/hls/entry.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
@@ -47,11 +48,12 @@ using namespace libwavy::ffmpeg;
  *
  * It is recommended by the FFmpeg Developers to use av_log()
  * instead of stdout hence if `--debug` is invoked, it will
- * provide with verbose AV LOGS regarding the HLS encoding process.
+ * provide with verbose AV LOGS regarding the HLS encoding and transcoding process.
  *
  */
 
-constexpr const char* HELP_STR = " <input file> <output directory> <audio format> [--debug]";
+constexpr const char* HELP_STR =
+  " <input file> <output directory> <audio format> [--debug] <server-ip>";
 
 auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<int> found_bitrates)
   -> int
@@ -59,14 +61,14 @@ auto exportTOMLFile(const char* filename, const std::string& output_dir, vector<
   libwavy::registry::RegisterAudio parser(filename, found_bitrates);
   if (!parser.parse())
   {
-    std::cerr << "Failed to parse audio file.\n";
+    LOG_ERROR << OWNER_LOG << "Failed to parse audio file.";
     return WAVY_RET_FAIL;
   }
 
   std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
 
   parser.exportToTOML(macros::to_string(outputTOMLFile));
-  LOG_INFO << ENCODER_LOG << "TOML metadata exported to " << outputTOMLFile;
+  LOG_INFO << OWNER_LOG << "TOML metadata exported to " << outputTOMLFile;
 
   return WAVY_RET_SUC;
 }
@@ -101,11 +103,11 @@ auto checkFLACEncode(std::span<char*> args) -> bool
 #endif
 }
 
-void DBG_logCheck(const bool& avdebug_mode)
+void DBG_AVlogCheck(const bool& avdebug_mode)
 {
   if (avdebug_mode)
   {
-    LOG_INFO << ENCODER_LOG << "-- AV Debug mode enabled: AV_LOG will output verbose logs.";
+    LOG_INFO << OWNER_LOG << "-- AV Debug mode enabled: AV_LOG will output verbose logs.";
     av_log_set_level(AV_LOG_DEBUG);
   }
   else
@@ -118,21 +120,23 @@ auto main(int argc, char* argv[]) -> int
 {
   libwavy::log::init_logging();
 
-  if (argc < 4)
+  if (argc < 5)
   {
     LOG_ERROR << "Usage: " << argv[0] << HELP_STR;
-    return 1;
+    return WAVY_RET_FAIL;
   }
 
   bool avdebug_mode = checkAVDebug(std::span(argv + 4, argc - 4));
   bool use_flac =
     checkFLACEncode(std::span(argv + 3, argc - 3)); // This is to encode in lossless FLAC format
 
+  const std::string server = argv[4];
+
   Metadata met;
   int      entryBitrate = met.fetchBitrate(argv[1]);
-  LOG_INFO << ENCODER_LOG << "Entry input file's bitrate: " << entryBitrate;
+  LOG_INFO << OWNER_LOG << "Entry input file's bitrate: " << entryBitrate;
 
-  DBG_logCheck(avdebug_mode);
+  DBG_AVlogCheck(avdebug_mode);
 
   /*
    * @NOTE
@@ -163,7 +167,7 @@ auto main(int argc, char* argv[]) -> int
 
   if (fs::exists(output_dir))
   {
-    LOG_WARNING << ENCODER_LOG << "Output directory exists, rewriting...";
+    LOG_WARNING << OWNER_LOG << "Output directory exists, rewriting...";
     fs::remove_all(output_dir);
     fs::remove_all(macros::DISPATCH_ARCHIVE_REL_PATH);
   }
@@ -194,7 +198,7 @@ auto main(int argc, char* argv[]) -> int
    */
   if (use_flac)
   {
-    LOG_INFO << ENCODER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
+    LOG_INFO << OWNER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
     seg.createSegmentsFLAC(argv[1], output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
     return exportTOMLFile(argv[1], output_dir,
@@ -222,11 +226,11 @@ auto main(int argc, char* argv[]) -> int
     {
       std::string output_file_i = output_dir + "/output_" + std::to_string(i) + ".mp3";
       Transcoder  trns;
-      LOG_INFO << ENCODER_LOG << "[Bitrate: " << i << "] Starting transcoding...";
+      LOG_INFO << OWNER_LOG << "[Bitrate: " << i << "] Starting transcoding...";
       int result = trns.transcode_mp3(argv[1], output_file_i.c_str(), i * 1000);
       if (result == 0)
       {
-        LOG_INFO << ENCODER_LOG << "[Bitrate: " << i
+        LOG_INFO << OWNER_LOG << "[Bitrate: " << i
                  << "] Transcoding OK. Creating HLS segments...";
         std::vector<int> res = seg.createSegments(output_file_i.c_str(), output_dir.c_str());
         for (int b : res)
@@ -234,13 +238,13 @@ auto main(int argc, char* argv[]) -> int
       }
       else
       {
-        LOG_WARNING << ENCODER_LOG << "[Bitrate: " << i << "] Transcoding failed.";
+        LOG_WARNING << OWNER_LOG << "[Bitrate: " << i << "] Transcoding failed.";
       }
 
       std::remove(output_file_i.c_str());
     });
-  LOG_INFO << ENCODER_LOG
-           << "Total TRANSCODING + HLS segmenting seems to be complete. Going ahead with creating "
+  LOG_INFO << OWNER_LOG
+           << "Total TRANSCODING + HLS segmenting JOB seems to be complete. Going ahead with creating "
               "<master playlist> ...";
 
   std::unordered_set<int> unique_set(
@@ -250,5 +254,11 @@ auto main(int argc, char* argv[]) -> int
 
   seg.createMasterPlaylistMP3(output_dir, output_dir);
 
-  return exportTOMLFile(argv[1], output_dir, found_bitrates);
+  if (exportTOMLFile(argv[1], output_dir, found_bitrates) > 0)
+  {
+    LOG_ERROR << OWNER_LOG << "Failed to export metadata to `metadata.toml`. Exiting...";
+    return WAVY_RET_FAIL;
+  }
+
+  return dispatch(server, output_dir);
 }

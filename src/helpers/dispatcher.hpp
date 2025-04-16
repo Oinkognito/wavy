@@ -1,3 +1,5 @@
+#pragma once
+
 /************************************************
  * Wavy Project - High-Fidelity Audio Streaming
  * ---------------------------------------------
@@ -27,26 +29,18 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/common/macros.hpp>
 #include <libwavy/dispatch/entry.hpp>
 
-auto main(int argc, char* argv[]) -> int
+// A neat wrapper for dispatcher that works right out of the box
+
+auto dispatch(const std::string& server, const std::string& dir) -> int
 {
-  libwavy::log::init_logging();
-
-  if (argc < 5)
-  {
-    LOG_ERROR << "Usage: " << argv[0] << " <server> <port> <payload-directory> <master_playlist>";
-    return 1;
-  }
-
-  const std::string server          = argv[1];
-  const std::string port            = argv[2];
-  const std::string dir             = argv[3];
-  const std::string master_playlist = argv[4];
 
   try
   {
-    libwavy::dispatch::Dispatcher dispatcher(server, port, dir, master_playlist);
+    libwavy::dispatch::Dispatcher dispatcher(server, dir,
+                                             macros::to_string(macros::MASTER_PLAYLIST));
     if (!dispatcher.process_and_upload())
     {
       LOG_ERROR << DISPATCH_LOG << "Upload process failed.";

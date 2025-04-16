@@ -58,15 +58,13 @@ if (DEFINED COMPILE_REPORT AND COMPILE_REPORT)
  add_compile_options(-ftime-report)
 endif()
 
-set(ENCODER_BIN hls_encoder)
-set(SERVER_BIN hls_server)
-set(DISPATCHER_BIN hls_dispatcher)
-set(CLIENT_BIN hls_client)
+set(OWNER_BIN wavy_owner)
+set(SERVER_BIN wavy_server)
+set(CLIENT_BIN wavy_client)
 
-set(ENCODER_SRC src/encode.cpp)
-set(SERVER_SRC src/server.cpp libwavy/server/serverHelper.cpp)
-set(DISPATCHER_SRC src/dispatcher.cpp)
-set(CLIENT_SRC src/client_receive.cpp)
+set(OWNER_SRC src/Owner.cpp)
+set(SERVER_SRC src/Server.cpp libwavy/server/serverHelper.cpp)
+set(CLIENT_SRC src/Client.cpp)
 
 find_package(PkgConfig REQUIRED)
 if (DEFINED NO_FFMPEG AND NO_FFMPEG)
@@ -120,8 +118,8 @@ if (TBB_FOUND)
     include_directories(${TBB_INCLUDE_DIRS})
     link_directories(${TBB_LIBRARY_DIRS})
 
-    add_custom_executable(${ENCODER_BIN} ${ENCODER_SRC})
-    target_link_libraries(${ENCODER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb)
+    add_custom_executable(${OWNER_BIN} ${OWNER_SRC})
+    target_link_libraries(${OWNER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 
 ########################### ADD FETCHER PLUGINS HERE #########################################
@@ -158,14 +156,10 @@ target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOUR
 target_link_libraries(wavy-server PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 # Now, link the shared library to the server executable
-add_executable(${SERVER_BIN} src/server.cpp)
+add_executable(${SERVER_BIN} src/Server.cpp)
 target_include_directories(${SERVER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE  ${ARCHIVE_LIB} ${ZSTD_LIBRARIES} wavy-server)
-
-add_executable(${DISPATCHER_BIN} ${DISPATCHER_SRC})
-target_include_directories(${DISPATCHER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(${DISPATCHER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
 add_custom_target(format COMMAND clang-format -i src/*.cpp include/*.h)
 add_custom_target(tidy COMMAND clang-tidy -fix src/*.cpp include/*.h --)
@@ -173,10 +167,9 @@ add_custom_target(tidy COMMAND clang-tidy -fix src/*.cpp include/*.h --)
 add_custom_target(remove COMMAND rm -f *.ts *.m3u8)
 
 # Individual build targets
-add_custom_target(build_encoder COMMAND ${CMAKE_COMMAND} --build . --target ${ENCODER_BIN})
+add_custom_target(build_owner COMMAND ${CMAKE_COMMAND} --build . --target ${OWNER_BIN})
 add_custom_target(build_decoder COMMAND ${CMAKE_COMMAND} --build . --target ${DECODER_BIN})
 add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SERVER_BIN})
-add_custom_target(build_dispatcher COMMAND ${CMAKE_COMMAND} --build . --target ${DISPATCHER_BIN})
 add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLIENT_BIN})
 
 # Examples
@@ -306,7 +299,7 @@ message(STATUS "│ CMake Version           : ${CMAKE_VERSION}")
 message(STATUS "│ Compiler                : ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "│ Compiler Flags          : ${CMAKE_CXX_FLAGS}")
 message(STATUS "│ Libwavy Dest            : ${CMAKE_SOURCE_DIR}/libwavy/")
-message(STATUS "│ Executable Names        : ${ENCODER_BIN}, ${CLIENT_BIN}, ${SERVER_BIN}, ${DISPATCHER_BIN}")
+message(STATUS "│ Executable Names        : ${OWNER_BIN}, ${CLIENT_BIN}, ${SERVER_BIN}")
 message(STATUS "│ libquwrof               : ${CMAKE_SOURCE_DIR}/libquwrof/")
 message(STATUS "│ Build Wavy-UI           : ${BUILD_UI}")
 message(STATUS "│ C++ Standard            : ${CMAKE_CXX_STANDARD}")

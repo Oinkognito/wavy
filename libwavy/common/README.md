@@ -48,11 +48,10 @@ Each component of Wavy has a **log category**, making it easier to filter logs. 
 | **Category**          | **Use Case**                          |
 |-----------------------|----------------------------------------|
 | `DECODER_LOG`         | Logs related to audio decoding         |
-| `ENCODER_LOG`         | Logs related to audio encoding         |
 | `TRANSCODER_LOG`      | Logs related to audio transcoding      |
 | `LIBAV_LOG`           | Logs related to FFmpeg/libav usage     |
 | `NETWORK_LOG`         | Logs for network operations            |
-| `HLS_LOG`             | Logs related to HLS processing         |
+| `HLS_LOG`             | Logs related to HLS processing and encoding         |
 | `UNIX_LOG`            | Logs for Unix-specific operations      |
 | `DISPATCH_LOG`        | Logs related to dispatching streams    |
 | `SERVER_LOG`          | General server logs                    |
@@ -61,11 +60,12 @@ Each component of Wavy has a **log category**, making it easier to filter logs. 
 | `SERVER_EXTRACT_LOG`  | Extracting uploaded archive files      |
 | `SERVER_VALIDATE_LOG` | Validation of uploaded files           |
 | `RECEIVER_LOG`        | Logs related to receiving streams      |
+| `OWNER_LOG`           | Logs related to Owner's transcoding + HLS segmenting          |
 
 ### **Example Usage**
 ```cpp
 LOG_INFO << SERVER_LOG << "Client connected: ID = " << client_id;
-LOG_ERROR << ENCODER_LOG << "Encoding failed due to invalid codec settings";
+LOG_ERROR << OWNER_LOG << "Failed due to invalid codec settings";
 ```
 
 ## **4. Synchronous vs Asynchronous Logging**
@@ -109,7 +109,7 @@ The log output is structured as follows:
 **Example**
 ```
 [12:34:56.789] [INFO]    #SERVER_LOG Client connected: ID = 12345
-[12:34:56.900] [WARNING] #ENCODER_LOG Encoding delay detected
+[12:34:56.900] [WARNING] #OWNER_LOG Encoding delay detected
 [12:34:57.101] [ERROR]   #DISPATCH_LOG Failed to open network socket
 [12:34:57.101] [TRACE] []   #DISPATCH_LOG Failed to open network socket
 ```
