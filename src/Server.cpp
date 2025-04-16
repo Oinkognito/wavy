@@ -53,7 +53,7 @@ auto main() -> int
                                      ssl::context::pem);
     LOG_TRACE << "Loaded private key file: " << macros::SERVER_PRIVATE_KEY;
 
-    libwavy::server::HLS_Server server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
+    libwavy::server::WavyServer server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();
   }
   catch (std::exception& e)

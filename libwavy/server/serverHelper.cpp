@@ -73,7 +73,7 @@ auto validate_m4s(const std::string& m4s_path) -> bool
 
   if (box_type != "ftyp")
   {
-    LOG_ERROR << SERVER_VALIDATE_LOG << "Missing 'ftyp' header in .m4s: " << m4s_path;
+    LOG_WARNING << SERVER_VALIDATE_LOG << "Missing 'ftyp' header in .m4s: " << m4s_path;
     return false;
   }
 
@@ -83,8 +83,8 @@ auto validate_m4s(const std::string& m4s_path) -> bool
 
   if (content.find("moof") == std::string::npos || content.find("mdat") == std::string::npos)
   {
-    LOG_ERROR << SERVER_VALIDATE_LOG
-              << "Invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
+    LOG_WARNING << SERVER_VALIDATE_LOG
+                << "Possible invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
     return false;
   }
 

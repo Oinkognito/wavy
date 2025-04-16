@@ -122,10 +122,10 @@ auto tokenizePath(std::istringstream& iss) -> vector<std::string>;
 namespace libwavy::server
 {
 
-class HLS_Session : public std::enable_shared_from_this<HLS_Session>
+class WavySession : public std::enable_shared_from_this<WavySession>
 {
 public:
-  explicit HLS_Session(boost::asio::ssl::stream<tcp::socket> socket, const std::string ip)
+  explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const std::string ip)
       : socket_(std::move(socket)), ip_id_(std::move(ip))
   {
   }
@@ -615,10 +615,10 @@ private:
   }
 };
 
-class HLS_Server
+class WavyServer
 {
 public:
-  HLS_Server(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
+  WavyServer(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
              short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context),
         signals_(io_context, SIGINT, SIGTERM, SIGHUP),
@@ -638,7 +638,7 @@ public:
     start_accept();
   }
 
-  ~HLS_Server() { wavySocketBind.cleanup(); }
+  ~WavyServer() { wavySocketBind.cleanup(); }
 
 private:
   tcp::acceptor              acceptor_;
@@ -661,7 +661,7 @@ private:
         std::string ip = socket.remote_endpoint().address().to_string();
         LOG_INFO_ASYNC << SERVER_LOG << "Accepted new connection from " << ip;
 
-        auto session = std::make_shared<HLS_Session>(
+        auto session = std::make_shared<WavySession>(
           boost::asio::ssl::stream<tcp::socket>(std::move(socket), ssl_context_), ip);
         session->start();
         start_accept();

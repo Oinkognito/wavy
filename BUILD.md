@@ -44,12 +44,9 @@ This performs:
 | Target           | Description                                                 |
 |------------------|-------------------------------------------------------------|
 | `all`            | Builds **all** components                                   |
-| `encoder`        | Builds `hls_encoder`                                        |
-| `decoder`        | Builds `hls_decoder`                                        |
-| `playback`       | Builds `hls_playback`                                       |
-| `server`         | Builds `hls_server`                                         |
-| `dispatcher`     | Builds `hls_dispatcher`                                     |
-| `client`         | Builds `hls_client`                                         |
+| `owner`          | Builds `wavy_owner`                                         |
+| `server`         | Builds `wavy_server`                                        |
+| `client`         | Builds `wavy_client`                                         |
 | `init`           | Downloads and installs third-party headers (`miniaudio`, `toml++`) |
 
 ## Extra CMake Flags
