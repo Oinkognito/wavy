@@ -31,12 +31,16 @@
 #include <string>
 #include <string_view>
 
-#define TRANSPORT_STREAM_START_BYTE  0x47 // 0x47 (MPEG-TS sync byte)
-#define WAVY_SERVER_PORT_NO          8080
-#define WAVY_SERVER_AUDIO_SIZE_LIMIT 200 // in MiBs
-#define WAVY_SERVER_PORT_NO_STR      "8080"
-#define CRLF2                        "\r\n\r\n"
-#define CRLF                         "\r\n"
+enum
+{
+  TRANSPORT_STREAM_START_BYTE  = 0x47, // 0x47 (MPEG-TS sync byte)
+  WAVY_SERVER_PORT_NO          = 8080,
+  WAVY_SERVER_AUDIO_SIZE_LIMIT = 200 // in MiBs
+};
+
+#define WAVY_SERVER_PORT_NO_STR "8080"
+#define CRLF2                   "\r\n\r\n"
+#define CRLF                    "\r\n"
 
 #define WAVY_RET_SUC   0
 #define WAVY_RET_FAIL  1

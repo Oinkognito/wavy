@@ -88,7 +88,6 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
 // Define log categories
 #define LOG_CATEGORIES                                   \
   X(DECODER, BOLD "#DECODER_LOG " RESET)                 \
-  X(ENCODER, BOLD "#ENCODER_LOG " RESET)                 \
   X(TRANSCODER, BOLD "#TRANSCODER_LOG " RESET)           \
   X(LIBAV, BOLD "#LIBAV_LOG " RESET)                     \
   X(AUDIO, BOLD "#AUDIO_LOG " RESET)                     \
@@ -104,6 +103,7 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
   X(SERVER_UPLD, BOLD "#SERVER_UPLD_LOG " RESET)         \
   X(SERVER_EXTRACT, BOLD "#SERVER_EXTRACT_LOG " RESET)   \
   X(SERVER_VALIDATE, BOLD "#SERVER_VALIDATE_LOG " RESET) \
+  X(OWNER, BOLD "#OWNER_LOG" RESET)                      \
   X(RECEIVER, BOLD "#RECEIVER_LOG " RESET)
 
 // Generate string constants
