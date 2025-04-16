@@ -31,7 +31,7 @@ jobs:
 
     - name: Install Default Audio Backend Dependencies
       run: |
-        apt-get install libpulse-dev
+        sudo apt-get install libpulse-dev
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC (with GNU-ld)
       run: |

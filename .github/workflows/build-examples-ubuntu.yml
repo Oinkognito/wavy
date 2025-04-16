@@ -27,11 +27,11 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev 
+            libmp3lame-dev libtbb-dev
 
-   - name: Install Default Audio Backend Dependencies
+    - name: Install Default Audio Backend Dependencies
       run: |
-        apt-get install libpulse-dev
+        sudo apt-get install libpulse-dev
 
     - name: Build Examples of Wavy (x86-64 arch) - GCC (with GNU-ld)
       run: |

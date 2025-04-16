@@ -23,7 +23,7 @@ jobs:
     
     - name: Install Default Audio Backend Dependencies
       run: |
-        pacman -S libpulse
+        pacman -S --noconfirm libpulse
 
     - name: Checkout repository
       uses: actions/checkout@v3
