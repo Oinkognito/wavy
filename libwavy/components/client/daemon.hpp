@@ -28,7 +28,6 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <libwavy/tsfetcher/plugin/entry.hpp>
 #include <libwavy/utils/audio/entry.hpp>
 
