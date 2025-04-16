@@ -70,6 +70,8 @@ auto main(int argc, char* argv[]) -> int
   const int         bitrate             = parser.get_int("bitrate-stream", 0);
   const std::string audioBackendLibPath = parser.get("audioBackendLibPath");
 
+  parser.requireMinArgs(5, argc);
+
   // Check if index or bitrate is valid
   if (index == -1)
   {

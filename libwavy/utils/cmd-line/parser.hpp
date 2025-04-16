@@ -74,6 +74,16 @@ public:
     }
   }
 
+  void requireMinArgs(size_t min_argc, size_t actual_argc) const
+  {
+    if (actual_argc < min_argc)
+    {
+      LOG_ERROR << "Not enough arguments provided. Expected at least " << min_argc << ", but got "
+                << actual_argc << ".";
+      print_usage_and_exit();
+    }
+  }
+
   [[nodiscard]] auto get(const std::string& key, const std::string& default_value = "") const
     -> std::string
   {

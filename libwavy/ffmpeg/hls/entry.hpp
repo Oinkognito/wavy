@@ -81,7 +81,7 @@ public:
    * @param output_playlist The output HLS playlist path.
    * @return True on success, false on failure.
    */
-  auto createSegmentsFLAC(const char* input_file, const std::string& output_dir,
+  auto createSegmentsFLAC(const std::string& input_file, const std::string& output_dir,
                           const char* output_playlist, int bitrate) -> bool
   {
     AVFormatContext * input_ctx = nullptr, *output_ctx = nullptr;
@@ -95,7 +95,7 @@ public:
     LOG_DEBUG << HLS_LOG << "Playlist destination: " << output_playlist_str;
 
     // Open input file
-    if ((ret = avformat_open_input(&input_ctx, input_file, nullptr, nullptr)) < 0)
+    if ((ret = avformat_open_input(&input_ctx, input_file.c_str(), nullptr, nullptr)) < 0)
     {
       av_log(nullptr, AV_LOG_ERROR, "Error opening input file.\n");
       return ret;

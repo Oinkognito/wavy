@@ -6,6 +6,7 @@ set(GREEN "${ESC}[32m")  # Success messages
 set(YELLOW "${ESC}[33m") # Warning messages
 set(BLUE   "${ESC}[34m")  # Information messages
 set(PURPLE "${ESC}[35m")
+set(PINK "${ESC}[95m")
 set(BOLD "${ESC}[1m")
 set(UNDERLINE "${ESC}[4m")
 
@@ -35,7 +36,7 @@ option(AUTOGEN_HEADER "Autogenerate Config Header for the project" ON)
 
 # Check if CMake is using Ninja
 if (DEFINED BUILD_NINJA AND BUILD_NINJA)
-    message(STATUS "Using ${BLUE}Ninja build system${RESET} for fast parallel builds")
+    message(STATUS "Using ${BLUE}${BOLD}${UNDERLINE}Ninja build system${RESET} for fast parallel builds")
     set(CMAKE_MAKE_PROGRAM ninja)
 else()
   message(STATUS "Using ${CMAKE_GENERATOR}...")
@@ -45,7 +46,7 @@ endif()
 option(USE_MOLD "Use mold as the linker" OFF)
 
 if(DEFINED USE_MOLD AND USE_MOLD)
-    message(STATUS "Using ${BLUE}mold linker${RESET}")
+    message(STATUS "Using ${BLUE}${BOLD}${UNDERLINE}mold linker${RESET}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=mold -Wl,--stats")
     set(CMAKE_LINKER mold)
 else()
@@ -54,7 +55,7 @@ endif()
 
 # Enable diagnostics on compilation and linking
 if (DEFINED COMPILE_REPORT AND COMPILE_REPORT)
- message(STATUS "Requested for compile report.")
+ message(STATUS "${BLUE}${BOLD}${UNDERLINE}Requested for compile report.${RESET}")
  add_compile_options(-ftime-report)
 endif()
 
@@ -68,7 +69,7 @@ set(CLIENT_SRC src/Client.cpp)
 
 find_package(PkgConfig REQUIRED)
 if (DEFINED NO_FFMPEG AND NO_FFMPEG)
-  message(STATUS "Skipping FFmpeg check...")
+  message(STATUS "${YELLOW}${BOLD}Skipping FFmpeg check...${RESET}")
 else ()
   pkg_check_modules(FFMPEG REQUIRED libavutil libavformat libavcodec libswresample)
 endif()
@@ -77,24 +78,24 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_library(ARCHIVE_LIB archive)
 if(ARCHIVE_LIB)
-    message(STATUS "Found archive library: ${ARCHIVE_LIB}")
+  message(STATUS "${BLUE}${BOLD}Found archive library: ${ARCHIVE_LIB}${RESET}")
 else()
-    message(WARNING "Archive library not found")
+  message(WARNING "${YELLOW}${BOLD}Archive library not found${RESET}")
 endif()
 
 find_library(ZSTD_LIB libzstd)
 pkg_check_modules(ZSTD REQUIRED libzstd)
 
 if(ZSTD_FOUND)
-    message(STATUS "pkg-config found Zstd: ${ZSTD_LIBRARIES}")
-    message(STATUS "Zstd include directories: ${ZSTD_INCLUDE_DIRS}")
+  message(STATUS "${BLUE}${BOLD}pkg-config found Zstd: ${ZSTD_LIBRARIES}${RESET}")
+  message(STATUS "${BLUE}${BOLD}${UNDERLINE}Zstd include directories: ${ZSTD_INCLUDE_DIRS}${RESET}")
 else()
-    message(WARNING "pkg-config could not find Zstd")
+  message(WARNING "${YELLOW}${BOLD}pkg-config could not find Zstd${RESET}")
 endif()
 
 
 if (DEFINED NO_TBB AND NO_TBB)
-  message(STATUS "Skippping module Intel-oneTBB...")
+  message(STATUS "${YELLOW}${BOLD}Skippping module Intel-oneTBB...${RESET}")
 else()
   find_package(TBB REQUIRED tbb)
   pkg_check_modules(TBB REQUIRED tbb)
@@ -114,7 +115,7 @@ function(add_custom_executable_ffmpeg name src_file)
 endfunction()
 
 if (TBB_FOUND)
-    message(STATUS "Found oneTBB: ${TBB_LIBRARIES}")
+  message(STATUS "${BLUE}${BOLD}Found oneTBB: ${TBB_LIBRARIES}${RESET}")
     include_directories(${TBB_INCLUDE_DIRS})
     link_directories(${TBB_LIBRARY_DIRS})
 
@@ -125,25 +126,25 @@ endif()
 ########################### ADD FETCHER PLUGINS HERE #########################################
 set(WAVY_FETCHER_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/fetcher)
 set(WAVY_FETCHER_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/tsfetcher/methods)
-message(STATUS "${BLUE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
-message(NOTICE "\n==================[ WAVY FETCH PLUGIN BUILD ]==================")
+message(NOTICE "\n${BLUE}${BOLD} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY FETCH PLUGIN BUILD ]==================${RESET}")
 add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
 # Add more here ...
-message(NOTICE "===============================================================\n")
+message(NOTICE "${GREEN}${BOLD}===============================================================${RESET}\n")
 ########################### END FETCHER PLUGINS HERE #########################################
 
 ########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
 set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
 set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/audio/backends)
-message(STATUS "${BLUE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
-message(NOTICE "\n==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]==================")
+message(NOTICE "\n${BLUE}${BOLD} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
+message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/miniaudio)
+add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
 # Add more here ...
-message(NOTICE "=========================================================================\n")
+message(NOTICE "${GREEN}${BOLD}=========================================================================${RESET}\n")
 ########################### END AUDIO BACKEND PLUGINS HERE #########################################
 
 add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
-message(STATUS "<< Client compilation with std-C++20... >>")
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${CLIENT_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 
@@ -174,7 +175,7 @@ add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLI
 
 # Examples
 if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
-  message(STATUS "${PURPLE}Compiling examples for Wavy...${RESET}")
+  message(STATUS "${PURPLE}${BOLD}${UNDERLINE}Compiling examples for Wavy...${RESET}")
   add_subdirectory(examples/hls)
   add_subdirectory(examples/transcoder)
   add_subdirectory(examples/flac)
@@ -187,10 +188,10 @@ if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
 endif()
 
 if (DEFINED BUILD_UI AND BUILD_UI)
-  message(STATUS "${PURPLE}Building Wavy-UI with libquwrof...${RESET}")
+  message(STATUS "${PURPLE}${BOLD}${UNDERLINE}Building Wavy-UI with libquwrof...${RESET}")
   add_subdirectory(ui/)
 else()
-  message(STATUS "${BLUE}Skipping Wavy-UI build...${RESET}")
+  message(STATUS "${BLUE}${BOLD}Skipping Wavy-UI build...${RESET}")
 endif()
 
 if(DEFINED BUILD_TARGET)
@@ -287,7 +288,7 @@ if (DEFINED AUTOGEN_HEADER AND AUTOGEN_HEADER)
   )
   message(NOTICE "${PURPLE}${BOLD}${UNDERLINE}--> AUTOGENERATED HEADER 'config.h' TO ${CMAKE_CURRENT_SOURCE_DIR}/autogen/.${RESET}\n")
 else()
-  message(STATUS "${BLUE}Skipping autogeneration of config header.${RESET}")
+  message(STATUS "${BLUE}${BOLD}Skipping autogeneration of config header.${RESET}")
 endif()
 
 message(STATUS "\n━━━━━━━━━━━━━━━━━ ${PROJECT_NAME} project v${PROJECT_VERSION} ━━━━━━━━━━━━━━━━━\n")
