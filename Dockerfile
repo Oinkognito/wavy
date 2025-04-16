@@ -22,4 +22,4 @@ RUN make clean && make init && make server-cert-gen && make server EXTRA_CMAKE_F
 
 EXPOSE 8080
 
-CMD ["./build/hls_server"]
+CMD ["./build/wavy_server"]
