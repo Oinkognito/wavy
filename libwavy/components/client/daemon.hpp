@@ -77,7 +77,6 @@ public:
       LOG_ERROR << "Failed to fetch clients. Exiting...";
       return WAVY_RET_FAIL;
     }
-    std::string audio_id = clients[index];
 
     // Validate the index
     if (index < 0 || index >= static_cast<int>(clients.size()))
@@ -85,6 +84,8 @@ public:
       LOG_ERROR << RECEIVER_LOG << "Invalid index. Available range: 0 to " << clients.size() - 1;
       return WAVY_RET_FAIL;
     }
+
+    std::string audio_id = clients[index];
 
     // Fetch the transport stream
     if (!fetcher->fetch(_ip_id, audio_id, gs, _bitrate, flac_found))

@@ -24,7 +24,7 @@ jobs:
 
     - name: Install Default Audio Backend Dependencies
       run: |
-        dnf install pulseaudio-libs-devel
+        dnf install -y pulseaudio-libs-devel
 
     - name: Checkout repository
       uses: actions/checkout@v3

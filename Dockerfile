@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     zstd \
     pkgconf \
     libarchive-dev \
-    libpulse-dev
+    pulseaudio-dev
 
 COPY . /app
 

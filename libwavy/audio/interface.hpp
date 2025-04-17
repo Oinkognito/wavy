@@ -38,7 +38,8 @@ public:
   virtual ~IAudioBackend() = default;
 
   virtual auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
-                          int preferredSampleRate = 0, int preferredChannels = 0) -> bool = 0;
+                          int preferredSampleRate = 0, int preferredChannels = 0, int bitDepth = 16)
+    -> bool = 0;
 
   virtual void play() = 0;
 

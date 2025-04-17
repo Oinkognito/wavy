@@ -80,7 +80,8 @@ private:
 
 public:
   auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
-                  int preferredSampleRate, int preferredChannels) -> bool override
+                  int preferredSampleRate, int preferredChannels, int bitDepth = 16)
+    -> bool override
   {
     // Check if audio input is valid
     if (audioInput.empty())

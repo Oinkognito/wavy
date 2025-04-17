@@ -213,32 +213,34 @@ private:
   auto fetch_metadata(const std::string& metadata_path, std::ostringstream& response_stream,
                       const std::string& audio_id) -> bool
   {
-    LOG_DEBUG << "[Fetch Metadata] Processing file: " << metadata_path;
+    LOG_TRACE_ASYNC << "Processing file: " << metadata_path;
 
     try
     {
       AudioMetadata metadata = parseAudioMetadata(metadata_path);
       LOG_DEBUG_ASYNC << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
+      auto responseWrite = [&](int index, const std::string& label, const std::string& value)
+      { response_stream << "      " << index << ". " << label << ": " << value << "\n"; };
+
       response_stream << "  - " << audio_id << "\n";
-      response_stream << "      1. Title:              " << metadata.title << "\n";
-      response_stream << "      2. Artist:             " << metadata.artist << "\n";
-      response_stream << "      3. Album:              " << metadata.album << "\n";
-      response_stream << "      4. Bitrate:            " << metadata.bitrate << " kbps\n";
-      response_stream << "      5. Audio Bitrate:      " << metadata.audio_stream.bitrate
-                      << " kbps\n";
-      response_stream << "      6. Codec:              " << metadata.audio_stream.codec << "\n";
-      response_stream << "      7. Available Bitrates: [";
-      for (const auto& br : metadata.bitrates)
-      {
-        response_stream << br << ",";
-      }
+      responseWrite(1, "Title", metadata.title);
+      responseWrite(2, "Artist", metadata.artist);
+      responseWrite(3, "Duration", std::to_string(metadata.duration) + " secs");
+      responseWrite(4, "Album", metadata.album);
+      responseWrite(5, "Bitrate", std::to_string(metadata.bitrate) + " kbps");
+      responseWrite(6, "Sample Rate", std::to_string(metadata.audio_stream.sample_rate) + " Hz");
+      responseWrite(7, "Sample Format", metadata.audio_stream.sample_format);
+      responseWrite(8, "Audio Bitrate", std::to_string(metadata.audio_stream.bitrate) + " kbps");
+      responseWrite(9, "Codec", metadata.audio_stream.codec);
+
+      response_stream << "      10. Available Bitrates: [";
+      std::ranges::for_each(metadata.bitrates, [&](auto br) { response_stream << br << ","; });
       response_stream << "]\n";
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR_ASYNC << "[Fetch Metadata] Error parsing metadata for Audio-ID " << audio_id << ": "
-                      << e.what();
+      LOG_ERROR_ASYNC << "Error parsing metadata for Audio-ID " << audio_id << ": " << e.what();
       return false;
     }
 
@@ -247,12 +249,12 @@ private:
 
   void handle_list_audio_info()
   {
-    LOG_INFO_ASYNC << "[List Audio Info] Handling audio metadata listing request";
+    LOG_INFO_ASYNC << "Handling audio metadata listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR_ASYNC << "[List Audio Info] Storage directory not found: " << storage_path;
+      LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -265,7 +267,7 @@ private:
       if (bfs::is_directory(ip_entry.status()))
       {
         std::string ip_id = ip_entry.path().filename().string();
-        LOG_DEBUG_ASYNC << "[List Audio Info] Processing IP-ID: " << ip_id;
+        LOG_DEBUG_ASYNC << "Processing IP-ID: " << ip_id;
         response_stream << ip_id << ":\n";
 
         bool audio_found = false;
@@ -274,28 +276,26 @@ private:
           if (bfs::is_directory(audio_entry.status()))
           {
             std::string audio_id = audio_entry.path().filename().string();
-            LOG_DEBUG_ASYNC << "[List Audio Info] Found Audio-ID: " << audio_id;
+            LOG_TRACE_ASYNC << "Found Audio-ID: " << audio_id;
 
             std::string metadata_path =
               audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
             if (bfs::exists(metadata_path))
             {
-              LOG_DEBUG_ASYNC << "[List Audio Info] Found metadata file: " << metadata_path;
+              LOG_TRACE_ASYNC << "Found metadata file: " << metadata_path;
               if (fetch_metadata(metadata_path, response_stream, audio_id))
                 audio_found = true;
             }
             else
             {
-              LOG_DEBUG_ASYNC << "[List Audio Info] No metadata file found for Audio-ID: "
-                              << audio_id;
+              LOG_WARNING_ASYNC << "No metadata file found for Audio-ID: " << audio_id;
             }
           }
         }
 
         if (!audio_found)
         {
-          LOG_WARNING_ASYNC << "[List Audio Info] No metadata found for any audio IDs under IP-ID: "
-                            << ip_id;
+          LOG_WARNING_ASYNC << "No metadata found for any audio IDs under IP-ID: " << ip_id;
           response_stream << "  (No metadata found for any audio IDs)\n";
         }
 
@@ -305,7 +305,7 @@ private:
 
     if (!entries_found)
     {
-      LOG_WARNING_ASYNC << "[List Audio Info] No IPs or Audio-IDs with metadata found in storage";
+      LOG_ERROR_ASYNC << "No IPs or Audio-IDs with metadata found in storage";
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -316,12 +316,12 @@ private:
 
   void handle_list_ips()
   {
-    LOG_INFO_ASYNC << "[List IPs] Handling IP listing request";
+    LOG_INFO_ASYNC << "Handling IP listing request";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR_ASYNC << "[List IPs] Storage directory not found: " << storage_path;
+      LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -357,7 +357,7 @@ private:
 
     if (!entries_found)
     {
-      LOG_WARNING_ASYNC << "[List IPs] No IPs or Audio-IDs found in storage";
+      LOG_ERROR_ASYNC << "No IPs or Audio-IDs found in storage";
       send_response(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
