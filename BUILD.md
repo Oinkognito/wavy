@@ -16,11 +16,22 @@ This document outlines how to build, configure, and customize the **Wavy** proje
 
 Wavy is modular and split into six major components:
 
-- **Encoder**: Converts raw audio into HLS-compatible segments.
-- **Decoder**: Parses and decodes HLS segments.
-- **Dispatcher**: Packages files and sends them to the server.
+- **Owner**: Transcodes given audio file (if needed) and converts into HLS-compatible segments and dispatches to server.
 - **Server**: HTTPS-based storage and segment distribution service.
 - **Client**: Pulls and fetches HLS playlists and segments and has **playback** integration.
+
+> [!NOTE]
+> 
+> *Dispatcher* is integrated within the **Owner** binary itself!
+> 
+> Similarly,
+> *Fetcher* and *Audio Backend* are integrated with **Client** component.
+> 
+> They are important architectural components that play a vital role in Wavy, but 
+> moving forward, they CANNOT be compiled separarely as a target.
+> 
+> If it is really needed to compile them separarely, take a look at [examples](https://github.com/Oinkognito/Wavy/blob/main/examples/README.md).
+> 
 
 These components can be built individually or collectively using the Makefile.
 
@@ -59,16 +70,28 @@ make <target> EXTRA_CMAKE_FLAGS="..."
 
 ### Supported Flags
 
-| Flag                   | Description                                                  |
-|------------------------|--------------------------------------------------------------|
-| `-DBUILD_EXAMPLES=ON`  | Enables building of example programs                         |
-| `-DUSE_MOLD=ON`        | Enables [mold](https://github.com/rui314/mold) linker        |
-| `-DBUILD_NINJA=ON`     | Generates a Ninja backend instead of Makefiles               |
-| `-DBUILD_UI=ON`        | Enables optional graphical components (if available)         |
-| `-DAUTOGEN_HEADER=ON`  | Automatically generates internal headers                     |
-| `-DCOMPILE_REPORT=ON`  | Outputs build reports and diagnostic metadata                |
-| `-DNO_FFMPEG=ON`       | **Disables FFmpeg support**, useful for minimal server build |
-| `-DNO_TBB=ON`          | **Disables Intel oneTBB** (parallelism), useful for servers  |
+| Flag                              | Description                                                                  |
+|-----------------------------------|------------------------------------------------------------------------------|
+| `-DBUILD_EXAMPLES=ON`             | Enables building of example programs                                         |
+| `-DUSE_MOLD=ON`                   | Enables [mold](https://github.com/rui314/mold) linker                        |
+| `-DBUILD_NINJA=ON`                | Generates a Ninja backend instead of Makefiles                               |
+| `-DBUILD_UI=ON`                   | Enables optional graphical components (if available)                         |
+| `-DAUTOGEN_HEADER=ON`             | Automatically generates internal headers                                     | 
+| `-DCOMPILE_REPORT=ON`             | Outputs build reports and diagnostic metadata                                |
+| `-DNO_FFMPEG=ON`                  | **Disables FFmpeg support**, useful for minimal server build                 |
+| `-DNO_TBB=ON`                     | **Disables Intel oneTBB** (parallelism), useful for servers                  |
+| `-DBUILD_FETCHER_PLUGINS=ON`      | Enables building for ALL `TSFetcher` plugins (deps must be handled manually) |
+| `-DBUILD_AUDIO_BACKEND_PLUGINS=ON`| Enables building for ALL `TSFetcher` plugins (deps must be handled manually) |
+
+> [!NOTE]
+> 
+> It is key to note that out of the above flags, the below are by default turned **OFF**:
+> 
+> 1. `-DBUILD_FETCHER_PLUGINS`
+> 2. `-DBUILD_AUDIO_BACKEND_PLUGINS`
+> 3. `-DNO_FFMPEG`
+> 4. `-DNO_TBB`
+> 
 
 
 ### Minimal Server Build (No FFmpeg / No oneTBB)
@@ -86,22 +109,18 @@ This excludes all audio/video encoding/decoding dependencies.
 | Target         | Description                                               |
 |----------------|-----------------------------------------------------------|
 | `run-server`   | Executes the compiled server binary                       |
-| `run-encoder`  | Executes the encoder with `$(ARGS)` passed from CLI       |
-| `dispatch`     | Executes the dispatcher with `$(ARGS)` passed from CLI    |
 
-Use like:
+Since the binaries `wavy_owner` and `wavy_client` have a LOT of parameters required, this approach is not really convenient.
 
-```sh
-make run-encoder ARGS="<input_file> <output dir> <audio-format> [--debug]"
-```
+There will be a section to explain the parameters for the above binaries instead for further clarity.
 
 ## Code Quality and Maintenance
 
 | Target               | Description                                                           |
 |----------------------|-----------------------------------------------------------------------|
 | `format`             | Applies `clang-format` to all source files                            |
-| `tidy`               | Runs `clang-tidy` checks using `compile_commands.json`               |
-| `prepend-license-src`| Prepends license headers (ignores external headers)                  |
+| `tidy`               | Runs `clang-tidy` checks using `compile_commands.json`                |
+| `prepend-license-src`| Prepends license headers (ignores external headers)                   |
 
 
 ## Cleaning and Reset

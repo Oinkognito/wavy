@@ -87,9 +87,6 @@ run-server:
 run-owner:
 	./$(BUILD_DIR)/$(OWNER_BIN) $(ARGS)
 
-dispatch:
-	./$(BUILD_DIR)/$(DISPATCHER_BIN) $(ARGS)
-
 server-cert:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 

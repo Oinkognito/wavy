@@ -123,6 +123,7 @@ if (TBB_FOUND)
     target_link_libraries(${OWNER_BIN} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 
+if (DEFINED BUILD_FETCHER_PLUGINS AND BUILD_FETCHER_PLUGINS)
 ########################### ADD FETCHER PLUGINS HERE #########################################
 set(WAVY_FETCHER_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/fetcher)
 set(WAVY_FETCHER_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/tsfetcher/methods)
@@ -132,7 +133,11 @@ add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}===============================================================${RESET}\n")
 ########################### END FETCHER PLUGINS HERE #########################################
+else()
+  message(STATUS "${YELLOW}${BOLD}${UNDERLINE}Skipping FETCHER PLUGIN build routine...${RESET}")
+endif()
 
+if (DEFINED BUILD_AUDIO_BACKEND_PLUGINS AND BUILD_AUDIO_BACKEND_PLUGINS)
 ########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
 set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
 set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libwavy/audio/backends)
@@ -143,6 +148,9 @@ add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}=========================================================================${RESET}\n")
 ########################### END AUDIO BACKEND PLUGINS HERE #########################################
+else()
+  message(STATUS "${YELLOW}${BOLD}${UNDERLINE}Skipping AUDIO BACKEND PLUGIN build routine...${RESET}")
+endif()
 
 add_custom_executable_ffmpeg(${CLIENT_BIN} ${CLIENT_SRC})
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)

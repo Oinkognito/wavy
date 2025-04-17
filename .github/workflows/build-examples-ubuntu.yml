@@ -29,10 +29,6 @@ jobs:
             libarchive-dev \
             libmp3lame-dev libtbb-dev
 
-    - name: Install Default Audio Backend Dependencies
-      run: |
-        sudo apt-get install libpulse-dev
-
     - name: Build Examples of Wavy (x86-64 arch) - GCC (with GNU-ld)
       run: |
         make EXTRA_CMAKE_FLAGS="-DBUILD_EXAMPLES=ON"

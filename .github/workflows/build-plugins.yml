@@ -1,10 +1,10 @@
-name: "Wavy CI / Clang-Tidy (x86-64 arch Ubuntu)"
+name: "Wavy CI / Ubuntu Build with Plugins (x86-64 arch - GCC)"
 
 on:
   push:
-    branches: [ "main" ]  # Trigger on push to the 'main' branch
+    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]  # Trigger on pull requests to the 'main' branch
+    branches: [ "main" ]
 
 jobs:
   release:
@@ -18,9 +18,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install clang-tidy
-      run: sudo apt-get install -y clang-tidy make wget jq bash
-
     - name: Install dependencies for Wavy
       run: |
         sudo apt-get update
@@ -30,16 +27,12 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev qt6-base-dev
+            libmp3lame-dev libtbb-dev
 
-    - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
+    - name: Install Default Audio Backend Dependencies
       run: |
-        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON"
+        sudo apt-get install libpulse-dev
 
-    - name: Strip errorneous compilation flags
+    - name: Build Release Version of Wavy with PLUGINS (x86-64 arch) - GCC (with GNU-ld)
       run: |
-        ./scripts/compiler-flags-fix.sh
-
-    - name: Run Clang Tidy check for Wavy
-      run: |
-        make tidy
+        make EXTRA_CMAKE_FLAGS="-DBUILD_FETCHER_PLUGINS=ON -DBUILD_AUDIO_BACKEND_PLUGINS=ON"
