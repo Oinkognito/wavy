@@ -30,11 +30,11 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev qt6-base-dev
+            libmp3lame-dev libtbb-dev qt6-base-dev libpulse-dev
 
     - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
       run: |
-        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON"
+        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON -DBUILD_FETCHER_PLUGINS=ON -DBUILD_AUDIO_BACKEND_PLUGINS=ON"
 
     - name: Strip errorneous compilation flags
       run: |
