@@ -30,6 +30,7 @@
 
 #include <libwavy/common/macros.hpp>
 #include <libwavy/utils/io/dbg/entry.hpp>
+#include <libwavy/utils/math/entry.hpp>
 #include <vector>
 
 extern "C"
@@ -223,7 +224,28 @@ private:
     AVFrame*  frame   = av_frame_alloc();
     bool      is_flac = (codec_params->codec_id == AV_CODEC_ID_FLAC);
 
-    while (av_read_frame(ctx, packet) >= 0)
+    if (!packet || !frame)
+    {
+      av_log(nullptr, AV_LOG_ERROR, "Failed to allocate packet or frame\n");
+      if (packet)
+        av_packet_free(&packet);
+      if (frame)
+        av_frame_free(&frame);
+      return false;
+    }
+
+    // For debugging
+    if (is_flac)
+    {
+      LOG_DEBUG << DECODER_LOG << "Processing FLAC audio stream";
+      LOG_DEBUG << DECODER_LOG
+                << "Sample format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt);
+      LOG_DEBUG << DECODER_LOG << "Sample rate: " << codec_ctx->sample_rate;
+      LOG_DEBUG << DECODER_LOG << "Channels: " << codec_ctx->ch_layout.nb_channels;
+    }
+
+    int ret = 0;
+    while ((ret = av_read_frame(ctx, packet)) >= 0)
     {
       if (packet->stream_index != stream_idx)
       {
@@ -231,41 +253,133 @@ private:
         continue;
       }
 
-      if (avcodec_send_packet(codec_ctx, packet) == 0)
+      ret = avcodec_send_packet(codec_ctx, packet);
+      if (ret < 0)
       {
-        while (avcodec_receive_frame(codec_ctx, frame) == 0)
-        {
-          AVSampleFormat fmt        = codec_ctx->sample_fmt;
-          int            channels   = codec_ctx->ch_layout.nb_channels;
-          int            nb_samples = frame->nb_samples;
+        char errbuf[128];
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        LOG_ERROR << DECODER_LOG << "Error sending packet: " << errbuf;
+        av_packet_unref(packet);
+        continue;
+      }
 
-          if (av_sample_fmt_is_planar(fmt))
+      while ((ret = avcodec_receive_frame(codec_ctx, frame)) == 0)
+      {
+        auto fmt            = static_cast<AVSampleFormat>(frame->format);
+        int  channels       = frame->ch_layout.nb_channels;
+        int  nb_samples     = frame->nb_samples;
+        int  bytesPerSample = av_get_bytes_per_sample(fmt);
+
+        // Debug info for FLAC
+        if (is_flac)
+        {
+          static int frame_count = 0;
+          if (frame_count++ % 100 == 0)
           {
-            int bytesPerSample = av_get_bytes_per_sample(fmt);
-            for (int i = 0; i < nb_samples; ++i)
+            LOG_DEBUG << DECODER_LOG << "FLAC frame " << frame_count
+                      << ", format: " << av_get_sample_fmt_name(fmt) << ", samples: " << nb_samples;
+          }
+        }
+
+        if (av_sample_fmt_is_planar(fmt))
+        {
+          // Handle planar format (separate channels)
+          size_t before_size = output.size();
+          for (int i = 0; i < nb_samples; ++i)
+          {
+            for (int ch = 0; ch < channels; ++ch)
             {
-              for (int ch = 0; ch < channels; ++ch)
-              {
-                uint8_t* src = frame->data[ch] + i * bytesPerSample;
-                output.insert(output.end(), src, src + bytesPerSample);
-              }
+              uint8_t* src = frame->data[ch] + i * bytesPerSample;
+              output.insert(output.end(), src, src + bytesPerSample);
+            }
+          }
+
+          // Verify we added the expected amount of data
+          size_t expected_size = static_cast<size_t>(nb_samples) * channels * bytesPerSample;
+          size_t actual_added  = output.size() - before_size;
+          if (expected_size != actual_added)
+          {
+            LOG_WARNING << DECODER_LOG << "Size mismatch in planar data: expected " << expected_size
+                        << ", got " << actual_added;
+          }
+        }
+        else
+        {
+          // Handle interleaved format
+          size_t before_size = output.size();
+          size_t dataSize    = static_cast<size_t>(nb_samples) * channels * bytesPerSample;
+
+          // Safety check before inserting
+          if (frame->data[0] && dataSize > 0 && dataSize <= frame->linesize[0])
+          {
+            output.insert(output.end(), frame->data[0], frame->data[0] + dataSize);
+
+            // Verify we added the expected amount of data
+            size_t actual_added = output.size() - before_size;
+            if (dataSize != actual_added)
+            {
+              LOG_WARNING << DECODER_LOG << "Size mismatch in interleaved data: expected "
+                          << dataSize << ", got " << actual_added;
             }
           }
           else
           {
-            int    bytesPerSample = av_get_bytes_per_sample(fmt);
-            size_t dataSize;
-            WAVY__SAFE_MULTIPLY(nb_samples, channels, dataSize);
-            WAVY__SAFE_MULTIPLY(dataSize, bytesPerSample, dataSize);
-            output.insert(output.end(), frame->data[0], frame->data[0] + dataSize);
+            LOG_ERROR << DECODER_LOG << "Invalid data size: " << dataSize
+                      << ", linesize: " << frame->linesize[0];
           }
+        }
+      }
+
+      if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
+      {
+        char errbuf[128];
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        LOG_ERROR << DECODER_LOG << "Error receiving frame: " << errbuf;
+      }
+
+      av_packet_unref(packet);
+    }
+
+    // Flush the decoder
+    avcodec_send_packet(codec_ctx, nullptr);
+    while (avcodec_receive_frame(codec_ctx, frame) == 0)
+    {
+      auto fmt            = static_cast<AVSampleFormat>(frame->format);
+      int  channels       = frame->ch_layout.nb_channels;
+      int  nb_samples     = frame->nb_samples;
+      int  bytesPerSample = av_get_bytes_per_sample(fmt);
+
+      if (av_sample_fmt_is_planar(fmt))
+      {
+        for (int i = 0; i < nb_samples; ++i)
+        {
+          for (int ch = 0; ch < channels; ++ch)
+          {
+            uint8_t* src = frame->data[ch] + i * bytesPerSample;
+            output.insert(output.end(), src, src + bytesPerSample);
+          }
+        }
+      }
+      else
+      {
+        size_t dataSize = static_cast<size_t>(nb_samples) * channels * bytesPerSample;
+        if (frame->data[0] && dataSize > 0 && dataSize <= frame->linesize[0])
+        {
+          output.insert(output.end(), frame->data[0], frame->data[0] + dataSize);
         }
       }
     }
 
     av_frame_free(&frame);
     av_packet_free(&packet);
-    return true;
+
+    LOG_INFO << DECODER_LOG
+             << "Decoding complete: " << libwavy::util::math::bytesFormat(output.size())
+             << " bytes of raw audio data generated";
+    LOG_INFO << DECODER_LOG << "Sample format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt)
+             << ", Bytes per sample: " << av_get_bytes_per_sample(codec_ctx->sample_fmt);
+
+    return !output.empty();
   }
 
   void cleanup(AVFormatContext* ctx, AVCodecContext* codec_ctx = nullptr)

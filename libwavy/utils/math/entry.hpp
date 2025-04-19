@@ -1,3 +1,4 @@
+#pragma once
 /************************************************
  * Wavy Project - High-Fidelity Audio Streaming
  * ---------------------------------------------
@@ -27,17 +28,36 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <libwavy/audio/backends/miniaudio/entry.hpp>
 
-extern "C"
+#include <array>
+#include <iomanip>
+#include <sstream>
+#include <string>
+
+namespace libwavy::util::math
 {
-  auto create_audio_backend() -> libwavy::audio::IAudioBackend*
+
+inline auto formatSize(double size, const std::string& unit) -> std::string
+{
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(2) << size << " " << unit;
+  return oss.str();
+}
+
+inline auto bytesFormat(size_t bytes) -> std::string
+{
+  static constexpr std::array<const char*, 4> units    = {"B", "KiB", "MiB", "GiB"};
+  static constexpr std::array<size_t, 4>      divisors = {1, 1024, 1024 * 1024, 1024 * 1024 * 1024};
+
+  for (size_t i = 0; i < units.size(); ++i)
   {
-    return new libwavy::audio::MiniAudioBackend();
+    if (bytes < divisors[i + 1])
+    {
+      return formatSize(static_cast<double>(bytes) / divisors[i], units[i]);
+    }
   }
 
-  auto get_plugin_metadata() -> const char*
-  {
-    return "MiniAudio Plugin Backend v1.0 (supports MP3/FLAC)";
-  }
+  return formatSize(static_cast<double>(bytes) / divisors[3], units[3]);
 }
+
+} // namespace libwavy::util::math

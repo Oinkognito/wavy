@@ -49,6 +49,7 @@
 
 #include <libwavy/toml/toml_parser.hpp>
 #include <libwavy/unix/domainBind.hpp>
+#include <libwavy/utils/math/entry.hpp>
 #include <libwavy/zstd/decompression.h>
 
 /*
@@ -150,10 +151,10 @@ private:
                             {
                               if (ec)
                               {
-                                LOG_ERROR << SERVER_LOG << "SSL handshake failed: " << ec.message();
+                                LOG_ERROR_ASYNC << SERVER_LOG << "SSL handshake failed: " << ec.message();
                                 return;
                               }
-                              LOG_INFO << SERVER_LOG << "SSL handshake successful";
+                              LOG_INFO_ASYNC << SERVER_LOG << "SSL handshake successful";
                               do_read();
                             });
   }
@@ -495,13 +496,13 @@ private:
     std::string        target(request_.target().begin(), request_.target().end());
     std::istringstream iss(target);
 
-    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << " Processing request: " << target;
+    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << "Processing request: " << target;
 
     std::vector<std::string> parts = tokenizePath(iss);
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Invalid request path: " << target;
+      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Invalid request path: " << target;
       send_response(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
@@ -514,7 +515,7 @@ private:
     std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
                             audio_id + "/" + filename;
 
-    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << " Checking file: " << file_path;
+    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << "Checking file: " << file_path;
 
     // Use async file reading (prevent blocking on large files)
     auto file_stream = std::make_shared<boost::beast::http::file_body::value_type>();
@@ -524,15 +525,15 @@ private:
 
     if (ec)
     {
-      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Failed to open file: " << file_path
+      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Failed to open file: " << file_path
                       << " Error: " << ec.message();
       send_response(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
     std::uint64_t file_size = file_stream->size();
-    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " File opened asynchronously: " << file_path
-                   << " (Size: " << file_size << " bytes)";
+    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "File opened asynchronously: " << file_path
+                   << " (Size: " << libwavy::util::math::bytesFormat(file_size) << ")";
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
     if (filename.ends_with(macros::PLAYLIST_EXT))
@@ -559,16 +560,16 @@ private:
                       {
                         if (ec)
                         {
-                          LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << " Write error: " << ec.message();
+                          LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Write error: " << ec.message();
                         }
                         else
                         {
-                          LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " Response sent successfully.";
+                          LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "Response sent successfully.";
                         }
                         socket_.lowest_layer().close();
                       });
 
-    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << " [OWNER:" << ip_addr << "] Served: " << filename << " ("
+    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "[OWNER:" << ip_addr << "] Served: " << filename << " ("
                    << audio_id << ")";
   }
 

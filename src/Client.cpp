@@ -55,7 +55,7 @@ auto main(int argc, char* argv[]) -> int
 {
   libwavy::log::init_logging();
   libwavy::log::set_log_level(
-    libwavy::log::INFO); // anything with INFO and above priority will be printed
+    libwavy::log::DEBUG); // anything with INFO and above priority will be printed
 
   std::string usage = std::string(argv[0]) +
                       ": --ipAddr=<ip-id> --index=<index> --serverIP=<server-ip> "

@@ -85,31 +85,33 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
     }                                                              \
   } while (0)
 
-// Define log categories
-#define LOG_CATEGORIES                                   \
-  X(DECODER, BOLD "#DECODER_LOG " RESET)                 \
-  X(TRANSCODER, BOLD "#TRANSCODER_LOG " RESET)           \
-  X(LIBAV, BOLD "#LIBAV_LOG " RESET)                     \
-  X(AUDIO, BOLD "#AUDIO_LOG " RESET)                     \
-  X(NET, BOLD "#NETWORK_LOG " RESET)                     \
-  X(FETCH, BOLD "#TSFETCH_LOG " RESET)                   \
-  X(PLUGIN, BOLD "#PLUGIN_LOG " RESET)                   \
-  X(HLS, BOLD "#HLS_LOG " RESET)                         \
-  X(M3U8_PARSER, BOLD "#M3U8_PARSER_LOG " RESET)         \
-  X(UNIX, BOLD "#UNIX_LOG " RESET)                       \
-  X(DISPATCH, BOLD "#DISPATCH_LOG " RESET)               \
-  X(SERVER, BOLD "#SERVER_LOG " RESET)                   \
-  X(SERVER_DWNLD, BOLD "#SERVER_DWNLD_LOG " RESET)       \
-  X(SERVER_UPLD, BOLD "#SERVER_UPLD_LOG " RESET)         \
-  X(SERVER_EXTRACT, BOLD "#SERVER_EXTRACT_LOG " RESET)   \
-  X(SERVER_VALIDATE, BOLD "#SERVER_VALIDATE_LOG " RESET) \
-  X(OWNER, BOLD "#OWNER_LOG " RESET)                     \
-  X(RECEIVER, BOLD "#RECEIVER_LOG " RESET)
+#define LOG_FMT(str) BOLD str RESET
+
+#define LOG_CATEGORIES                                                \
+  X(DECODER,           "#DECODER_LOG         ")                       \
+  X(TRANSCODER,        "#TRANSCODER_LOG      ")                       \
+  X(LIBAV,             "#LIBAV_LOG           ")                       \
+  X(AUDIO,             "#AUDIO_LOG           ")                       \
+  X(NET,               "#NETWORK_LOG         ")                       \
+  X(FETCH,             "#TSFETCH_LOG         ")                       \
+  X(PLUGIN,            "#PLUGIN_LOG          ")                       \
+  X(HLS,               "#HLS_LOG             ")                       \
+  X(M3U8_PARSER,       "#M3U8_PARSER_LOG     ")                       \
+  X(UNIX,              "#UNIX_LOG            ")                       \
+  X(DISPATCH,          "#DISPATCH_LOG        ")                       \
+  X(SERVER,            "#SERVER_LOG          ")                       \
+  X(SERVER_DWNLD,      "#SERVER_DWNLD_LOG    ")                       \
+  X(SERVER_UPLD,       "#SERVER_UPLD_LOG     ")                       \
+  X(SERVER_EXTRACT,    "#SERVER_EXTRACT_LOG  ")                       \
+  X(SERVER_VALIDATE,   "#SERVER_VALIDATE_LOG ")                       \
+  X(OWNER,             "#OWNER_LOG           ")                       \
+  X(RECEIVER,          "#RECEIVER_LOG        ")
 
 // Generate string constants
-#define X(name, str) constexpr const char* name##_LOG = str;
+#define X(name, str) constexpr const char* name##_LOG = LOG_FMT(str);
 LOG_CATEGORIES
 #undef X
+#undef LOG_FMT
 
 namespace libwavy::log
 {
