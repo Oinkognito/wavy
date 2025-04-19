@@ -1,19 +1,24 @@
-set(AUD_BACKEND_TITLE "PulseAudio")
+set(AUD_BACKEND_TITLE "Test Audio Backend")
 
+# !!! KEEP THIS UNCHANGED !!!
 set(AUD_BACKEND_NAME wavy_audio_backend_${AUD_BACKEND_TITLE}_plugin)
 set(AUD_BACKEND_SRC src/entry.cpp)
 
+# !!! KEEP THIS UNCHANGED !!!
 message(STATUS "  >>> Building AUDIO BACKEND PLUGIN: ${AUD_BACKEND_TITLE}")
 message(STATUS "  >>> Target: ${AUD_BACKEND_NAME}")
 message(STATUS "  >>> Output Directory: ${WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH}\n")
 
-# Find PulseAudio using pkg-config
+# Find required audio backend using pkg-config (CHANGE AS YOU PLEASE)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PULSEAUDIO REQUIRED libpulse-simple)
 pkg_check_modules(FFMPEG REQUIRED libavutil libavformat libavcodec libswresample)
 
+# !!! KEEP THIS UNCHANGED !!!
+# IMPORTANT: MAKE YOUR PLUGIN A SHARED OBJECT FILE (.SO)
 add_library(${AUD_BACKEND_NAME} SHARED ${AUD_BACKEND_SRC})
 
+# INCLUDE REQUIRED DIRECTORIES YOUR DESIRED AUDIO BACKEND TO PLUGIN
 target_include_directories(${AUD_BACKEND_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}
   ${ZSTD_INCLUDE_DIRS}
@@ -21,12 +26,13 @@ target_include_directories(${AUD_BACKEND_NAME} PRIVATE
   ${FFMPEG_INCLUDE_DIRS}
 )
 
+# LINK REQUIRED LIBRARIES YOUR DESIRED AUDIO BACKEND TO PLUGIN
 target_link_libraries(${AUD_BACKEND_NAME} PRIVATE
   ${ZSTD_LIBRARIES}
   ${PULSEAUDIO_LIBRARIES}
   ${FFMPEG_LIBRARIES}
 )
 
+# !!! KEEP THIS UNCHANGED !!!
 set_target_properties(${AUD_BACKEND_NAME} PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH}
-)
