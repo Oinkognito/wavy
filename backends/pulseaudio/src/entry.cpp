@@ -27,7 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <libwavy/audio/backends/pulseaudio/entry.hpp>
+#include "../entry.hpp"
 
 extern "C"
 {

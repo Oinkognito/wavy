@@ -1,0 +1,12 @@
+[plugin]
+name = "ALSA"
+version = "0.1"
+description = "ALSA (Advanced Linux Sound Architecture) backend for decoded PCM from segments from Wavy-Server."
+
+[dependencies]
+dependencies = [
+    "asound",
+]
+
+[metadata]
+author = "nots1dd"

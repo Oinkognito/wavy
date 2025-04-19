@@ -1,6 +1,6 @@
 set(AUD_BACKEND_TITLE "ALSA")
 
-set(AUD_BACKEND_NAME wavy_audio_backend_alsa_plugin)
+set(AUD_BACKEND_NAME wavy_audio_backend_${AUD_BACKEND_TITLE}_plugin)
 set(AUD_BACKEND_SRC src/entry.cpp)
 
 message(STATUS "  >>> Building AUDIO BACKEND PLUGIN: ${AUD_BACKEND_TITLE}")
