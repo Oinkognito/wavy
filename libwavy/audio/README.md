@@ -349,6 +349,42 @@ Just pass the name of the plugin over to name in a string like so:
 
 Nothing more to it.
 
+## Writing your entry.cpp 
+
+This is the final step of your plugin, the one that really matters.
+
+`entry.cpp` is the entry of your plugin, where the symbols `create_audio_backend` and `get_plugin_metadata` are read. This is VERY simple just look at this example:
+
+```cpp 
+#include "../entry.hpp"
+
+extern "C"
+{
+  auto create_audio_backend() -> libwavy::audio::IAudioBackend*
+  {
+    return new libwavy::audio::PulseAudioBackend();
+  }
+
+  auto get_plugin_metadata() -> const char*
+  {
+    return "PulseAudio (PA) Plugin Backend v1.0 (supports MP3/FLAC)";
+  }
+}
+```
+
+You just pass over your class in `create_audio_backend` and the name of your plugin in `get_plugin_metadata` and thats it!
+
+Here is the ideal source tree of how your plugin should look like:
+
+```bash 
+.
+├── CMakeLists.txt # Compiling logic for your plugin that is referenced as a subdirectory in Wavy
+├── plugin.hpp      # Your plugin logic that implements IAudioBackend here
+├── plugin.toml    # [Optional]: Just basic plugin info
+└── src
+    └── entry.cpp  # Implementation of two symbols read at runtime
+```
+
 ## Compiling it with the main Wavy Build System 
 
 It is **HIGHLY** recommended to compile your plugin as part of the `Wavy's CMake build system` for more uniformity and ease of accessing your plugin.
