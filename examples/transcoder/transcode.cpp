@@ -72,6 +72,6 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  int result = trns.transcode_mp3(input_file, output_file, bitrate);
+  int result = trns.transcode_to_mp3(input_file, output_file, bitrate);
   return (result < 0) ? 1 : 0;
 }
