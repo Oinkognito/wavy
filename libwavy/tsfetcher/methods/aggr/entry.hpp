@@ -38,6 +38,7 @@
 #include <libwavy/common/macros.hpp>
 #include <libwavy/network/entry.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
+#include <libwavy/utils/audio/entry.hpp>
 #include <libwavy/utils/io/dbg/entry.hpp>
 
 namespace libwavy::fetch
@@ -54,8 +55,9 @@ public:
     ctx_->set_verify_mode(ssl::verify_none);
   }
 
-  auto fetch(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
-             int desired_bandwidth, bool& flac_found) -> bool override
+  auto fetchAndPlay(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
+                    int desired_bandwidth, bool& flac_found,
+                    const std::string& audio_backend_lib_path) -> bool override
   {
     LOG_INFO << FETCH_LOG << "Request Owner: " << ip_id;
     LOG_INFO << FETCH_LOG << "Audio-ID: " << audio_id;
@@ -91,6 +93,13 @@ public:
     }
 
     LOG_INFO << FETCH_LOG << "Stored " << gs.transport_segments.size() << " transport segments.";
+
+    // Decode and play the fetched stream
+    if (!decodeAndPlay(gs, flac_found, audio_backend_lib_path))
+    {
+      return WAVY_RET_FAIL;
+    }
+
     return true;
   }
 

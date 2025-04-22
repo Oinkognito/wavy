@@ -39,8 +39,9 @@ class ISegmentFetcher
 public:
   virtual ~ISegmentFetcher() = default;
 
-  virtual auto fetch(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
-                     int desired_bandwidth, bool& flac_found) -> bool = 0;
+  virtual auto fetchAndPlay(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
+                            int desired_bandwidth, bool& flac_found,
+                            const std::string& audio_backend_lib_path) -> bool = 0;
 
   virtual auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
     -> std::vector<std::string> = 0;

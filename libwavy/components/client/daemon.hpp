@@ -88,15 +88,9 @@ public:
     std::string audio_id = clients[index];
 
     // Fetch the transport stream
-    if (!fetcher->fetch(_ip_id, audio_id, gs, _bitrate, flac_found))
+    if (!fetcher->fetchAndPlay(_ip_id, audio_id, gs, _bitrate, flac_found, _audio_backend_lib_path))
     {
       LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
-      return WAVY_RET_FAIL;
-    }
-
-    // Decode and play the fetched stream
-    if (!decodeAndPlay(gs, flac_found, _audio_backend_lib_path))
-    {
       return WAVY_RET_FAIL;
     }
 

@@ -52,11 +52,11 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
     LOG_ERROR << DECODER_LOG << "Decoding failed";
     return false;
   }
-  
 
-  const std::string audioBackendLibPath = std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" + (customAudioBackendLibPath.empty()
-                                            ? "libwavy_audio_backend_miniaudio_plugin.so"
-                                            : customAudioBackendLibPath);
+  const std::string audioBackendLibPath =
+    std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
+    (customAudioBackendLibPath.empty() ? "libwavy_audio_backend_PulseAudio_plugin.so"
+                                       : customAudioBackendLibPath);
 
   LOG_INFO << RECEIVER_LOG << "Attempting to start audio playback...";
   try
