@@ -151,7 +151,8 @@ private:
                             {
                               if (ec)
                               {
-                                LOG_ERROR_ASYNC << SERVER_LOG << "SSL handshake failed: " << ec.message();
+                                LOG_ERROR_ASYNC << SERVER_LOG
+                                                << "SSL handshake failed: " << ec.message();
                                 return;
                               }
                               LOG_INFO_ASYNC << SERVER_LOG << "SSL handshake successful";
@@ -533,7 +534,7 @@ private:
 
     std::uint64_t file_size = file_stream->size();
     LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "File opened asynchronously: " << file_path
-                   << " (Size: " << libwavy::util::math::bytesFormat(file_size) << ")";
+                   << " (Size: " << libwavy::utils::math::bytesFormat(file_size) << ")";
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
     if (filename.ends_with(macros::PLAYLIST_EXT))

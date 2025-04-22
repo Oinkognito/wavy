@@ -63,10 +63,13 @@ extern "C"
 // flac -> mp3 transcoding (16, 32 bit tested and verified)
 // mp3 -> mp3 transcoding
 
+// SCALE_FACTOR_32B: Scaling factor for 32 bit audio stream (float by default)
 constexpr float SCALE_FACTOR_32B = 1.0f / static_cast<float>(1 << 31);
-constexpr float SCALE_FACTOR_16B = 1.0f / static_cast<float>(1 << 15); // 32768.0f
-
+// SCALE_FACTOR_16B: Scaling factor for 16 bit audio stream (float by default)
+constexpr float SCALE_FACTOR_16B = 1.0f / static_cast<float>(1 << 15);
+// FLOAT_TO_INT32: Converstion metric needed to convert float scaling factor to int32
 constexpr float FLOAT_TO_INT32 = static_cast<float>(1 << 31);
+// FLOAT_TO_INT16: Converstion metric needed to convert float scaling factor to int16
 constexpr float FLOAT_TO_INT16 = static_cast<float>(1 << 15);
 
 namespace libwavy::ffmpeg
@@ -75,15 +78,15 @@ namespace libwavy::ffmpeg
 class Transcoder
 {
 private:
-  AVFormatContext* in_format_ctx   = nullptr;
-  AVFormatContext* out_format_ctx  = nullptr;
-  AVCodecContext*  in_codec_ctx    = nullptr;
-  AVCodecContext*  out_codec_ctx   = nullptr;
-  SwrContext*      swr_ctx         = nullptr;
-  AVStream*        out_stream      = nullptr;
-  AVPacket*        packet          = av_packet_alloc();
-  AVFrame*         frame           = av_frame_alloc();
-  AVFrame*         resampled_frame = av_frame_alloc();
+  AVFormatContext* in_format_ctx   = nullptr; // Format context for the input media file
+  AVFormatContext* out_format_ctx  = nullptr; // Format context for the output media file
+  AVCodecContext*  in_codec_ctx    = nullptr; // Codec context for decoding input audio
+  AVCodecContext*  out_codec_ctx   = nullptr; // Codec context for encoding output audio
+  SwrContext*      swr_ctx         = nullptr; // Resampler context for audio format conversion
+  AVStream*        out_stream      = nullptr; // Output stream to write encoded audio
+  AVPacket*        packet          = av_packet_alloc(); // Container for encoded/compressed data
+  AVFrame*         frame           = av_frame_alloc();  // Raw decoded audio frame
+  AVFrame*         resampled_frame = av_frame_alloc();  // Frame holding resampled audio data
 
 public:
   void print_audio_info(const char* filename, AVFormatContext* format_ctx,
@@ -105,6 +108,8 @@ public:
     LOG_DEBUG << TRANSCODER_LOG << "=================================================";
   }
 
+  ///* Removing the transcoding artifacts through the current implementation seems to be working WITHOUT destroying existing audio data.
+  ///  if this is causing any audio data loss or unneeded manipulation, feel free to open an issue and explain in detail. *///
   template <typename T, typename F, typename R>
   void process_samples(AVFrame* frame, F convert_to_float, R convert_from_float)
   {
@@ -263,8 +268,8 @@ public:
     }
   }
   // Main transcoding function - now more modular
-  auto transcode_mp3(const char* input_filename, const char* output_filename,
-                     const int given_bitrate) -> int
+  auto transcode_to_mp3(const char* input_filename, const char* output_filename,
+                        const int given_bitrate) -> int
   {
     av_log_set_level(AV_LOG_INFO);
 

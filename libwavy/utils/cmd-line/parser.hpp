@@ -36,7 +36,7 @@
 #include <string>
 #include <utility>
 
-namespace libwavy::util::cmdline
+namespace libwavy::utils::cmdline
 {
 class CmdLineParser
 {
@@ -135,4 +135,4 @@ private:
   std::map<std::string, std::string> arguments_;
   std::string                        usage_text_;
 };
-} // namespace libwavy::util::cmdline
+} // namespace libwavy::utils::cmdline

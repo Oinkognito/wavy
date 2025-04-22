@@ -35,6 +35,8 @@
 #include <pulse/simple.h>
 #include <vector>
 
+using namespace libwavy::utils::pluginlog;
+
 namespace libwavy::audio
 {
 
@@ -54,11 +56,16 @@ public:
   {
     audioData = audioInput;
 
-    if (isFlac) preferredSampleRate = 44100;
+    ::libwavy::utils::pluginlog::set_default_tag(_AUDIO_BACKEND_NAME_);
+
+    if (isFlac)
+      preferredSampleRate = 44100;
 
     pa_sample_spec sampleSpec;
-    sampleSpec.format = isFlac ? PA_SAMPLE_S32LE : PA_SAMPLE_FLOAT32LE; // Supports float PCM (common for decoded FLAC and MP3)
-    sampleSpec.rate   = (preferredSampleRate > 0) ? preferredSampleRate : 48000;
+    sampleSpec.format =
+      isFlac ? PA_SAMPLE_S32LE
+             : PA_SAMPLE_FLOAT32LE; // Supports float PCM (common for decoded FLAC and MP3)
+    sampleSpec.rate     = (preferredSampleRate > 0) ? preferredSampleRate : 48000;
     sampleSpec.channels = (preferredChannels > 0) ? preferredChannels : 2;
 
     int error;
@@ -67,12 +74,11 @@ public:
 
     if (!stream)
     {
-      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_NAME_)
-        << "Failed to initialize PulseAudio: " << pa_strerror(error);
+      PLUGIN_LOG_ERROR() << "Failed to initialize PulseAudio: " << pa_strerror(error);
       return false;
     }
 
-    PLUGIN_LOG_INFO(_AUDIO_BACKEND_NAME_) << "PulseAudio Backend initialized successfully.";
+    PLUGIN_LOG_INFO() << "PulseAudio Backend initialized successfully.";
     return true;
   }
 
@@ -91,7 +97,7 @@ public:
       int error;
       if (pa_simple_write(stream, audioData.data() + offset, toWrite, &error) < 0)
       {
-        PLUGIN_LOG_ERROR(_AUDIO_BACKEND_NAME_) << "PulseAudio write failed: " << pa_strerror(error);
+        PLUGIN_LOG_ERROR() << "PulseAudio write failed: " << pa_strerror(error);
         break;
       }
 
@@ -106,7 +112,7 @@ public:
 
   ~PulseAudioBackend() override
   {
-    PLUGIN_LOG_INFO(_AUDIO_BACKEND_NAME_) << "Cleaning up PulseAudioBackend.";
+    PLUGIN_LOG_INFO() << "Cleaning up PulseAudioBackend.";
     isPlaying = false;
 
     if (stream)

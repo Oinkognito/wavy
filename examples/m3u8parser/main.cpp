@@ -34,7 +34,7 @@
 
 namespace fs = boost::filesystem;
 using namespace libwavy::hls::parser;
-using StdFileUtil = libwavy::util::FileUtil<std::string>;
+using StdFileUtil = libwavy::utils::FileUtil<std::string>;
 
 void printError(const std::string& bin)
 {

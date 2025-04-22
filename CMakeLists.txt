@@ -177,7 +177,6 @@ add_custom_target(remove COMMAND rm -f *.ts *.m3u8)
 
 # Individual build targets
 add_custom_target(build_owner COMMAND ${CMAKE_COMMAND} --build . --target ${OWNER_BIN})
-add_custom_target(build_decoder COMMAND ${CMAKE_COMMAND} --build . --target ${DECODER_BIN})
 add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SERVER_BIN})
 add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLIENT_BIN})
 

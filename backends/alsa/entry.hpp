@@ -28,12 +28,13 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <alsa/asoundlib.h>
 #include <alsa/pcm.h>
 #include <libwavy/audio/interface.hpp>
 #include <libwavy/utils/io/log/entry.hpp>
 #include <vector>
+
+using namespace libwavy::utils::pluginlog;
 
 namespace libwavy::audio
 {
@@ -54,6 +55,7 @@ public:
     -> bool override
   {
     audioData = audioInput;
+    ::libwavy::utils::pluginlog::set_default_tag(_AUDIO_BACKEND_NAME_);
 
     if (isFlac)
     {
@@ -61,8 +63,7 @@ public:
       format              = SND_PCM_FORMAT_S32_LE;
       preferredSampleRate = 44100;
 
-      PLUGIN_LOG_INFO(_AUDIO_BACKEND_NAME_)
-        << "FLAC PCM data found -> setting sample rate to " << preferredSampleRate;
+      PLUGIN_LOG_INFO() << "FLAC PCM data found -> setting sample rate to " << preferredSampleRate;
     }
 
     const char* device = "default";
@@ -70,7 +71,7 @@ public:
 
     if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
     {
-      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_NAME_) << "Failed to open ALSA device: " << snd_strerror(err);
+      PLUGIN_LOG_ERROR() << "Failed to open ALSA device: " << snd_strerror(err);
       return false;
     }
 
@@ -87,12 +88,11 @@ public:
 
     if ((err = snd_pcm_hw_params(handle, hw_params)) < 0)
     {
-      PLUGIN_LOG_ERROR(_AUDIO_BACKEND_NAME_)
-        << "Failed to set ALSA HW params: " << snd_strerror(err);
+      PLUGIN_LOG_ERROR() << "Failed to set ALSA HW params: " << snd_strerror(err);
       return false;
     }
 
-    PLUGIN_LOG_INFO(_AUDIO_BACKEND_NAME_) << "ALSA Backend initialized successfully.";
+    PLUGIN_LOG_INFO() << "ALSA Backend initialized successfully.";
     return true;
   }
 
@@ -115,7 +115,7 @@ public:
         frames = snd_pcm_recover(handle, frames, 0);
         if (frames < 0)
         {
-          PLUGIN_LOG_ERROR(_AUDIO_BACKEND_NAME_) << "ALSA write failed: " << snd_strerror(frames);
+          PLUGIN_LOG_ERROR() << "ALSA write failed: " << snd_strerror(frames);
           break;
         }
       }
@@ -131,7 +131,7 @@ public:
 
   ~AlsaAudioBackend() override
   {
-    PLUGIN_LOG_INFO(_AUDIO_BACKEND_NAME_) << "Cleaning up AlsaAudioBackend.";
+    PLUGIN_LOG_INFO() << "Cleaning up AlsaAudioBackend.";
     isPlaying = false;
 
     if (handle)

@@ -91,7 +91,8 @@ auto main(int argc, char* argv[]) -> int
   libwavy::log::init_logging();
   libwavy::log::set_log_level(libwavy::log::INFO);
 
-  libwavy::util::cmdline::CmdLineParser cmdLineParser(std::span<char* const>(argv, argc), HELP_STR);
+  libwavy::utils::cmdline::CmdLineParser cmdLineParser(std::span<char* const>(argv, argc),
+                                                       HELP_STR);
 
   bool              avdebug_mode = cmdLineParser.get("avDbgLog") == "true" ? true : false;
   bool              use_flac     = cmdLineParser.get("flacEncode") == "true"
@@ -171,8 +172,9 @@ auto main(int argc, char* argv[]) -> int
     LOG_INFO << OWNER_LOG << "Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...";
     seg.createSegmentsFLAC(input_file, output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
-    int ret = exportTOMLFile(input_file.c_str(), output_dir,
-                          {}); // just give empty array as we are not transcoding to diff bitrates
+    int ret =
+      exportTOMLFile(input_file.c_str(), output_dir,
+                     {}); // just give empty array as we are not transcoding to diff bitrates
     if (ret == 0)
     {
       return dispatch(server, output_dir);
@@ -201,20 +203,22 @@ auto main(int argc, char* argv[]) -> int
     bitrates.begin(), bitrates.end(),
     [&](int i)
     {
-      std::string output_file_i = output_dir + "/output_" + std::to_string(i) + ".mp3";
-      Transcoder  trns;
-      LOG_INFO << OWNER_LOG << "[Bitrate: " << i << "] Starting transcoding...";
-      int result = trns.transcode_mp3(input_file.c_str(), output_file_i.c_str(), i * 1000);
+      std::string output_file_i =
+        output_dir + "/output_" + std::to_string(i) + macros::to_string(macros::MP3_FILE_EXT);
+      Transcoder trns;
+      LOG_INFO << OWNER_LOG << "[Bitrate: " << i << "] Starting transcoding job...";
+      int result = trns.transcode_to_mp3(input_file.c_str(), output_file_i.c_str(), i * 1000);
       if (result == 0)
       {
-        LOG_INFO << OWNER_LOG << "[Bitrate: " << i << "] Transcoding OK. Creating HLS segments...";
+        LOG_INFO << OWNER_LOG << "[Bitrate: " << i
+                 << "] Transcoding JOB went OK. Creating HLS segments...";
         std::vector<int> res = seg.createSegments(output_file_i.c_str(), output_dir.c_str());
         for (int b : res)
           concurrent_found_bitrates.push_back(b);
       }
       else
       {
-        LOG_WARNING << OWNER_LOG << "[Bitrate: " << i << "] Transcoding failed.";
+        LOG_WARNING << OWNER_LOG << "[Bitrate: " << i << "] Transcoding Job failed.";
       }
 
       std::remove(output_file_i.c_str());

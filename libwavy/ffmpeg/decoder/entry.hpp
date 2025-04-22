@@ -374,7 +374,7 @@ private:
     av_packet_free(&packet);
 
     LOG_INFO << DECODER_LOG
-             << "Decoding complete: " << libwavy::util::math::bytesFormat(output.size())
+             << "Decoding complete: " << libwavy::utils::math::bytesFormat(output.size())
              << " bytes of raw audio data generated";
     LOG_INFO << DECODER_LOG << "Sample format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt)
              << ", Bytes per sample: " << av_get_bytes_per_sample(codec_ctx->sample_fmt);

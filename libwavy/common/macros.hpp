@@ -80,6 +80,8 @@ enum
   X(TRANSPORT_STREAM_EXT, ".ts")                              \
   X(MP4_FILE_EXT, ".mp4")                                     \
   X(M4S_FILE_EXT, ".m4s")                                     \
+  X(MP3_FILE_EXT, ".mp3")                                     \
+  X(FLAC_FILE_EXT, ".flac")                                   \
   X(ZSTD_FILE_EXT, "zst")                                     \
   X(TOML_FILE_EXT, ".toml")                                   \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \

@@ -62,7 +62,7 @@ auto main(int argc, char* argv[]) -> int
                       "--bitrate-stream=<bitrate-stream> --tsfetchMode=<mode> "
                       "[--tsfetchLib=<so_file>] --audioBackendLibPath=<so_file>";
 
-  libwavy::util::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
+  libwavy::utils::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
 
   const std::string ip_id               = parser.get("ipAddr");
   const int         index               = parser.get_int("index", -1); // Safe parsing of integer

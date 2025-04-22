@@ -43,7 +43,7 @@
 //
 // This FileUtil template should be able to handle std::string and boost::filesystem::path
 
-namespace libwavy::util
+namespace libwavy::utils
 {
 
 template <typename PathType> class FileUtil
@@ -93,4 +93,4 @@ private:
 #endif
 };
 
-} // namespace libwavy::util
+} // namespace libwavy::utils

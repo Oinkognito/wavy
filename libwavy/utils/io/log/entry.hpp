@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#pragma once
 
 #include <chrono>
 #include <ctime>
@@ -35,8 +36,9 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 
-namespace pluginlog
+namespace libwavy::utils::pluginlog
 {
 
 // ANSI colors
@@ -108,17 +110,32 @@ inline auto timestamp() -> std::string
   return oss.str();
 }
 
-// Logger stream object
+inline auto thread_id() -> std::string
+{
+  std::ostringstream oss;
+  oss << std::this_thread::get_id();
+  return oss.str();
+}
+
+// Default tag (thread-local)
+inline thread_local std::string default_tag = "PLUGIN";
+
+inline void set_default_tag(const std::string& tag) { default_tag = tag; }
+
+inline auto get_default_tag() -> const std::string& { return default_tag; }
+
 class PluginLogStream
 {
 public:
-  PluginLogStream(Level level, std::string tag)
+  PluginLogStream(Level level, const char* file, int line, std::string tag = get_default_tag())
       : _level(level), _tag(std::move(tag)), _stream(),
         _out(level == Level::ERROR ? std::cerr : std::cout)
   {
     _stream << level_to_color(_level) << "[" << timestamp() << "] "
             << "[" << level_to_string(_level) << "] "
-            << "[" << _tag << "] ";
+            << "[TID " << thread_id() << "] "
+            << "[" << _tag << "] "
+            << "(" << file << ":" << line << ") ";
   }
 
   template <typename T> auto operator<<(const T& value) -> PluginLogStream&
@@ -140,11 +157,38 @@ private:
   std::ostream&      _out;
 };
 
-// Macros for convenience
-#define PLUGIN_LOG_TRACE(tag) ::pluginlog::PluginLogStream(::pluginlog::Level::TRACE, tag)
-#define PLUGIN_LOG_DEBUG(tag) ::pluginlog::PluginLogStream(::pluginlog::Level::DEBUG, tag)
-#define PLUGIN_LOG_INFO(tag)  ::pluginlog::PluginLogStream(::pluginlog::Level::INFO, tag)
-#define PLUGIN_LOG_WARN(tag)  ::pluginlog::PluginLogStream(::pluginlog::Level::WARN, tag)
-#define PLUGIN_LOG_ERROR(tag) ::pluginlog::PluginLogStream(::pluginlog::Level::ERROR, tag)
+// Logging macros (uses __FILE__ and __LINE__)
+#define PLUGIN_LOG_TRACE()                                                                \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::TRACE, \
+                                               __FILE__, __LINE__)
+#define PLUGIN_LOG_DEBUG()                                                                \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::DEBUG, \
+                                               __FILE__, __LINE__)
+#define PLUGIN_LOG_INFO()                                                                          \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::INFO, __FILE__, \
+                                               __LINE__)
+#define PLUGIN_LOG_WARN()                                                                          \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::WARN, __FILE__, \
+                                               __LINE__)
+#define PLUGIN_LOG_ERROR()                                                                \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::ERROR, \
+                                               __FILE__, __LINE__)
 
-} // namespace pluginlog
+// Macros with explicit tag override
+#define PLUGIN_LOG_TRACE_TAG(tag)                                                         \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::TRACE, \
+                                               __FILE__, __LINE__, tag)
+#define PLUGIN_LOG_DEBUG_TAG(tag)                                                         \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::DEBUG, \
+                                               __FILE__, __LINE__, tag)
+#define PLUGIN_LOG_INFO_TAG(tag)                                                                   \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::INFO, __FILE__, \
+                                               __LINE__, tag)
+#define PLUGIN_LOG_WARN_TAG(tag)                                                                   \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::WARN, __FILE__, \
+                                               __LINE__, tag)
+#define PLUGIN_LOG_ERROR_TAG(tag)                                                         \
+  ::libwavy::utils::pluginlog::PluginLogStream(::libwavy::utils::pluginlog::Level::ERROR, \
+                                               __FILE__, __LINE__, tag)
+
+} // namespace libwavy::utils::pluginlog

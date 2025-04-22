@@ -28,13 +28,12 @@
  * See LICENSE file for full details.
  ************************************************/
 
-
 #include <array>
 #include <iomanip>
 #include <sstream>
 #include <string>
 
-namespace libwavy::util::math
+namespace libwavy::utils::math
 {
 
 inline auto formatSize(double size, const std::string& unit) -> std::string
@@ -60,4 +59,4 @@ inline auto bytesFormat(size_t bytes) -> std::string
   return formatSize(static_cast<double>(bytes) / divisors[3], units[3]);
 }
 
-} // namespace libwavy::util::math
+} // namespace libwavy::utils::math
