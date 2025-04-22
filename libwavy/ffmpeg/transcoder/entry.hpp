@@ -48,7 +48,9 @@ extern "C"
 // $NOTE
 //
 // When we detect inf/NaN in frames, currently I am trying to just silence them but in reality
-// the audio has a high pitch uptick (glitch like noise) for a brief moment of that sample
+// the audio has a slightly high pitch uptick (glitch like noise) for a brief moment of that sample
+//
+// This is called having a transcoding artifact and this issue is for mp3 -> mp3 transcoding ONLY
 //
 // Not sure on how to fix it at this moment.
 //
@@ -61,8 +63,11 @@ extern "C"
 // flac -> mp3 transcoding (16, 32 bit tested and verified)
 // mp3 -> mp3 transcoding
 
-constexpr float SCALE_FACTOR_32B = 1.0f / (1 << 31);
-constexpr float SCALE_FACTOR_16B = static_cast<float>(1 << 15); // 32768.0f
+constexpr float SCALE_FACTOR_32B = 1.0f / static_cast<float>(1 << 31);
+constexpr float SCALE_FACTOR_16B = 1.0f / static_cast<float>(1 << 15); // 32768.0f
+
+constexpr float FLOAT_TO_INT32 = static_cast<float>(1 << 31);
+constexpr float FLOAT_TO_INT16 = static_cast<float>(1 << 15);
 
 namespace libwavy::ffmpeg
 {
@@ -100,6 +105,115 @@ public:
     LOG_DEBUG << TRANSCODER_LOG << "=================================================";
   }
 
+  template <typename T, typename F, typename R>
+  void process_samples(AVFrame* frame, F convert_to_float, R convert_from_float)
+  {
+    if (!frame)
+      return;
+    int  format           = frame->format;
+    bool is_planar        = av_sample_fmt_is_planar(static_cast<AVSampleFormat>(format));
+    int  channels         = frame->ch_layout.nb_channels;
+    int  samples          = frame->nb_samples;
+    bool found_invalid    = false;
+    bool found_high_pitch = false;
+
+    // Parameters for high pitch detection
+    const float threshold        = 0.85f; // Threshold for high amplitude
+    const int   window_size      = 5;     // Window size for checking rapid changes
+    const float change_threshold = 0.5f;  // Threshold for rapid amplitude changes
+
+    auto clamp = [](auto x)
+    {
+      using U = decltype(x);
+      return std::max(static_cast<U>(-1.0), std::min(static_cast<U>(1.0), x));
+    };
+
+    // Store previous samples for high pitch detection
+    std::vector<std::vector<float>> prev_samples(channels, std::vector<float>(window_size, 0.0f));
+
+    for (int ch = 0; ch < channels; ++ch)
+    {
+      auto* data   = reinterpret_cast<T*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
+      int   stride = is_planar ? 1 : channels;
+
+      // First pass: Convert all samples to float for analysis
+      std::vector<float> float_samples(samples);
+      for (int i = 0; i < samples; ++i)
+      {
+        float_samples[i] = convert_to_float(data[i * stride]);
+      }
+
+      // Second pass: Detect and fix issues
+      for (int i = 0; i < samples; ++i)
+      {
+        float sample = float_samples[i];
+
+        // Check for NaN or Inf
+        bool is_invalid = std::isnan(sample) || std::isinf(sample);
+
+        // Check for high pitch indicators (rapid changes in amplitude)
+        bool is_high_pitch = false;
+        if (!is_invalid && i >= window_size)
+        {
+          // Calculate average change over the window
+          float avg_change = 0.0f;
+          for (int j = 1; j < window_size; ++j)
+          {
+            avg_change += std::abs(float_samples[i - j] - float_samples[i - j + 1]);
+          }
+          avg_change /= (window_size - 1);
+
+          // Check if sample has high amplitude AND rapid changes
+          if (std::abs(sample) > threshold && avg_change > change_threshold)
+          {
+            is_high_pitch    = true;
+            found_high_pitch = true;
+          }
+        }
+
+        if (is_invalid)
+        {
+          LOG_WARNING << TRANSCODER_LOG << "Found invalid sample for data sample: " << sample
+                      << " at idx -> " << i;
+          sample        = 0.0f;
+          found_invalid = true;
+        }
+        else if (is_high_pitch)
+        {
+          LOG_WARNING << TRANSCODER_LOG << "Found high pitch sample: " << sample << " at idx -> "
+                      << i;
+          sample = 0.0f; // Silence the high pitch sample
+        }
+        else
+        {
+          sample = clamp(sample);
+        }
+
+        // Store the processed sample
+        data[i * stride] = convert_from_float(sample);
+
+        // Update previous samples window
+        for (int j = window_size - 1; j > 0; --j)
+        {
+          prev_samples[ch][j] = prev_samples[ch][j - 1];
+        }
+        prev_samples[ch][0] = sample;
+      }
+    }
+
+    if (found_invalid)
+    {
+      LOG_INFO << TRANSCODER_LOG << "Sanitization Job done for invalid samples of format -> "
+               << format;
+    }
+
+    if (found_high_pitch)
+    {
+      LOG_INFO << TRANSCODER_LOG
+               << "Sanitization Job done for high pitch audio artifacts of format -> " << format;
+    }
+  }
+
   inline auto soft_clip(float x) -> float
   {
     return std::tanh(x); // Smoothly compresses extreme values
@@ -107,128 +221,45 @@ public:
 
   inline auto soft_clip(double x) -> double { return std::tanh(x); }
 
-  // Function to sanitize audio samples (to avoid any enery issues from psymodel or quantize source files of libmp3lame)
+  // Function to sanitize audio samples (to avoid any energy issues from psymodel or quantize source files of libmp3lame)
   void sanitize_audio_samples(AVFrame* frame)
   {
     if (!frame)
       return;
-
-    int  format        = frame->format;
-    int  is_planar     = av_sample_fmt_is_planar(static_cast<AVSampleFormat>(format));
-    int  channels      = frame->ch_layout.nb_channels;
-    int  samples       = frame->nb_samples;
-    bool found_invalid = false;
-
-    // Define lambda for clamping values safely
-    auto clamp = [](auto x)
+    switch (frame->format)
     {
-      using T = decltype(x);
-      return std::max(static_cast<T>(-1.0), std::min(static_cast<T>(1.0), x));
-    };
-
-    // Process each audio channel
-    for (int ch = 0; ch < channels; ch++)
-    {
-      if (format == AV_SAMPLE_FMT_FLT || format == AV_SAMPLE_FMT_FLTP)
-      {
-        // Handle floating-point formats
-        auto* data =
-          reinterpret_cast<float*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
-        int stride = is_planar ? 1 : channels;
-
-        for (int i = 0; i < samples; i++)
-        {
-          float& sample = data[i * stride];
-
-          if (std::isnan(sample) || std::isinf(sample))
-          {
-            sample        = 0.0f; // Replace NaN/Inf with silence
-            found_invalid = true;
-          }
-          else
-          {
-            sample = clamp(soft_clip(sample));
-          }
-        }
-      }
-      else if (format == AV_SAMPLE_FMT_DBL || format == AV_SAMPLE_FMT_DBLP)
-      {
-        // Handle double-precision floating point
-        auto* data =
-          reinterpret_cast<double*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
-        int stride = is_planar ? 1 : channels;
-
-        for (int i = 0; i < samples; i++)
-        {
-          double& sample = data[i * stride];
-
-          if (std::isnan(sample) || std::isinf(sample))
-          {
-            sample        = 0.0; // Replace NaN/Inf with silence
-            found_invalid = true;
-          }
-          else
-          {
-            sample = clamp(sample);
-          }
-        }
-      }
-      else if (format == AV_SAMPLE_FMT_S32 || format == AV_SAMPLE_FMT_S32P)
-      {
-        // Handle 32-bit FLAC PCM -> Convert to float (-1.0 to 1.0)
-        auto* data =
-          reinterpret_cast<int32_t*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
-        int stride = is_planar ? 1 : channels;
-
-        for (int i = 0; i < samples; i++)
-        {
-          float sample = static_cast<float>(data[i * stride]) * SCALE_FACTOR_32B;
-
-          if (std::isnan(sample) || std::isinf(sample))
-          {
-            sample        = 0.0f;
-            found_invalid = true;
-          }
-          else
-          {
-            sample = clamp(soft_clip(sample));
-          }
-
-          // Convert back to int32 after processing (only if needed)
-          data[i * stride] = static_cast<int32_t>(sample * SCALE_FACTOR_32B);
-        }
-      }
-      else if (format == AV_SAMPLE_FMT_S16 || format == AV_SAMPLE_FMT_S16P)
-      {
-        // Handle 16-bit FLAC PCM -> Convert to float (-1.0 to 1.0)
-        auto* data =
-          reinterpret_cast<int16_t*>(is_planar ? frame->extended_data[ch] : frame->data[0]);
-        int stride = is_planar ? 1 : channels;
-
-        for (int i = 0; i < samples; i++)
-        {
-          float sample = static_cast<float>(data[i * stride]) / SCALE_FACTOR_16B; // Normalize
-
-          if (std::isnan(sample) || std::isinf(sample))
-          {
-            sample        = 0.0f;
-            found_invalid = true;
-          }
-          else
-          {
-            sample = clamp(soft_clip(sample));
-          }
-
-          // Convert back to int16 after processing
-          data[i * stride] = static_cast<int16_t>(sample * SCALE_FACTOR_16B);
-        }
-      }
-    }
-
-    if (found_invalid)
-    {
-      LOG_INFO << TRANSCODER_LOG
-               << "Sanitized invalid audio samples (NaN/Inf values) -> Format: " << format;
+      case AV_SAMPLE_FMT_FLT:
+      case AV_SAMPLE_FMT_FLTP:
+        process_samples<float>(
+          frame, [](float v) -> float { return v; }, [](float v) -> float { return v; });
+        break;
+      case AV_SAMPLE_FMT_DBL:
+      case AV_SAMPLE_FMT_DBLP:
+        process_samples<double>(
+          frame, [](double v) -> float { return static_cast<float>(v); },
+          [](float v) -> double { return static_cast<double>(v); });
+        break;
+      case AV_SAMPLE_FMT_S32:
+      case AV_SAMPLE_FMT_S32P:
+        process_samples<int32_t>(
+          frame,
+          // int32 to float: multiply by 1/(2^31)
+          [](int32_t v) -> float { return static_cast<float>(v) * SCALE_FACTOR_32B; },
+          // float to int32: multiply by 2^31
+          [](float v) -> int32_t { return static_cast<int32_t>(v * FLOAT_TO_INT32); });
+        break;
+      case AV_SAMPLE_FMT_S16:
+      case AV_SAMPLE_FMT_S16P:
+        process_samples<int16_t>(
+          frame,
+          // int16 to float: multiply by 1/(2^15)
+          [](int16_t v) -> float { return static_cast<float>(v) * SCALE_FACTOR_16B; },
+          // float to int16: multiply by 2^15
+          [](float v) -> int16_t { return static_cast<int16_t>(v * FLOAT_TO_INT16); });
+        break;
+      default:
+        // Unsupported format
+        break;
     }
   }
   // Main transcoding function - now more modular
@@ -563,7 +594,7 @@ public:
       return ret;
     }
 
-    LOG_DEBUG << "==> Initialized resampler successfully";
+    LOG_DEBUG << TRANSCODER_LOG << "==> Initialized resampler successfully";
 
     return 0;
   }
@@ -605,7 +636,7 @@ public:
       return ret;
     }
 
-    LOG_DEBUG << "==> Allocated frame buffers successfully";
+    LOG_DEBUG << TRANSCODER_LOG << "==> Allocated frame buffers successfully";
 
     return 0;
   }
@@ -635,6 +666,10 @@ public:
 
       av_packet_unref(packet);
     }
+
+    LOG_INFO
+      << TRANSCODER_LOG
+      << "Total Audio Sanization Job (ASJ) done while processing and decoding audio packets.";
 
     if (samples_sanitized > 0)
     {
@@ -797,6 +832,8 @@ public:
         return ret;
       }
     }
+
+    LOG_INFO << TRANSCODER_LOG << "Total Audio Sanization Job (ASJ) done while flushing resampler.";
 
     return 0;
   }
