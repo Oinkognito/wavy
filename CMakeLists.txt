@@ -36,6 +36,11 @@ option(BUILD_EXAMPLES "Compile examples for the project" OFF)
 option(BUILD_UI "Build Wavy-UI using libquwrof" OFF)
 option(AUTOGEN_HEADER "Autogenerate Config Header for the project" ON)
 
+set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
+set(WAVY_AUDIO_PLUGIN_ENTRIES "")
+set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backends)
+set(WAVY_AUDIO_BACKEND_CONFIG_HEADER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/autogen/audioConfig.h")
+
 # Check if CMake is using Ninja
 if (DEFINED BUILD_NINJA AND BUILD_NINJA)
     message(STATUS "Using ${BLUE}${BOLD}${UNDERLINE}Ninja build system${RESET} for fast parallel builds")
@@ -146,10 +151,6 @@ endif()
 
 if (DEFINED BUILD_AUDIO_BACKEND_PLUGINS AND BUILD_AUDIO_BACKEND_PLUGINS)
 ########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
-set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
-set(WAVY_AUDIO_PLUGIN_ENTRIES "")
-set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backends)
-set(WAVY_AUDIO_BACKEND_CONFIG_HEADER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/autogen/audioConfig.h")
 message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
