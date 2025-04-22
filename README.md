@@ -67,6 +67,8 @@ To build and run **Wavy**, install the following dependencies:
 |-------------|---------|
 | **FLAC & FLAC++** | FLAC decoding and encoding for lossless streaming |
 | **Qt6** (_Core, Widgets_) | Required for GUI development. |
+| **Mold** (modern linker) | For faster linker times. |
+| **Ninja** (Build system) | A smaller and lightweight build system. |
 
 Here are the dependencies installation command for some common distributions:
 
@@ -231,7 +233,6 @@ xdg-open docs/html/index.html  # Opens the documentation in a browser
 ## **Credits**
 
 1. **TOML++**:  Header-only TOML config file parser and serializer for C++17.  [TOML++ (tomlplusplus)](https://github.com/marzer/tomlplusplus)
-2. **Miniaudio**:  Audio playback and capture library written in C, in a single source file. [Miniaudio](https://github.com/mackron/miniaudio)
 
 ## **License**
 The **Wavy Project** is licensed under the **BSD-3-Clause License**.  

@@ -11,9 +11,7 @@ SERVER_BIN := wavy_server
 CLIENT_BIN := wavy_client
 
 # Third-party dependencies
-MINIAUDIO_URL := https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h
 TOMLPP_URL := https://raw.githubusercontent.com/marzer/tomlplusplus/refs/heads/master/toml.hpp
-MINIAUDIO_DEST_DIR := libwavy/
 TOMLPP_DEST_DIR := libwavy/toml/
 
 # Allow extra flags for CMake
@@ -30,7 +28,6 @@ endef
 
 # Initialize dependencies
 init:
-	@wget -O $(MINIAUDIO_DEST_DIR)/miniaudio.h $(MINIAUDIO_URL)
 	@wget -O $(TOMLPP_DEST_DIR)/toml.hpp $(TOMLPP_URL)
 
 # Build all targets
@@ -70,7 +67,7 @@ tidy:
 	@find src libwavy libquwrof -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" | xargs clang-tidy -p $(BUILD_DIR)
 
 prepend-license-src:
-	@find src libwavy libquwrof examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" ! -name "miniaudio.h" -exec ./scripts/license-prepend.sh {} +
+	@find src libwavy libquwrof examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" -exec ./scripts/license-prepend.sh {} +
 
 # Clean build files
 clean:
@@ -94,4 +91,4 @@ server-cert:
 server-cert-gen:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 
-.PHONY: default all owner server client run-owner run-server verbose clean cleanup format tidy init server-cert
+.PHONY: default all owner server client run-owner run-server verbose clean cleanup format tidy init server-cert server-cert-gen
