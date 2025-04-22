@@ -53,8 +53,6 @@ To suppress high-pitch or whistling artifacts, the module uses a simple heuristi
 
 Flagged samples are zeroed out to mute these audible artifacts.
 
-Absolutely — tuning the parameters like **high amplitude threshold**, **window size**, and **average change threshold** will directly affect the sensitivity and behavior of your **high-pitch artifact detection**. Here's a detailed breakdown of what happens when each is adjusted:
-
 ## Parameter Behavior Explained
 
 ### a. **High Amplitude Threshold (`threshold = 0.85f`)**
