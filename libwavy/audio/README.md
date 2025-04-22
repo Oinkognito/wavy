@@ -198,7 +198,7 @@ public:
 There is a template for writing CMakeLists.txt for audio backend plugins: 
 
 ```cmake 
-set(AUD_BACKEND_TITLE "Test Backend")
+set(AUD_BACKEND_TITLE "Test Audio Backend")
 
 # !!! KEEP THIS UNCHANGED !!!
 set(AUD_BACKEND_NAME wavy_audio_backend_${AUD_BACKEND_TITLE}_plugin)
@@ -208,6 +208,8 @@ set(AUD_BACKEND_SRC src/entry.cpp)
 message(STATUS "  >>> Building AUDIO BACKEND PLUGIN: ${AUD_BACKEND_TITLE}")
 message(STATUS "  >>> Target: ${AUD_BACKEND_NAME}")
 message(STATUS "  >>> Output Directory: ${WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH}\n")
+# !!! KEEP THIS UNCHANGED !!!
+set(WAVY_AUDIO_PLUGIN_ENTRIES "${WAVY_AUDIO_PLUGIN_ENTRIES}${AUD_BACKEND_TITLE}|${AUD_BACKEND_NAME}\n" PARENT_SCOPE)
 
 # Find required audio backend using pkg-config (CHANGE AS YOU PLEASE)
 find_package(PkgConfig REQUIRED)
@@ -236,7 +238,6 @@ target_link_libraries(${AUD_BACKEND_NAME} PRIVATE
 # !!! KEEP THIS UNCHANGED !!!
 set_target_properties(${AUD_BACKEND_NAME} PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH}
-)
 ```
 
 This is located [here](https://github.com/Oinkognito/Wavy/blob/main/assets/templates/plugin/audio-backend/CMakeLists.txt) for more details.
@@ -395,7 +396,9 @@ Just head over to Wavy's root [CMakeLists.txt](https://github.com/Oinkognito/Wav
 if (DEFINED BUILD_AUDIO_BACKEND_PLUGINS AND BUILD_AUDIO_BACKEND_PLUGINS)
 ########################### ADD AUDIO BACKEND PLUGINS HERE #########################################
 set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
+set(WAVY_AUDIO_PLUGIN_ENTRIES "")
 set(WAVY_AUDIO_BACKEND_PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backends)
+set(WAVY_AUDIO_BACKEND_CONFIG_HEADER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/autogen/audioConfig.h")
 message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
@@ -419,10 +422,10 @@ add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/path-to-your-plugin) # if you
 add_subdirectory(your-abs-dir-to-plugin/) # absolute directory of where your plugin is located with it's CMakeLists visible
 ```
 
-Then recompile with `-DBUILD_AUDIO_BACKEND_PLUGINS=ON` flag when running `make` like so:
+Then recompile with autogen header (`AUTOGEN_HEADER`) and build audio backend plugin (`BUILD_AUDIO_BACKEND_PLUGINS`) flags on when running `make` like so:
 
 ```bash 
-make rebuild "-DBUILD_AUDIO_BACKEND_PLUGINS=ON" # can concatenate this with your existing flags
+make rebuild "-DBUILD_AUDIO_BACKEND_PLUGINS=ON -DAUTOGEN_HEADER=ON" # can concatenate this with your existing flags
 ```
 
 That's it! Your plugin should now compile to a shared object file and should be in `build/plugins/audio` (with respect to Wavy's source tree dir). 
@@ -436,6 +439,8 @@ Just pass over your plugin's shared object name to `Wavy Client` like so:
 ```
 
 Check out your plugin `CMakeLists.txt`'s definition of `AUD_BACKEND_NAME` for more information on its name or just check out the shared object file yourself.
+
+You can also checkout `autogen/audioConfig.h` and see your plugin's `name`, `lib` and `path` (relative) for more info on how Wavy stores it!
 
 ## Footnotes 
 

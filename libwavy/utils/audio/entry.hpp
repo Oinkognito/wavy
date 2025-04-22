@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <autogen/audioConfig.h>
 #include <libwavy/audio/plugin/entry.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
@@ -53,12 +54,18 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
     return false;
   }
 
+  if (gNumAudioBackends == 0)
+  {
+    LOG_ERROR << PLUGIN_LOG << "No audio backend plugins found! Exiting cleanly...";
+    return false;
+  }
+
   const std::string audioBackendLibPath =
     std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
-    (customAudioBackendLibPath.empty() ? "libwavy_audio_backend_PulseAudio_plugin.so"
-                                       : customAudioBackendLibPath);
+    (customAudioBackendLibPath.empty() ? gAudioBackends[0].plugin_path : customAudioBackendLibPath);
 
-  LOG_INFO << RECEIVER_LOG << "Attempting to start audio playback...";
+  LOG_INFO << RECEIVER_LOG << "Given Audio Backend Plugin: '" << audioBackendLibPath;
+
   try
   {
     // load audio backend plugin here

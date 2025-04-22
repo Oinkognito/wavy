@@ -8,6 +8,8 @@ set(AUD_BACKEND_SRC src/entry.cpp)
 message(STATUS "  >>> Building AUDIO BACKEND PLUGIN: ${AUD_BACKEND_TITLE}")
 message(STATUS "  >>> Target: ${AUD_BACKEND_NAME}")
 message(STATUS "  >>> Output Directory: ${WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH}\n")
+# !!! KEEP THIS UNCHANGED !!!
+set(WAVY_AUDIO_PLUGIN_ENTRIES "${WAVY_AUDIO_PLUGIN_ENTRIES}${AUD_BACKEND_TITLE}|${AUD_BACKEND_NAME}\n" PARENT_SCOPE)
 
 # Find required audio backend using pkg-config (CHANGE AS YOU PLEASE)
 find_package(PkgConfig REQUIRED)
