@@ -34,7 +34,7 @@
 
 // A neat wrapper for dispatcher that works right out of the box
 
-auto dispatch(const std::string& server, const std::string& dir) -> int
+auto dispatch(const IPAddr& server, const Directory& dir) -> int
 {
 
   try
@@ -52,7 +52,7 @@ auto dispatch(const std::string& server, const std::string& dir) -> int
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "[Main] Error: " << e.what();
+    LOG_ERROR << DISPATCH_LOG << "Error: " << e.what();
     return WAVY_RET_SUC;
   }
 }

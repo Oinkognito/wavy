@@ -29,8 +29,10 @@
  ************************************************/
 
 #include <libwavy/common/types.hpp>
+#include <libwavy/tsfetcher/interface.hpp>
 #include <libwavy/tsfetcher/plugin/entry.hpp>
 #include <libwavy/utils/audio/entry.hpp>
+#include <utility>
 
 namespace libwavy::components::client
 {
@@ -45,10 +47,10 @@ private:
   RelPath        _audio_backend_lib_path;
 
 public:
-  WavyClient(const StorageOwnerID ip_id, const IPAddr server, const RelPath plugin_path,
-             const int bitrate, const RelPath audioBackendLibPath)
-      : _ip_id(ip_id), _server(server), _plugin_path(plugin_path), _bitrate(bitrate),
-        _audio_backend_lib_path(std::move(audioBackendLibPath))
+  WavyClient(StorageOwnerID ip_id, IPAddr server, RelPath plugin_path, const int bitrate,
+             const RelPath& audioBackendLibPath)
+      : _ip_id(std::move(ip_id)), _server(std::move(server)), _plugin_path(std::move(plugin_path)),
+        _bitrate(bitrate), _audio_backend_lib_path(std::move(audioBackendLibPath))
   {
   }
 
@@ -56,9 +58,7 @@ public:
   {
     LOG_INFO << "Starting Client Fetch and Playback Daemon...";
 
-    std::unique_ptr<libwavy::fetch::ISegmentFetcher,
-                    std::function<void(libwavy::fetch::ISegmentFetcher*)>>
-      fetcher;
+    fetch::SegmentFetcherPtr fetcher;
 
     try
     {

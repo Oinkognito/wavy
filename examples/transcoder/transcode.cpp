@@ -27,6 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/common/macros.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>
 
 /*
@@ -73,5 +74,5 @@ auto main(int argc, char* argv[]) -> int
   }
 
   int result = trns.transcode_to_mp3(input_file, output_file, bitrate);
-  return (result < 0) ? 1 : 0;
+  return (result < WAVY_RET_SUC) ? WAVY_RET_FAIL : WAVY_RET_SUC;
 }

@@ -33,9 +33,7 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 
-auto decodeAndPlay(GlobalState& gs, bool& flac_found,
-                   const std::string& customAudioBackendLibPath = "")
-
+auto decodeAndPlay(GlobalState& gs, bool& flac_found, const RelPath& customAudioBackendLibPath = "")
   -> bool
 {
   auto segments = gs.getAllSegments();
@@ -62,7 +60,7 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
     return false;
   }
 
-  const std::string audioBackendLibPath =
+  const RelPath audioBackendLibPath =
     std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
     (customAudioBackendLibPath.empty() ? gAudioBackends[0].plugin_path : customAudioBackendLibPath);
 
@@ -72,9 +70,7 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
   {
     // load audio backend plugin here
     LOG_INFO << PLUGIN_LOG << "Loading audio backend plugin...";
-    std::unique_ptr<libwavy::audio::IAudioBackend,
-                    std::function<void(libwavy::audio::IAudioBackend*)>>
-      backend;
+    libwavy::audio::AudioBackendPtr backend;
     backend = libwavy::audio::plugin::WavyAudioBackend::load(audioBackendLibPath);
     if (backend->initialize(decoded_audio, flac_found))
     {

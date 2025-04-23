@@ -28,8 +28,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <functional>
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
+#include <memory>
 #include <string>
 
 namespace libwavy::fetch
@@ -54,5 +56,8 @@ extern "C"
   using FetcherDestroyFn       = void(ISegmentFetcher*);
   using FetcherCreateWithArgFn = ISegmentFetcher*(const char* server_addr);
 }
+
+using SegmentFetcherPtr = std::unique_ptr<libwavy::fetch::ISegmentFetcher,
+                                          std::function<void(libwavy::fetch::ISegmentFetcher*)>>;
 
 } // namespace libwavy::fetch

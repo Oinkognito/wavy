@@ -55,7 +55,7 @@ using namespace libwavy::ffmpeg;
 constexpr const char* HELP_STR = " --inputFile=<input file> --outputDir=<output directory> "
                                  "--flacEncode=<true/false> [--avDbgLog] --serverIP=<server-ip>";
 
-auto exportTOMLFile(const std::string& filename, const std::string& output_dir,
+auto exportTOMLFile(const FileName& filename, const Directory& output_dir,
                     vector<int> found_bitrates) -> int
 {
   libwavy::registry::RegisterAudio parser(filename, found_bitrates);
@@ -65,7 +65,8 @@ auto exportTOMLFile(const std::string& filename, const std::string& output_dir,
     return WAVY_RET_FAIL;
   }
 
-  std::string outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
+  // This path is relative to where the binary is run!!
+  RelPath outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
 
   parser.exportToTOML(macros::to_string(outputTOMLFile));
   LOG_INFO << OWNER_LOG << "TOML metadata exported to " << outputTOMLFile;
@@ -94,13 +95,13 @@ auto main(int argc, char* argv[]) -> int
   libwavy::utils::cmdline::CmdLineParser cmdLineParser(std::span<char* const>(argv, argc),
                                                        HELP_STR);
 
-  bool              avdebug_mode = cmdLineParser.get("avDbgLog") == "true" ? true : false;
-  bool              use_flac     = cmdLineParser.get("flacEncode") == "true"
-                                     ? true
-                                     : false; // This is to encode in lossless FLAC format
-  const std::string input_file   = cmdLineParser.get("inputFile");
-  const std::string server       = cmdLineParser.get("serverIP");
-  const std::string output_dir   = cmdLineParser.get("outputDir");
+  bool            avdebug_mode = cmdLineParser.get("avDbgLog") == "true" ? true : false;
+  bool            use_flac     = cmdLineParser.get("flacEncode") == "true"
+                                   ? true
+                                   : false; // This is to encode in lossless FLAC format
+  const RelPath   input_file   = cmdLineParser.get("inputFile");
+  const IPAddr    server       = cmdLineParser.get("serverIP");
+  const Directory output_dir   = cmdLineParser.get("outputDir");
 
   cmdLineParser.requireMinArgs(5, argc);
 
@@ -203,7 +204,7 @@ auto main(int argc, char* argv[]) -> int
     bitrates.begin(), bitrates.end(),
     [&](int i)
     {
-      std::string output_file_i =
+      RelPath output_file_i =
         output_dir + "/output_" + std::to_string(i) + macros::to_string(macros::MP3_FILE_EXT);
       Transcoder trns;
       LOG_INFO << OWNER_LOG << "[Bitrate: " << i << "] Starting transcoding job...";

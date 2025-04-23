@@ -28,8 +28,10 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <functional>
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
+#include <memory>
 
 namespace libwavy::audio
 {
@@ -46,4 +48,7 @@ public:
 
   [[nodiscard]] virtual auto name() const -> AudioBackendPluginName = 0;
 };
+
+using AudioBackendPtr = std::unique_ptr<IAudioBackend, std::function<void(IAudioBackend*)>>;
+
 } // namespace libwavy::audio

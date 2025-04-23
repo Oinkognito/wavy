@@ -28,6 +28,7 @@
  ************************************************/
 
 #include <cstdlib>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/network/entry.hpp>
 
@@ -53,16 +54,16 @@ auto main(int argc, char* argv[]) -> int
     LOG_ERROR << argv[0] << " <server-ip>" << " <path>";
     return EXIT_FAILURE;
   }
-  const std::string& server_ip = argv[1];
-  const std::string& route     = argv[2];
-  asio::io_context   ioc;
-  ssl::context       ctx(ssl::context::tlsv12_client);
+  const IPAddr     server_ip = argv[1];
+  const NetTarget  route     = argv[2];
+  asio::io_context ioc;
+  ssl::context     ctx(ssl::context::tlsv12_client);
   ctx.set_verify_mode(ssl::verify_none);
   libwavy::network::HttpsClient client(ioc, ctx, server_ip);
 
   try
   {
-    std::string result = client.get(route);
+    NetResponse result = client.get(route);
 
     if (result.empty())
       LOG_WARNING << "Found nothing.";

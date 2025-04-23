@@ -22,6 +22,16 @@ using FileName =
 using DirPathHolder = std::
   string; // When creating members of a class that hold dir / path / file name info at all, use this holder
 
+//[ DIRECTORY AND PATHS C-STYLE DEFS ]//
+using CStrDirectory = const char*; // Directory represented as const char*
+using CStrRelPath   = const char*; // Relative Path as const char*
+using CStrAbsPath   = const char*; // Absolute Path as const char*
+using CStrFileName  = const char*; // Just the filename as const char*
+
+// NOTE: CStrRelPath and RelPath have the leisure of storing EVEN the absolute path, but NOT vice-versa!
+//
+// Only use AbsPath and CStrAbsPath when you are ABSOLUTELY sure that the data stored is an absolute path!!
+
 //[ PLAYLIST CONTENT ]//
 using PlaylistData = std::string; // The playlist (.m3u8) content stored here
 
@@ -38,4 +48,5 @@ using AudioChunk                           = std::size_t;
 using SampleSize                           = std::size_t;
 using ByteCount                            = size_t;
 using AudioStreamIdx                       = int;
+using AudioStreamIdxIter                   = unsigned int;
 inline constexpr SampleSize BytesPerSample = sizeof(float) * 2; // stereo float

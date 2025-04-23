@@ -84,7 +84,7 @@ public:
    * @return True on success, false on failure.
    */
   auto createSegmentsFLAC(const AbsPath& input_file, const Directory& output_dir,
-                          const char* output_playlist, int bitrate) -> bool
+                          CStrRelPath output_playlist, int bitrate) -> bool
   {
     AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
     AVStream *       in_stream = nullptr, *out_stream = nullptr;
@@ -236,7 +236,7 @@ public:
    * @param use_flac Whether to use FLAC instead of MP3.
    * @return A vector of found bitrates.
    */
-  auto createSegments(const char* input_file, const char* output_dir, bool use_flac = false)
+  auto createSegments(CStrRelPath input_file, CStrDirectory output_dir, bool use_flac = false)
     -> std::vector<int>
   {
     std::vector<std::string> playlist_files;
@@ -329,7 +329,7 @@ private:
    * @param bitrate The target bitrate for encoding.
    * @return True on success, false on failure.
    */
-  auto encode_variant(const char* input_file, const char* output_playlist, int bitrate) -> bool
+  auto encode_variant(CStrRelPath input_file, CStrRelPath output_playlist, int bitrate) -> bool
   {
     AVFormatContext* input_ctx          = nullptr;
     AVFormatContext* output_ctx         = nullptr;
@@ -352,7 +352,7 @@ private:
     }
 
     // Find audio stream
-    for (unsigned int i = 0; i < input_ctx->nb_streams; i++)
+    for (AudioStreamIdxIter i = 0; i < input_ctx->nb_streams; i++)
     {
       if (input_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
       {

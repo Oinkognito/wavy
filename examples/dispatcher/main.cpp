@@ -28,6 +28,7 @@
  ************************************************/
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/dispatch/entry.hpp>
 
 // A neat wrapper for dispatcher that works right out of the box
@@ -43,8 +44,9 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  const std::string server = argv[1];
-  const std::string dir    = argv[2];
+  // Add your custom logic to validate these cmd-line args if needed...
+  const IPAddr    server = argv[1];
+  const Directory dir    = argv[2];
 
   try
   {

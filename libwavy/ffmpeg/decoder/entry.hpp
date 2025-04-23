@@ -49,9 +49,9 @@ inline constexpr ByteCount DefaultAVIOBufferSize = 32768;
 // Custom AVIO read function
 static auto readAVIO(void* opaque, AudioByte* buf, int buf_size) -> int
 {
-  auto*         segments      = static_cast<std::vector<std::string>*>(opaque);
-  static size_t segment_index = 0;
-  static size_t read_offset   = 0;
+  auto*              segments      = static_cast<TotalAudioData*>(opaque);
+  static size_t      segment_index = 0;
+  static AudioOffset read_offset   = 0;
 
   if (segment_index >= segments->size())
   {
@@ -150,7 +150,7 @@ private:
   auto init_input_context(TotalAudioData& ts_segments, AVFormatContext*& ctx) -> bool
   {
     ctx          = avformat_alloc_context();
-    auto* buffer = static_cast<unsigned char*>(av_malloc(DefaultAVIOBufferSize));
+    auto* buffer = static_cast<DecodedAudioData*>(av_malloc(DefaultAVIOBufferSize));
     if (!buffer)
       return false;
 
@@ -181,7 +181,7 @@ private:
 
   auto find_audio_stream(AVFormatContext* ctx, AudioStreamIdx& index) -> bool
   {
-    for (unsigned int i = 0; i < ctx->nb_streams; i++)
+    for (AudioStreamIdxIter i = 0; i < ctx->nb_streams; i++)
     {
       if (ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
       {

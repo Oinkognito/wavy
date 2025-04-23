@@ -27,26 +27,28 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/common/types.hpp"
 #include "server.hpp"
 
-auto is_valid_extension(const std::string& filename) -> bool
+auto is_valid_extension(const FileName& filename) -> bool
 {
   return filename.ends_with(macros::PLAYLIST_EXT) ||
          filename.ends_with(macros::TRANSPORT_STREAM_EXT) ||
          filename.ends_with(macros::M4S_FILE_EXT) || filename.ends_with(macros::TOML_FILE_EXT);
 }
 
-auto validate_m3u8_format(const std::string& content) -> bool
+auto validate_m3u8_format(const PlaylistData& content) -> bool
 {
   return content.find(macros::PLAYLIST_GLOBAL_HEADER) != std::string::npos;
 }
 
-auto validate_ts_file(const std::vector<uint8_t>& data) -> bool
+auto validate_ts_file(const AudioBuffer& data) -> bool
 {
   return !data.empty() && data[0] == TRANSPORT_STREAM_START_BYTE; // MPEG-TS sync byte
 }
 
-auto validate_m4s(const std::string& m4s_path) -> bool
+// This validation is NOT correct, will change this in future.
+auto validate_m4s(const RelPath& m4s_path) -> bool
 {
   std::ifstream file(m4s_path, std::ios::binary);
   if (!file.is_open())
@@ -92,7 +94,7 @@ auto validate_m4s(const std::string& m4s_path) -> bool
   return true;
 }
 
-auto extract_payload(const std::string& payload_path, const std::string& extract_path) -> bool
+auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -> bool
 {
   LOG_INFO << SERVER_EXTRACT_LOG << "Extracting PAYLOAD: " << payload_path;
 
@@ -116,8 +118,8 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
 
   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
   {
-    std::string filename    = archive_entry_pathname(entry);
-    std::string output_file = extract_path + "/" + filename;
+    RelPath filename    = archive_entry_pathname(entry);
+    AbsPath output_file = extract_path + "/" + filename;
 
     LOG_INFO << SERVER_EXTRACT_LOG
              << "Extracting file: " << bfs::relative(output_file, macros::SERVER_STORAGE_DIR);
@@ -179,8 +181,8 @@ auto extract_payload(const std::string& payload_path, const std::string& extract
   return valid_files_found;
 }
 
-auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
-                          const std::string& ip_id) -> bool
+auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id,
+                          const StorageOwnerID& ip_id) -> bool
 {
   LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and extracting GZIP file: " << gzip_path;
 
@@ -192,8 +194,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
     return false;
   }
 
-  std::string temp_extract_path =
-    macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
+  AbsPath temp_extract_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
   bfs::create_directories(temp_extract_path);
 
   if (!extract_payload(gzip_path, temp_extract_path))
@@ -204,7 +205,7 @@ auto extract_and_validate(const std::string& gzip_path, const std::string& audio
 
   LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction complete, validating files...";
 
-  std::string storage_path =
+  AbsPath storage_path =
     macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_id + "/" + audio_id;
   bfs::create_directories(storage_path);
 

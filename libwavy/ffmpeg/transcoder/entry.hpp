@@ -90,7 +90,7 @@ private:
   AVFrame*         resampled_frame = av_frame_alloc();  // Frame holding resampled audio data
 
 public:
-  void print_audio_info(const char* filename, AVFormatContext* format_ctx,
+  void print_audio_info(CStrRelPath filename, AVFormatContext* format_ctx,
                         AVCodecContext* codec_ctx, const char* label)
   {
     LOG_DEBUG << TRANSCODER_LOG << "========== " << label << " ===============";
@@ -269,7 +269,7 @@ public:
     }
   }
   // Main transcoding function - now more modular
-  auto transcode_to_mp3(const char* input_filename, const char* output_filename,
+  auto transcode_to_mp3(CStrRelPath input_filename, CStrRelPath output_filename,
                         const int given_bitrate) -> int
   {
     av_log_set_level(AV_LOG_INFO);
@@ -338,8 +338,8 @@ public:
   }
 
   // Function to initialize the input file and decoder
-  auto initialize_input(const char* input_filename, AVFormatContext** in_format_ctx,
-                        AVCodecContext** in_codec_ctx, int* audio_stream_index) -> int
+  auto initialize_input(CStrRelPath input_filename, AVFormatContext** in_format_ctx,
+                        AVCodecContext** in_codec_ctx, AudioStreamIdx* audio_stream_index) -> int
   {
     int ret = 0;
 
@@ -416,7 +416,7 @@ public:
   }
 
   // Function to initialize the output file and encoder
-  auto initialize_output(const char* output_filename, AVFormatContext** out_format_ctx,
+  auto initialize_output(CStrRelPath output_filename, AVFormatContext** out_format_ctx,
                          AVCodecContext** out_codec_ctx, AVStream** out_stream,
                          AVCodecContext* in_codec_ctx, int bitrate) -> int
   {
@@ -651,7 +651,7 @@ public:
   auto process_audio_frames(AVFormatContext* in_format_ctx, AVCodecContext* in_codec_ctx,
                             AVCodecContext* out_codec_ctx, AVFormatContext* out_format_ctx,
                             SwrContext* swr_ctx, AVFrame* frame, AVFrame* resampled_frame,
-                            AVPacket* packet, int audio_stream_index) -> int
+                            AVPacket* packet, AudioStreamIdx audio_stream_index) -> int
   {
     int     ret               = 0;
     int64_t next_pts          = 0;

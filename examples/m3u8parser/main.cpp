@@ -28,13 +28,14 @@
  ************************************************/
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/parser/entry.hpp>
 #include <libwavy/utils/io/file/entry.hpp>
 
 namespace fs = boost::filesystem;
 using namespace libwavy::hls::parser;
-using StdFileUtil = libwavy::utils::FileUtil<std::string>;
+using StdFileUtil = libwavy::utils::FileUtil<PlaylistData>;
 
 void printError(const std::string& bin)
 {
@@ -45,7 +46,8 @@ void printError(const std::string& bin)
   LOG_INFO << "2. " << bin << " $(cat hls_mp3_64.m3u8) 0 1 [Parse as MEDIA playlist from string]";
 }
 
-auto readContentIfRequired(const std::string& path, bool use_string_parser) -> std::string
+// If we want the string parser (from stdin), try to read the PlaylistData, else just pass over the path
+auto readContentIfRequired(const RelPath& path, bool use_string_parser) -> PlaylistData
 {
   return use_string_parser ? path : StdFileUtil::readFile(path);
 }
@@ -61,9 +63,9 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  const std::string playlist_path      = argv[1];
-  const bool        is_master_playlist = (argc > 2) && std::stoi(argv[2]) > 0;
-  const bool        use_string_parser  = (argc > 3) && std::stoi(argv[3]) > 0;
+  const RelPath playlist_path      = argv[1];
+  const bool    is_master_playlist = (argc > 2) && std::stoi(argv[2]) > 0;
+  const bool    use_string_parser  = (argc > 3) && std::stoi(argv[3]) > 0;
 
   LOG_INFO << "Parsing: " << playlist_path << " using "
            << (use_string_parser ? "string" : "file path") << " parser";

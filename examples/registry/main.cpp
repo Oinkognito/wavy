@@ -28,6 +28,7 @@
  ************************************************/
 
 #include <iostream>
+#include <libwavy/common/types.hpp>
 #include <libwavy/registry/entry.hpp>
 
 auto main(int argc, char* argv[]) -> int
@@ -38,10 +39,8 @@ auto main(int argc, char* argv[]) -> int
     return 1;
   }
 
-  std::string inputFile  = argv[1];
-  std::string outputFile = argv[2];
-
-  avformat_network_init(); // Initialize FFmpeg network components
+  RelPath inputFile  = argv[1];
+  RelPath outputFile = argv[2];
 
   libwavy::registry::RegisterAudio parser(inputFile,
                                           {}); // just give empty vector for found bitrates

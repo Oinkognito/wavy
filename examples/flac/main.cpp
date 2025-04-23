@@ -28,6 +28,7 @@
  ************************************************/
 
 #include <libwavy/codecs/flac/metadata.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 
 auto main(int argc, char* argv[]) -> int
@@ -36,8 +37,8 @@ auto main(int argc, char* argv[]) -> int
 
   if (argc > 1)
   {
-    const std::string file     = argv[1];
-    auto              metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
+    const RelPath file     = argv[1];
+    auto          metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
 
     LOG_INFO << "Bitrate:         " << metadata.bitrate << " bps";
     LOG_INFO << "Total Samples:   " << metadata.total_samples;

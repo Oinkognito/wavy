@@ -64,14 +64,15 @@ auto main(int argc, char* argv[]) -> int
 
   libwavy::utils::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
 
-  const std::string ip_id               = parser.get("ipAddr");
-  const int         index               = parser.get_int("index", -1); // Safe parsing of integer
-  const std::string server              = parser.get("serverIP");
-  const int         bitrate             = parser.get_int("bitrate-stream", 0);
-  const std::string audioBackendLibPath = parser.get("audioBackendLibPath");
+  const StorageOwnerID ip_id   = parser.get("ipAddr");
+  const int            index   = parser.get_int("index", -1); // Safe parsing of integer
+  const IPAddr         server  = parser.get("serverIP");
+  const int            bitrate = parser.get_int("bitrate-stream", 0);
+  const RelPath        audioBackendLibPath =
+    parser.get("audioBackendLibPath"); // relative to WAVY_FETCHER_PLUGIN_OUTPUT_PATH
   const std::string fetch_mode =
-    parser.get("fetchMode", "default");                     // Default to "default" if not specified
-  const std::string fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
+    parser.get("fetchMode", "default");                 // Default to "default" if not specified
+  const RelPath fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
 
   parser.requireMinArgs(5, argc);
 
