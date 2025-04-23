@@ -28,10 +28,64 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <iterator>
 #include <string>
 #include <vector>
 
+using AudioData             = std::string;
+using TotalAudioData        = std::vector<AudioData>;
+using DecodedAudioData      = unsigned char;
+using TotalDecodedAudioData = std::vector<DecodedAudioData>;
+
+using namespace std;
+
+struct StreamMetadata
+{
+  string codec;
+  string type;
+  int    bitrate;
+  int    sample_rate;
+  int    channels;
+  string channel_layout;
+  string sample_format;
+};
+
+struct AudioMetadata
+{
+  int         bitrate;
+  int         duration;
+  string      path;
+  string      file_format;
+  string      file_format_long;
+  vector<int> bitrates;
+
+  string         title;
+  string         artist;
+  string         album;
+  pair<int, int> track;
+  pair<int, int> disc;
+  string         copyright;
+  string         genre;
+  string         comment;
+  string         album_artist;
+  string         tsrc;
+  string         encoder;
+  string         encoded_by;
+  string         date;
+
+  StreamMetadata audio_stream;
+  StreamMetadata video_stream;
+};
+
 struct GlobalState
 {
-  std::vector<std::string> transport_segments;
+  TotalAudioData transport_segments;
+
+  void appendSegmentsFLAC(AudioData&& initSegment, TotalAudioData&& m4sSegments)
+  {
+    transport_segments.push_back(std::move(initSegment));
+    transport_segments.insert(transport_segments.end(),
+                              std::make_move_iterator(m4sSegments.begin()),
+                              std::make_move_iterator(m4sSegments.end()));
+  }
 };

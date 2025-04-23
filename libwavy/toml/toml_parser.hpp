@@ -30,82 +30,53 @@
 
 #include "toml.hpp"
 #include <cstdlib>
-#include <filesystem>
+#include <libwavy/common/state.hpp>
 #include <string_view>
 
-using namespace std;
-namespace toml_fs = std::filesystem;
-
-#define PARENT_AUDIO_PARSER                 "audio_parser"
-#define PARENT_AUDIO_FIELD_BITRATE          "bitrate"
-#define PARENT_AUDIO_FIELD_DURATION         "duration"
-#define PARENT_AUDIO_FIELD_PATH             "path"
-#define PARENT_AUDIO_FIELD_FILE_FORMAT      "file_format"
-#define PARENT_AUDIO_FIELD_FILE_FORMAT_LONG "file_format_long"
-#define PARENT_AUDIO_FIELD_TRNS_BITRATES    "transcoded_bitrates"
-
-#define PARENT_METADATA                    "metadata"
-#define PARENT_METADATA_FIELD_TSRC         "TSRC"
-#define PARENT_METADATA_FIELD_ALBUM        "album"
-#define PARENT_METADATA_FIELD_ALBUM_ARTIST "album_artist"
-#define PARENT_METADATA_FIELD_ARTIST       "artist"
-#define PARENT_METADATA_FIELD_COMMENT      "comment"
-#define PARENT_METADATA_FIELD_COPYRIGHT    "copyright"
-#define PARENT_METADATA_FIELD_DATE         "date"
-#define PARENT_METADATA_FIELD_DISC         "disc"
-#define PARENT_METADATA_FIELD_ENCODED_BY   "encoded_by"
-#define PARENT_METADATA_FIELD_ENCODER      "encoder"
-#define PARENT_METADATA_FIELD_GENRE        "genre"
-#define PARENT_METADATA_FIELD_TITLE        "title"
-#define PARENT_METADATA_FIELD_TRACK        "track"
-
-#define PARENT_STREAM_0                    "stream_0"
-#define PARENT_STREAM_1                    "stream_1"
-#define PARENT_STREAM_FIELD_BITRATE        "bitrate"
-#define PARENT_STREAM_FIELD_CHANNEL_LAYOUT "channel_layout"
-#define PARENT_STREAM_FIELD_CHANNELS       "channels"
-#define PARENT_STREAM_FIELD_CODEC          "codec"
-#define PARENT_STREAM_FIELD_SAMPLE_FORMAT  "sample_format"
-#define PARENT_STREAM_FIELD_SAMPLE_RATE    "sample_rate"
-#define PARENT_STREAM_FIELD_TYPE           "type"
-
-struct StreamMetadata
+namespace TomlKeys
 {
-  string codec;
-  string type;
-  int    bitrate;
-  int    sample_rate;
-  int    channels;
-  string channel_layout;
-  string sample_format;
-};
-
-struct AudioMetadata
+namespace Audio
 {
-  int         bitrate;
-  int         duration;
-  string      path;
-  string      file_format;
-  string      file_format_long;
-  vector<int> bitrates;
+inline constexpr auto Parser          = "audio_parser";
+inline constexpr auto Bitrate         = "bitrate";
+inline constexpr auto Duration        = "duration";
+inline constexpr auto Path            = "path";
+inline constexpr auto FileFormat      = "file_format";
+inline constexpr auto FileFormatLong  = "file_format_long";
+inline constexpr auto TranscodedRates = "transcoded_bitrates";
+} // namespace Audio
 
-  string         title;
-  string         artist;
-  string         album;
-  pair<int, int> track;
-  pair<int, int> disc;
-  string         copyright;
-  string         genre;
-  string         comment;
-  string         album_artist;
-  string         tsrc;
-  string         encoder;
-  string         encoded_by;
-  string         date;
+namespace Metadata
+{
+inline constexpr auto Root        = "metadata";
+inline constexpr auto TSRC        = "TSRC";
+inline constexpr auto Album       = "album";
+inline constexpr auto AlbumArtist = "album_artist";
+inline constexpr auto Artist      = "artist";
+inline constexpr auto Comment     = "comment";
+inline constexpr auto Copyright   = "copyright";
+inline constexpr auto Date        = "date";
+inline constexpr auto Disc        = "disc";
+inline constexpr auto EncodedBy   = "encoded_by";
+inline constexpr auto Encoder     = "encoder";
+inline constexpr auto Genre       = "genre";
+inline constexpr auto Title       = "title";
+inline constexpr auto Track       = "track";
+} // namespace Metadata
 
-  StreamMetadata audio_stream;
-  StreamMetadata video_stream;
-};
+namespace Stream
+{
+inline constexpr auto Stream0       = "stream_0";
+inline constexpr auto Stream1       = "stream_1";
+inline constexpr auto Bitrate       = "bitrate";
+inline constexpr auto ChannelLayout = "channel_layout";
+inline constexpr auto Channels      = "channels";
+inline constexpr auto Codec         = "codec";
+inline constexpr auto SampleFormat  = "sample_format";
+inline constexpr auto SampleRate    = "sample_rate";
+inline constexpr auto Type          = "type";
+} // namespace Stream
+} // namespace TomlKeys
 
 // Parses a fraction (e.g., "6/12")
 inline auto parseFraction(string_view value) -> pair<int, int>
@@ -121,76 +92,77 @@ inline auto parseAudioMetadataFromTomlTable(const toml::table& metadata) -> Audi
   AudioMetadata result;
 
   // Audio Parser Section
-  result.bitrate     = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_BITRATE].value_or(-1);
-  result.duration    = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_DURATION].value_or(-1);
-  result.path        = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_PATH].value_or(""s);
-  result.file_format = metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT].value_or(""s);
+  result.bitrate     = metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::Bitrate].value_or(-1);
+  result.duration    = metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::Duration].value_or(-1);
+  result.path        = metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::Path].value_or(""s);
+  result.file_format = metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::FileFormat].value_or(""s);
   result.file_format_long =
-    metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_FILE_FORMAT_LONG].value_or(""s);
+    metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::FileFormatLong].value_or(""s);
+
   if (auto bitrates_array =
-        metadata[PARENT_AUDIO_PARSER][PARENT_AUDIO_FIELD_TRNS_BITRATES].as_array())
+        metadata[TomlKeys::Audio::Parser][TomlKeys::Audio::TranscodedRates].as_array())
   {
     for (const auto& val : *bitrates_array)
     {
       if (val.is_integer())
-      {
         result.bitrates.push_back(static_cast<int>(val.as_integer()->get()));
-      }
     }
   }
 
   // Metadata Section
-  result.tsrc         = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_TSRC].value_or(""s);
-  result.album        = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_ALBUM].value_or(""s);
-  result.album_artist = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_ALBUM_ARTIST].value_or(""s);
-  result.artist       = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_ARTIST].value_or(""s);
-  result.comment      = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_COMMENT].value_or(""s);
-  result.copyright    = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_COPYRIGHT].value_or(""s);
-  result.date         = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_DATE].value_or(""s);
-  result.encoded_by   = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_ENCODED_BY].value_or(""s);
-  result.encoder      = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_ENCODER].value_or(""s);
-  result.genre        = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_GENRE].value_or(""s);
-  result.title        = metadata[PARENT_METADATA][PARENT_METADATA_FIELD_TITLE].value_or(""s);
+  result.tsrc  = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::TSRC].value_or(""s);
+  result.album = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Album].value_or(""s);
+  result.album_artist =
+    metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::AlbumArtist].value_or(""s);
+  result.artist  = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Artist].value_or(""s);
+  result.comment = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Comment].value_or(""s);
+  result.copyright =
+    metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Copyright].value_or(""s);
+  result.date = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Date].value_or(""s);
+  result.encoded_by =
+    metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::EncodedBy].value_or(""s);
+  result.encoder = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Encoder].value_or(""s);
+  result.genre   = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Genre].value_or(""s);
+  result.title   = metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Title].value_or(""s);
 
   result.track =
-    parseFraction(metadata[PARENT_METADATA][PARENT_METADATA_FIELD_TRACK].value_or(""s));
-  result.disc = parseFraction(metadata[PARENT_METADATA][PARENT_METADATA_FIELD_DISC].value_or(""s));
+    parseFraction(metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Track].value_or(""s));
+  result.disc =
+    parseFraction(metadata[TomlKeys::Metadata::Root][TomlKeys::Metadata::Disc].value_or(""s));
 
-  // Audio Stream Metadata
-  if (metadata.contains(PARENT_STREAM_0))
+  // Audio Stream
+  if (metadata.contains(TomlKeys::Stream::Stream0))
   {
-    const auto& audio_stream = metadata[PARENT_STREAM_0].as_table();
+    const auto& audio_stream = metadata[TomlKeys::Stream::Stream0].as_table();
     if (audio_stream)
     {
-      result.audio_stream.codec   = audio_stream->at(PARENT_STREAM_FIELD_CODEC).value_or(""s);
-      result.audio_stream.type    = audio_stream->at(PARENT_STREAM_FIELD_TYPE).value_or(""s);
-      result.audio_stream.bitrate = audio_stream->at(PARENT_STREAM_FIELD_BITRATE).value_or(-1);
-      result.audio_stream.sample_rate =
-        audio_stream->at(PARENT_STREAM_FIELD_SAMPLE_RATE).value_or(-1);
-      result.audio_stream.channels = audio_stream->at(PARENT_STREAM_FIELD_CHANNELS).value_or(-1);
+      result.audio_stream.codec       = audio_stream->at(TomlKeys::Stream::Codec).value_or(""s);
+      result.audio_stream.type        = audio_stream->at(TomlKeys::Stream::Type).value_or(""s);
+      result.audio_stream.bitrate     = audio_stream->at(TomlKeys::Stream::Bitrate).value_or(-1);
+      result.audio_stream.sample_rate = audio_stream->at(TomlKeys::Stream::SampleRate).value_or(-1);
+      result.audio_stream.channels    = audio_stream->at(TomlKeys::Stream::Channels).value_or(-1);
       result.audio_stream.channel_layout =
-        audio_stream->at(PARENT_STREAM_FIELD_CHANNEL_LAYOUT).value_or(""s);
+        audio_stream->at(TomlKeys::Stream::ChannelLayout).value_or(""s);
       result.audio_stream.sample_format =
-        audio_stream->at(PARENT_STREAM_FIELD_SAMPLE_FORMAT).value_or(""s);
+        audio_stream->at(TomlKeys::Stream::SampleFormat).value_or(""s);
     }
   }
 
-  // Video Stream Metadata
-  if (metadata.contains(PARENT_STREAM_1))
+  // Video Stream
+  if (metadata.contains(TomlKeys::Stream::Stream1))
   {
-    const auto& video_stream = metadata[PARENT_STREAM_1].as_table();
+    const auto& video_stream = metadata[TomlKeys::Stream::Stream1].as_table();
     if (video_stream)
     {
-      result.video_stream.codec   = video_stream->at(PARENT_STREAM_FIELD_CODEC).value_or(""s);
-      result.video_stream.type    = video_stream->at(PARENT_STREAM_FIELD_TYPE).value_or(""s);
-      result.video_stream.bitrate = video_stream->at(PARENT_STREAM_FIELD_BITRATE).value_or(-1);
-      result.video_stream.sample_rate =
-        video_stream->at(PARENT_STREAM_FIELD_SAMPLE_RATE).value_or(-1);
-      result.video_stream.channels = video_stream->at(PARENT_STREAM_FIELD_CHANNELS).value_or(-1);
+      result.video_stream.codec       = video_stream->at(TomlKeys::Stream::Codec).value_or(""s);
+      result.video_stream.type        = video_stream->at(TomlKeys::Stream::Type).value_or(""s);
+      result.video_stream.bitrate     = video_stream->at(TomlKeys::Stream::Bitrate).value_or(-1);
+      result.video_stream.sample_rate = video_stream->at(TomlKeys::Stream::SampleRate).value_or(-1);
+      result.video_stream.channels    = video_stream->at(TomlKeys::Stream::Channels).value_or(-1);
       result.video_stream.channel_layout =
-        video_stream->at(PARENT_STREAM_FIELD_CHANNEL_LAYOUT).value_or(""s);
+        video_stream->at(TomlKeys::Stream::ChannelLayout).value_or(""s);
       result.video_stream.sample_format =
-        video_stream->at(PARENT_STREAM_FIELD_SAMPLE_FORMAT).value_or(""s);
+        video_stream->at(TomlKeys::Stream::SampleFormat).value_or(""s);
     }
   }
 

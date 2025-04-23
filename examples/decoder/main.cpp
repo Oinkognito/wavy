@@ -36,7 +36,7 @@ auto main() -> int
 {
   GlobalState gs;
 
-  std::vector<std::string> ts_segments = gs.transport_segments;
+  auto ts_segments = gs.transport_segments;
 
   if (ts_segments.empty())
   {
@@ -44,8 +44,8 @@ auto main() -> int
     return 1;
   }
 
-  MediaDecoder               decoder;
-  std::vector<unsigned char> decoded_audio;
+  MediaDecoder          decoder;
+  TotalDecodedAudioData decoded_audio;
   if (!decoder.decode(gs.transport_segments, decoded_audio))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");

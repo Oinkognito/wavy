@@ -31,6 +31,7 @@
 #include <alsa/asoundlib.h>
 #include <alsa/pcm.h>
 #include <libwavy/audio/interface.hpp>
+#include <libwavy/common/state.hpp>
 #include <libwavy/utils/io/log/entry.hpp>
 #include <vector>
 
@@ -44,15 +45,14 @@ constexpr const char* _AUDIO_BACKEND_NAME_ = "ALSA";
 class AlsaAudioBackend : public IAudioBackend
 {
 private:
-  snd_pcm_t*                 handle{nullptr};
-  std::vector<unsigned char> audioData;
-  bool                       isPlaying{false};
-  snd_pcm_format_t           format{SND_PCM_FORMAT_FLOAT_LE}; // Default: float32 interleaved
+  snd_pcm_t*            handle{nullptr};
+  TotalDecodedAudioData audioData;
+  bool                  isPlaying{false};
+  snd_pcm_format_t      format{SND_PCM_FORMAT_FLOAT_LE}; // Default: float32 interleaved
 
 public:
-  auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
-                  int preferredSampleRate, int preferredChannels, int bitDepth = 16)
-    -> bool override
+  auto initialize(const TotalDecodedAudioData& audioInput, bool isFlac, int preferredSampleRate,
+                  int preferredChannels, int bitDepth = 16) -> bool override
   {
     audioData = audioInput;
     ::libwavy::utils::pluginlog::set_default_tag(_AUDIO_BACKEND_NAME_);

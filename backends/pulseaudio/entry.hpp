@@ -30,10 +30,10 @@
 
 #include <cstring>
 #include <libwavy/audio/interface.hpp>
+#include <libwavy/common/state.hpp>
 #include <libwavy/utils/io/log/entry.hpp>
 #include <pulse/error.h>
 #include <pulse/simple.h>
-#include <vector>
 
 using namespace libwavy::utils::pluginlog;
 
@@ -45,14 +45,13 @@ constexpr const char* _AUDIO_BACKEND_NAME_ = "PulseAudio";
 class PulseAudioBackend : public IAudioBackend
 {
 private:
-  pa_simple*                 stream{nullptr};
-  std::vector<unsigned char> audioData;
-  bool                       isPlaying{false};
+  pa_simple*            stream{nullptr};
+  TotalDecodedAudioData audioData;
+  bool                  isPlaying{false};
 
 public:
-  auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
-                  int preferredSampleRate, int preferredChannels, int /*bitDepth*/ = 16)
-    -> bool override
+  auto initialize(const TotalDecodedAudioData& audioInput, bool isFlac, int preferredSampleRate,
+                  int preferredChannels, int /*bitDepth*/ = 16) -> bool override
   {
     audioData = audioInput;
 

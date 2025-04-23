@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/common/state.hpp"
 #include <cstdlib>
 #include <memory>
 #include <sstream>
@@ -72,18 +73,15 @@ public:
     if (content.empty())
       return false;
 
-    std::string              init_mp4_data;
-    std::vector<std::string> m4s_segments;
+    AudioData      init_mp4_data;
+    TotalAudioData m4s_segments;
     if (!process_segments(content, ip_id, audio_id, init_mp4_data, m4s_segments, gs))
       return false;
 
     if (!m4s_segments.empty())
     {
       flac_found = true;
-      gs.transport_segments.push_back(std::move(init_mp4_data));
-      gs.transport_segments.insert(gs.transport_segments.end(),
-                                   std::make_move_iterator(m4s_segments.begin()),
-                                   std::make_move_iterator(m4s_segments.end()));
+      gs.appendSegmentsFLAC(std::move(init_mp4_data), std::move(m4s_segments));
     }
 
     if (!libwavy::dbg::FileWriter<std::string>::write(gs.transport_segments, "audio.raw"))
@@ -221,8 +219,8 @@ private:
   }
 
   auto process_segments(const std::string& playlist, const std::string& ip_id,
-                        const std::string& audio_id, std::string& init_mp4_data,
-                        std::vector<std::string>& m4s_segments, GlobalState& gs) -> bool
+                        const std::string& audio_id, AudioData& init_mp4_data,
+                        TotalAudioData& m4s_segments, GlobalState& gs) -> bool
   {
     std::istringstream stream(playlist);
     std::string        line;
@@ -256,9 +254,9 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        std::string url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+        const std::string url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
         LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
-        std::string data = client->get(url);
+        AudioData data = client->get(url);
 
         if (!data.empty())
         {

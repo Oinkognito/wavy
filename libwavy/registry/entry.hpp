@@ -87,37 +87,36 @@ public:
   {
     TomlGenerator tomlGen;
 
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_PATH, metadata.path);
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT,
-                          metadata.file_format);
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_FILE_FORMAT_LONG,
-                          metadata.file_format_long);
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_DURATION, metadata.duration);
-    tomlGen.addTableValue(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_BITRATE, metadata.bitrate);
+    // Do NOT put this in global context to avoid confusion!!
+    using namespace TomlKeys;
 
-    tomlGen.addTableArray(PARENT_AUDIO_PARSER, PARENT_AUDIO_FIELD_TRNS_BITRATES, bitrates);
+    tomlGen.addTableValue(Audio::Parser, Audio::Path, metadata.path);
+    tomlGen.addTableValue(Audio::Parser, Audio::FileFormat, metadata.file_format);
+    tomlGen.addTableValue(Audio::Parser, Audio::FileFormatLong, metadata.file_format_long);
+    tomlGen.addTableValue(Audio::Parser, Audio::Duration, metadata.duration);
+    tomlGen.addTableValue(Audio::Parser, Audio::Bitrate, metadata.bitrate);
+    tomlGen.addTableArray(Audio::Parser, Audio::TranscodedRates, bitrates);
 
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TITLE, metadata.title);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ARTIST, metadata.artist);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ALBUM, metadata.album);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TRACK,
+    tomlGen.addTableValue(Metadata::Root, Metadata::Title, metadata.title);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Artist, metadata.artist);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Album, metadata.album);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Track,
                           std::to_string(metadata.track.first) + "/" +
                             std::to_string(metadata.track.second));
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_DISC,
+    tomlGen.addTableValue(Metadata::Root, Metadata::Disc,
                           std::to_string(metadata.disc.first) + "/" +
                             std::to_string(metadata.disc.second));
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_COPYRIGHT, metadata.copyright);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_GENRE, metadata.genre);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_COMMENT, metadata.comment);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ALBUM_ARTIST,
-                          metadata.album_artist);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_TSRC, metadata.tsrc);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ENCODER, metadata.encoder);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_ENCODED_BY, metadata.encoded_by);
-    tomlGen.addTableValue(PARENT_METADATA, PARENT_METADATA_FIELD_DATE, metadata.date);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Copyright, metadata.copyright);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Genre, metadata.genre);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Comment, metadata.comment);
+    tomlGen.addTableValue(Metadata::Root, Metadata::AlbumArtist, metadata.album_artist);
+    tomlGen.addTableValue(Metadata::Root, Metadata::TSRC, metadata.tsrc);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Encoder, metadata.encoder);
+    tomlGen.addTableValue(Metadata::Root, Metadata::EncodedBy, metadata.encoded_by);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Date, metadata.date);
 
-    saveStreamMetadataToToml(tomlGen, metadata.audio_stream, PARENT_STREAM_0);
-    saveStreamMetadataToToml(tomlGen, metadata.video_stream, PARENT_STREAM_1);
+    saveStreamMetadataToToml(tomlGen, metadata.audio_stream, Stream::Stream0);
+    saveStreamMetadataToToml(tomlGen, metadata.video_stream, Stream::Stream1);
 
     tomlGen.saveToFile(outputFile);
   }
@@ -133,6 +132,8 @@ private:
   void populateMetadata()
   {
     metadata.path = filePath;
+
+    using namespace TomlKeys;
 
     if (fmt_ctx->iformat)
     {
@@ -153,31 +154,31 @@ private:
 
       std::ranges::transform(key, key.begin(), [](unsigned char c) { return std::tolower(c); });
 
-      if (key == PARENT_METADATA_FIELD_TITLE)
+      if (key == Metadata::Title)
         metadata.title = value;
-      else if (key == PARENT_METADATA_FIELD_ARTIST)
+      else if (key == Metadata::Artist)
         metadata.artist = value;
-      else if (key == PARENT_METADATA_FIELD_ALBUM)
+      else if (key == Metadata::Album)
         metadata.album = value;
-      else if (key == PARENT_METADATA_FIELD_TRACK)
+      else if (key == Metadata::Track)
         metadata.track = parseFraction(value);
-      else if (key == PARENT_METADATA_FIELD_DISC)
+      else if (key == Metadata::Disc)
         metadata.disc = parseFraction(value);
-      else if (key == PARENT_METADATA_FIELD_COPYRIGHT)
+      else if (key == Metadata::Copyright)
         metadata.copyright = value;
-      else if (key == PARENT_METADATA_FIELD_GENRE)
+      else if (key == Metadata::Genre)
         metadata.genre = value;
-      else if (key == PARENT_METADATA_FIELD_COMMENT)
+      else if (key == Metadata::Comment)
         metadata.comment = value;
-      else if (key == PARENT_METADATA_FIELD_ALBUM_ARTIST)
+      else if (key == Metadata::AlbumArtist)
         metadata.album_artist = value;
-      else if (key == PARENT_METADATA_FIELD_TSRC)
+      else if (key == Metadata::TSRC)
         metadata.tsrc = value;
-      else if (key == PARENT_METADATA_FIELD_ENCODER)
+      else if (key == Metadata::Encoder)
         metadata.encoder = value;
-      else if (key == PARENT_METADATA_FIELD_ENCODED_BY)
+      else if (key == Metadata::EncodedBy)
         metadata.encoded_by = value;
-      else if (key == PARENT_METADATA_FIELD_DATE)
+      else if (key == Metadata::Date)
         metadata.date = value;
     }
 
@@ -222,13 +223,16 @@ private:
   static void saveStreamMetadataToToml(TomlGenerator& tomlGen, const StreamMetadata& stream,
                                        const std::string& parent)
   {
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CODEC, stream.codec);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_TYPE, stream.type);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_SAMPLE_RATE, stream.sample_rate);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CHANNELS, stream.channels);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_BITRATE, stream.bitrate);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_SAMPLE_FORMAT, stream.sample_format);
-    tomlGen.addTableValue(parent, PARENT_STREAM_FIELD_CHANNEL_LAYOUT, stream.channel_layout);
+
+    using namespace TomlKeys;
+
+    tomlGen.addTableValue(parent, Stream::Codec, stream.codec);
+    tomlGen.addTableValue(parent, Stream::Type, stream.type);
+    tomlGen.addTableValue(parent, Stream::SampleRate, stream.sample_rate);
+    tomlGen.addTableValue(parent, Stream::Channels, stream.channels);
+    tomlGen.addTableValue(parent, Stream::Bitrate, stream.bitrate);
+    tomlGen.addTableValue(parent, Stream::SampleFormat, stream.sample_format);
+    tomlGen.addTableValue(parent, Stream::ChannelLayout, stream.channel_layout);
   }
 };
 
