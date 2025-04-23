@@ -4,6 +4,8 @@ message(STATUS "  >>> Building FETCH PLUGIN: ${PLUGIN_TYPE}")
 message(STATUS "  >>> Target: wavy_test_fetch_plugin")
 message(STATUS "  >>> Output Directory: ${CMAKE_BINARY_DIR}/plugins")
 
+set(WAVY_FETCHER_PLUGIN_ENTRIES "${WAVY_FETCHER_PLUGIN_ENTRIES}${FETCHER_PLUGIN_TYPE}|${FETCHER_PLUGIN_NAME}\n" PARENT_SCOPE)
+
 set(PLUGIN_NAME wavy_test_fetch_plugin)
 set(PLUGIN_SRC src/entry.cpp)
 

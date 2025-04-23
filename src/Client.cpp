@@ -31,6 +31,7 @@
 #error "Wavy-Client requires C++20 or later."
 #endif
 
+#include <autogen/fetcherConfig.h>
 #include <iostream>
 #include <libwavy/components/client/daemon.hpp>
 #include <libwavy/logger.hpp>
@@ -89,7 +90,7 @@ auto main(int argc, char* argv[]) -> int
     return WAVY_RET_FAIL;
   }
 
-  std::string plugin_path = "";
+  RelPath plugin_path = "";
 
   // Check if fetch mode is custom and fetchLib is provided
   if (fetch_mode == "custom")
@@ -103,14 +104,28 @@ auto main(int argc, char* argv[]) -> int
     // Set the plugin path to the custom library
     plugin_path = std::string(WAVY_FETCHER_PLUGIN_OUTPUT_PATH) + "/" + fetch_lib;
   }
-  else if (fetch_mode == "aggr")
+  bool foundFetcher = false;
+  for (const auto& gFetcher : gFetchers)
   {
-    plugin_path = std::string(WAVY_FETCHER_PLUGIN_OUTPUT_PATH) + "/libwavy_aggr_fetch_plugin.so";
+    if (fetch_mode == gFetcher.name)
+    {
+      plugin_path  = std::string(WAVY_FETCHER_PLUGIN_OUTPUT_PATH) + "/" + gFetcher.plugin_path;
+      foundFetcher = true;
+      break;
+    }
+  }
+
+  if (!foundFetcher)
+  {
+    LOG_ERROR << "No matching fetcher plugin found for mode: " << fetch_mode;
+    LOG_INFO << "Available fetchers: ";
+    for (const auto& gFetcher : gFetchers)
+      LOG_INFO << "Fetcher: " << gFetcher.name << " (" << gFetcher.plugin_path << ")";
+    return WAVY_RET_FAIL;
   }
   else
   {
-    LOG_ERROR << PLUGIN_LOG << "Plugin not found for fetch mode: " << fetch_mode;
-    return WAVY_RET_FAIL;
+    LOG_INFO << RECEIVER_LOG << "Proceeding with Fetcher Plugin: " << plugin_path;
   }
 
   bool flac_found = parser.get("--playFlac") == "true" ? true : false;

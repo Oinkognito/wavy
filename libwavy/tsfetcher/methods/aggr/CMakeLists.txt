@@ -7,6 +7,8 @@ message(STATUS "  >>> Building FETCH PLUGIN: ${FETCHER_PLUGIN_TYPE}")
 message(STATUS "  >>> Target: ${FETCHER_PLUGIN_NAME}")
 message(STATUS "  >>> Output Directory: ${WAVY_FETCHER_PLUGIN_OUTPUT_PATH}\n")
 
+set(WAVY_FETCHER_PLUGIN_ENTRIES "${WAVY_FETCHER_PLUGIN_ENTRIES}${FETCHER_PLUGIN_TYPE}|${FETCHER_PLUGIN_NAME}\n" PARENT_SCOPE)
+
 add_library(${FETCHER_PLUGIN_NAME} SHARED ${FETCHER_PLUGIN_SRC})
 target_include_directories(${FETCHER_PLUGIN_NAME} PRIVATE ${CMAKE_SOURCE_DIR} ${ZSTD_INCLUDE_DIRS})
 target_link_libraries(${FETCHER_PLUGIN_NAME} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ZSTD_LIBRARIES})
