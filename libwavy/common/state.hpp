@@ -29,6 +29,8 @@
  ************************************************/
 
 #include <iterator>
+#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -77,15 +79,64 @@ struct AudioMetadata
   StreamMetadata video_stream;
 };
 
+// This is supposed to be thread safe concurrent storage solution for
+// AudioData and DecodedAudioData
 struct GlobalState
 {
-  TotalAudioData transport_segments;
+private:
+  TotalAudioData            transport_segments;
+  mutable std::shared_mutex mutex_; // allows multiple readers, exclusive writer
 
+public:
+  void appendSegment(AudioData&& segment)
+  {
+    std::unique_lock lock(mutex_);
+    transport_segments.emplace_back(std::move(segment));
+  }
+
+  // Append initial segment + multiple segments safely
   void appendSegmentsFLAC(AudioData&& initSegment, TotalAudioData&& m4sSegments)
   {
+    std::unique_lock lock(mutex_); // exclusive lock for write
     transport_segments.push_back(std::move(initSegment));
     transport_segments.insert(transport_segments.end(),
                               std::make_move_iterator(m4sSegments.begin()),
                               std::make_move_iterator(m4sSegments.end()));
+  }
+
+  // Get a snapshot copy of all segments safely
+  auto getAllSegments() const -> TotalAudioData
+  {
+    std::shared_lock lock(mutex_);
+    return transport_segments;
+  }
+
+  auto getSegment(size_t index) const -> AudioData
+  {
+    std::shared_lock lock(mutex_);
+    if (index >= transport_segments.size())
+      return {}; // or throw or handle error
+    return transport_segments[index];
+  }
+
+  // check whether transport_segments is empty safely
+  auto segsEmpty() const -> bool
+  {
+    std::shared_lock lock(mutex_);
+    return transport_segments.empty();
+  }
+
+  // Clear all segments safely
+  void clearSegments()
+  {
+    std::unique_lock lock(mutex_);
+    transport_segments.clear();
+  }
+
+  // Get count safely
+  auto segSizeAll() const -> size_t
+  {
+    std::shared_lock lock(mutex_);
+    return transport_segments.size();
   }
 };

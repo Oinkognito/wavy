@@ -31,6 +31,8 @@
 #include <filesystem>
 #include <fstream>
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/state.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/logger.hpp>
 #include <regex>
@@ -81,15 +83,16 @@ public:
    * @param output_playlist The output HLS playlist path.
    * @return True on success, false on failure.
    */
-  auto createSegmentsFLAC(const std::string& input_file, const std::string& output_dir,
+  auto createSegmentsFLAC(const AbsPath& input_file, const Directory& output_dir,
                           const char* output_playlist, int bitrate) -> bool
   {
-    AVFormatContext * input_ctx = nullptr, *output_ctx = nullptr;
-    AVStream *        in_stream = nullptr, *out_stream = nullptr;
-    AVPacket*         pkt = nullptr;
-    int               ret, audio_stream_idx = -1;
-    const std::string segment_file_format = output_dir + "/hls_flac_%d.m4s";
-    const std::string output_playlist_str = output_dir + "/" + output_playlist;
+    AVFormatContext *input_ctx = nullptr, *output_ctx = nullptr;
+    AVStream *       in_stream = nullptr, *out_stream = nullptr;
+    AVPacket*        pkt = nullptr;
+    int              ret;
+    AudioStreamIdx   audio_stream_idx    = -1;
+    const AbsPath    segment_file_format = output_dir + "/hls_flac_%d.m4s";
+    const AbsPath    output_playlist_str = output_dir + "/" + output_playlist;
 
     LOG_DEBUG << HLS_LOG << "Segments format: " << segment_file_format;
     LOG_DEBUG << HLS_LOG << "Playlist destination: " << output_playlist_str;
@@ -267,7 +270,7 @@ public:
    * @param input_dir Directory containing the segmented HLS playlists.
    * @param output_dir Directory where the master playlist will be created.
    */
-  void createMasterPlaylistMP3(const std::string& input_dir, const std::string& output_dir)
+  void createMasterPlaylistMP3(const Directory& input_dir, const Directory& output_dir)
   {
     std::vector<std::string> playlists;
     std::vector<int>         bitrates;
@@ -294,7 +297,7 @@ public:
       return;
     }
 
-    std::string   master_playlist = output_dir + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+    const AbsPath master_playlist = output_dir + "/" + macros::to_string(macros::MASTER_PLAYLIST);
     std::ofstream m3u8(master_playlist);
 
     if (!m3u8)
@@ -331,7 +334,7 @@ private:
     AVFormatContext* input_ctx          = nullptr;
     AVFormatContext* output_ctx         = nullptr;
     AVStream*        audio_stream       = nullptr;
-    int              audio_stream_index = -1;
+    AudioStreamIdx   audio_stream_index = -1;
     bool             is_flac            = false;
     AVDictionary*    options            = nullptr;
 
@@ -395,12 +398,11 @@ private:
     audio_stream->codecpar->bit_rate = bitrate * 1000; // kbps to bps conversion
 
     // Prepare segment filename
-    std::string output_playlist_str = output_playlist;
-    size_t      last_slash          = output_playlist_str.find_last_of('/');
-    std::string out_dir =
+    RelPath   output_playlist_str = output_playlist;
+    size_t    last_slash          = output_playlist_str.find_last_of('/');
+    Directory out_dir =
       (last_slash != std::string::npos) ? output_playlist_str.substr(0, last_slash) : ".";
-    std::string segment_filename_format =
-      out_dir + "/hls_mp3_" + std::to_string(bitrate) + "_%d.ts";
+    AbsPath segment_filename_format = out_dir + "/hls_mp3_" + std::to_string(bitrate) + "_%d.ts";
 
     // Set HLS options common to both cases
     av_dict_set(&options, macros::to_string(macros::CODEC_HLS_TIME_FIELD).c_str(), "10", 0);

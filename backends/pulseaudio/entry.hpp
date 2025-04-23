@@ -40,7 +40,8 @@ using namespace libwavy::utils::pluginlog;
 namespace libwavy::audio
 {
 
-constexpr const char* _AUDIO_BACKEND_NAME_ = "PulseAudio";
+constexpr AudioBackendPluginName _AUDIO_BACKEND_NAME_ = "PulseAudio";
+using PulseError                                      = int;
 
 class PulseAudioBackend : public IAudioBackend
 {
@@ -85,15 +86,15 @@ public:
   {
     isPlaying = true;
 
-    size_t       offset    = 0;
-    const size_t chunkSize = 4096;
+    AudioOffset      offset    = 0;
+    const AudioChunk chunkSize = 4096;
 
     while (isPlaying && offset < audioData.size())
     {
-      size_t remaining = audioData.size() - offset;
-      size_t toWrite   = (remaining < chunkSize) ? remaining : chunkSize;
+      AudioChunk remaining = audioData.size() - offset;
+      AudioChunk toWrite   = std::min(remaining, chunkSize);
 
-      int error;
+      PulseError error;
       if (pa_simple_write(stream, audioData.data() + offset, toWrite, &error) < 0)
       {
         PLUGIN_LOG_ERROR() << "PulseAudio write failed: " << pa_strerror(error);
@@ -107,7 +108,10 @@ public:
     isPlaying = false;
   }
 
-  [[nodiscard]] auto name() const -> const char* override { return "PulseAudio Plugin Backend"; }
+  [[nodiscard]] auto name() const -> AudioBackendPluginName override
+  {
+    return "PulseAudio Plugin Backend";
+  }
 
   ~PulseAudioBackend() override
   {

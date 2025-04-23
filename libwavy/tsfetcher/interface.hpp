@@ -29,6 +29,7 @@
  ************************************************/
 
 #include <libwavy/common/state.hpp>
+#include <libwavy/common/types.hpp>
 #include <string>
 
 namespace libwavy::fetch
@@ -39,11 +40,11 @@ class ISegmentFetcher
 public:
   virtual ~ISegmentFetcher() = default;
 
-  virtual auto fetchAndPlay(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
-                            int desired_bandwidth, bool& flac_found,
-                            const std::string& audio_backend_lib_path) -> bool = 0;
+  virtual auto fetchAndPlay(const StorageOwnerID& ip_id, const StorageAudioID& audio_id,
+                            GlobalState& gs, int desired_bandwidth, bool& flac_found,
+                            const RelPath& audio_backend_lib_path) -> bool = 0;
 
-  virtual auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
+  virtual auto fetch_client_list(const IPAddr& server, const StorageOwnerID& target_ip_id)
     -> std::vector<std::string> = 0;
 };
 

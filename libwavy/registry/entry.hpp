@@ -38,6 +38,7 @@ extern "C"
 #include <libavutil/dict.h>
 #include <libavutil/samplefmt.h>
 }
+#include <libwavy/common/types.hpp>
 #include <libwavy/toml/toml_generator.hpp>
 #include <libwavy/toml/toml_parser.hpp>
 
@@ -49,7 +50,7 @@ using namespace libwavy::Toml;
 class RegisterAudio
 {
 public:
-  RegisterAudio(std::string filePath, std::vector<int> bitrates)
+  RegisterAudio(AbsPath filePath, std::vector<int> bitrates)
       : filePath(std::move(filePath)), bitrates(std::move(bitrates))
   {
   }
@@ -83,7 +84,7 @@ public:
     return true;
   }
 
-  void exportToTOML(const std::string& outputFile) const
+  void exportToTOML(const AbsPath& outputFile) const
   {
     TomlGenerator tomlGen;
 

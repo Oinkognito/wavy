@@ -32,6 +32,7 @@
 #include <autogen/config.h>
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/parser/ast/entry.hpp>
 #include <libwavy/parser/macros.hpp>
@@ -61,15 +62,14 @@ class M3U8Parser
 public:
   // Parse master playlist from either a file path or direct content
   template <StringLike T>
-  static auto parseMasterPlaylist(const T&                   source,
-                                  std::optional<std::string> base_path = std::nullopt)
+  static auto parseMasterPlaylist(const T& source, std::optional<AbsPath> base_path = std::nullopt)
     -> ast::MasterPlaylist
   {
     if constexpr (std::is_same_v<std::decay_t<T>, std::string> ||
                   std::is_same_v<std::decay_t<T>, std::string_view>)
     {
       // If a base path is not provided, use current directory
-      std::string base = base_path.value_or(".");
+      AbsPath base = base_path.value_or(".");
       LOG_DEBUG << M3U8_PARSER_LOG << "Using provided base path '" << base
                 << "' for master playlist.";
       return parseMaster(std::string(source), base);
@@ -87,7 +87,7 @@ public:
       std::stringstream ss;
       ss << file.rdbuf();
 
-      std::string base;
+      AbsPath base;
       if (base_path)
       {
         base = *base_path;
@@ -106,7 +106,7 @@ public:
 
   // Parse media playlist from either a file path or direct content
   template <StringLike T>
-  static auto parseMediaPlaylist(const T& source, int bitrate, const std::string& base_dir = ".")
+  static auto parseMediaPlaylist(const T& source, int bitrate, const Directory& base_dir = ".")
     -> ast::MediaPlaylist
   {
     if constexpr (std::is_same_v<std::decay_t<T>, std::string> ||
@@ -138,7 +138,7 @@ public:
   }
 
 private:
-  static auto parseMaster(const std::string& content, const std::string& base_path)
+  static auto parseMaster(const PlaylistData& content, const AbsPath& base_path)
     -> ast::MasterPlaylist
   {
     ast::MasterPlaylist               master;
@@ -166,7 +166,7 @@ private:
     return master;
   }
 
-  static auto parseMedia(const std::string& content, int bitrate, const std::string& base_path)
+  static auto parseMedia(const PlaylistData& content, int bitrate, const Directory& base_path)
     -> ast::MediaPlaylist
   {
     ast::MediaPlaylist media;

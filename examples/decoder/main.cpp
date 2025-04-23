@@ -36,7 +36,7 @@ auto main() -> int
 {
   GlobalState gs;
 
-  auto ts_segments = gs.transport_segments;
+  auto ts_segments = gs.getAllSegments();
 
   if (ts_segments.empty())
   {
@@ -46,7 +46,7 @@ auto main() -> int
 
   MediaDecoder          decoder;
   TotalDecodedAudioData decoded_audio;
-  if (!decoder.decode(gs.transport_segments, decoded_audio))
+  if (!decoder.decode(ts_segments, decoded_audio))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");
     return 1;

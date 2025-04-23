@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 
 extern "C"
@@ -740,7 +741,7 @@ public:
 
     // Resample the frame
     int num_samples = swr_convert(swr_ctx, resampled_frame->data, resampled_frame->nb_samples,
-                                  (const uint8_t**)frame->data, frame->nb_samples);
+                                  (const AudioByte**)frame->data, frame->nb_samples);
 
     if (num_samples < 0)
     {

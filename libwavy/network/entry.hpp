@@ -36,6 +36,7 @@
 #include <boost/beast/ssl.hpp>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 
 namespace ssl   = boost::asio::ssl;
@@ -50,7 +51,7 @@ namespace libwavy::network
 class HttpsClient
 {
 public:
-  HttpsClient(asio::io_context& ioc, ssl::context& ssl_ctx, std::string server)
+  HttpsClient(asio::io_context& ioc, ssl::context& ssl_ctx, IPAddr server)
       : ioc_(ioc), ssl_ctx_(ssl_ctx), server_(std::move(server))
   {
   }
@@ -58,9 +59,9 @@ public:
   /**
    * @brief Perform a GET request to the specified target.
    * @param target The HTTP target (e.g., "/hls/somefile.m3u8").
-   * @return The response body as a string, or an empty string on failure.
+   * @return The response body as a string, or an empty string (NetResponse) on failure.
    */
-  auto get(const std::string& target) -> std::string
+  auto get(NetTarget& target) -> NetResponse
   {
     try
     {
@@ -117,7 +118,7 @@ public:
 private:
   asio::io_context& ioc_;
   ssl::context&     ssl_ctx_;
-  std::string       server_;
+  IPAddr            server_;
 };
 
 } // namespace libwavy::network

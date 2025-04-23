@@ -42,11 +42,11 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
-#include <libwavy/common/macros.hpp>
 #include <sstream>
 #include <unistd.h>
-#include <vector>
 
+#include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/toml/toml_parser.hpp>
 #include <libwavy/unix/domainBind.hpp>
 #include <libwavy/utils/math/entry.hpp>
@@ -111,11 +111,11 @@ using boost::asio::ip::tcp;
 #define ARCHIVE_READ_BUFFER_SIZE 10240
 
 /* PROTOTYPES DEFINITION FOR VALIDATION IN SERVER */
-auto is_valid_extension(const std::string& filename) -> bool;
-auto validate_m3u8_format(const std::string& content) -> bool;
+auto is_valid_extension(const AbsPath& filename) -> bool;
+auto validate_m3u8_format(const PlaylistData& content) -> bool;
 auto validate_ts_file(const std::vector<uint8_t>& data) -> bool;
-auto validate_m4s(const std::string& m4s_path) -> bool;
-auto extract_and_validate(const std::string& gzip_path, const std::string& audio_id,
+auto validate_m4s(const AbsPath& m4s_path) -> bool;
+auto extract_and_validate(const AbsPath& gzip_path, const std::string& audio_id,
                           const std::string& ip_id) -> bool;
 void removeBodyPadding(std::string& body);
 auto tokenizePath(std::istringstream& iss) -> vector<std::string>;
@@ -126,7 +126,7 @@ namespace libwavy::server
 class WavySession : public std::enable_shared_from_this<WavySession>
 {
 public:
-  explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const std::string ip)
+  explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const IPAddr ip)
       : socket_(std::move(socket)), ip_id_(std::move(ip))
   {
   }
@@ -141,7 +141,7 @@ private:
   boost::asio::ssl::stream<tcp::socket> socket_;
   beast::flat_buffer                    buffer_;
   http::request<http::string_body>      request_;
-  std::string                           ip_id_;
+  IPAddr                                ip_id_;
 
   void do_handshake()
   {
@@ -212,8 +212,8 @@ private:
     socket_.next_layer().set_option(option);
   }
 
-  auto fetch_metadata(const std::string& metadata_path, std::ostringstream& response_stream,
-                      const std::string& audio_id) -> bool
+  auto fetch_metadata(const AbsPath& metadata_path, std::ostringstream& response_stream,
+                      const StorageAudioID& audio_id) -> bool
   {
     LOG_TRACE_ASYNC << "Processing file: " << metadata_path;
 
@@ -268,7 +268,7 @@ private:
     {
       if (bfs::is_directory(ip_entry.status()))
       {
-        std::string ip_id = ip_entry.path().filename().string();
+        StorageOwnerID ip_id = ip_entry.path().filename().string();
         LOG_DEBUG_ASYNC << "Processing IP-ID: " << ip_id;
         response_stream << ip_id << ":\n";
 
@@ -277,10 +277,10 @@ private:
         {
           if (bfs::is_directory(audio_entry.status()))
           {
-            std::string audio_id = audio_entry.path().filename().string();
+            StorageAudioID audio_id = audio_entry.path().filename().string();
             LOG_TRACE_ASYNC << "Found Audio-ID: " << audio_id;
 
-            std::string metadata_path =
+            RelPath metadata_path =
               audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
             if (bfs::exists(metadata_path))
             {
@@ -320,7 +320,7 @@ private:
   {
     LOG_INFO_ASYNC << "Handling IP listing request";
 
-    std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
+    AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
       LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
@@ -335,7 +335,7 @@ private:
     {
       if (bfs::is_directory(ip_entry.status()))
       {
-        std::string ip_id = ip_entry.path().filename().string();
+        StorageOwnerID ip_id = ip_entry.path().filename().string();
         response_stream << ip_id << ":\n"; // IP-ID Header
 
         bool audio_found = false;
@@ -430,9 +430,9 @@ private:
   {
     LOG_INFO_ASYNC << SERVER_UPLD_LOG << "Handling GZIP file upload";
 
-    std::string audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
-    std::string gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
-                            macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
+    StorageAudioID audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
+    AbsPath        gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
+                        macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
     bfs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
@@ -508,13 +508,13 @@ private:
       return;
     }
 
-    std::string ip_addr  = parts[1];
-    std::string audio_id = parts[2];
-    std::string filename = parts[3];
+    IPAddr         ip_addr  = parts[1];
+    StorageAudioID audio_id = parts[2];
+    FileName       filename = parts[3];
 
     // Construct the file path
-    std::string file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
-                            audio_id + "/" + filename;
+    AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
+                        audio_id + "/" + filename;
 
     LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << "Checking file: " << file_path;
 
@@ -660,7 +660,7 @@ private:
           return;
         }
 
-        std::string ip = socket.remote_endpoint().address().to_string();
+        IPAddr ip = socket.remote_endpoint().address().to_string();
         LOG_INFO_ASYNC << SERVER_LOG << "Accepted new connection from " << ip;
 
         auto session = std::make_shared<WavySession>(

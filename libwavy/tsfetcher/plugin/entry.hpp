@@ -31,6 +31,7 @@
 #include <autogen/config.h>
 #include <dlfcn.h>
 #include <functional>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
 #include <memory>
@@ -41,7 +42,7 @@ namespace libwavy::fetch::plugin
 class FetcherFactory
 {
 public:
-  static auto create(const std::string& plugin_path, const std::string& server)
+  static auto create(const AbsPath& plugin_path, const IPAddr& server)
     -> std::unique_ptr<ISegmentFetcher, std::function<void(ISegmentFetcher*)>>
   {
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);

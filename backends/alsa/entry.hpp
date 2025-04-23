@@ -33,14 +33,15 @@
 #include <libwavy/audio/interface.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/utils/io/log/entry.hpp>
-#include <vector>
 
 using namespace libwavy::utils::pluginlog;
 
 namespace libwavy::audio
 {
 
-constexpr const char* _AUDIO_BACKEND_NAME_ = "ALSA";
+constexpr AudioBackendPluginName _AUDIO_BACKEND_NAME_ = "ALSA";
+using ALSAFrame                                       = snd_pcm_sframes_t;
+using ALSAHandle                                      = snd_pcm_t*;
 
 class AlsaAudioBackend : public IAudioBackend
 {
@@ -100,16 +101,17 @@ public:
   {
     isPlaying = true;
 
-    size_t       offset    = 0;
-    const size_t chunkSize = 4096;
+    AudioOffset          offset    = 0;
+    constexpr AudioChunk chunkSize = 4096;
 
     while (isPlaying && offset < audioData.size())
     {
-      size_t remaining = audioData.size() - offset;
-      size_t toWrite   = (remaining < chunkSize) ? remaining : chunkSize;
+      AudioChunk remaining = audioData.size() - offset;
+      AudioChunk toWrite   = std::min(remaining, chunkSize);
 
-      snd_pcm_sframes_t frames = snd_pcm_writei(handle, audioData.data() + offset,
-                                                toWrite / (sizeof(float) * 2)); // stereo float
+      ALSAFrame frames =
+        snd_pcm_writei(handle, audioData.data() + offset, toWrite / BytesPerSample);
+
       if (frames < 0)
       {
         frames = snd_pcm_recover(handle, frames, 0);
@@ -127,7 +129,10 @@ public:
     isPlaying = false;
   }
 
-  [[nodiscard]] auto name() const -> const char* override { return "ALSA Plugin Backend"; }
+  [[nodiscard]] auto name() const -> AudioBackendPluginName override
+  {
+    return "ALSA Plugin Backend";
+  }
 
   ~AlsaAudioBackend() override
   {

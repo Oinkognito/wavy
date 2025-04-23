@@ -28,7 +28,8 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include <vector>
+#include <libwavy/common/state.hpp>
+#include <libwavy/common/types.hpp>
 
 namespace libwavy::audio
 {
@@ -37,12 +38,12 @@ class IAudioBackend
 public:
   virtual ~IAudioBackend() = default;
 
-  virtual auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
+  virtual auto initialize(const TotalDecodedAudioData& audioInput, bool isFlac,
                           int preferredSampleRate = 0, int preferredChannels = 0, int bitDepth = 16)
     -> bool = 0;
 
   virtual void play() = 0;
 
-  [[nodiscard]] virtual auto name() const -> const char* = 0;
+  [[nodiscard]] virtual auto name() const -> AudioBackendPluginName = 0;
 };
 } // namespace libwavy::audio

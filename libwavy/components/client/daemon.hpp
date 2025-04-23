@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include <libwavy/common/types.hpp>
 #include <libwavy/tsfetcher/plugin/entry.hpp>
 #include <libwavy/utils/audio/entry.hpp>
 
@@ -36,16 +37,16 @@ namespace libwavy::components::client
 class WavyClient
 {
 private:
-  std::string _ip_id;
-  std::string _server;
-  std::string _plugin_path;
-  GlobalState gs;
-  int         _bitrate;
-  std::string _audio_backend_lib_path;
+  StorageOwnerID _ip_id;
+  IPAddr         _server;
+  RelPath        _plugin_path;
+  GlobalState    gs;
+  int            _bitrate;
+  RelPath        _audio_backend_lib_path;
 
 public:
-  WavyClient(const std::string ip_id, const std::string server, const std::string plugin_path,
-             const int bitrate, const std::string audioBackendLibPath)
+  WavyClient(const StorageOwnerID ip_id, const IPAddr server, const RelPath plugin_path,
+             const int bitrate, const RelPath audioBackendLibPath)
       : _ip_id(ip_id), _server(server), _plugin_path(plugin_path), _bitrate(bitrate),
         _audio_backend_lib_path(std::move(audioBackendLibPath))
   {
@@ -85,7 +86,7 @@ public:
       return WAVY_RET_FAIL;
     }
 
-    std::string audio_id = clients[index];
+    StorageAudioID audio_id = clients[index];
 
     // Fetch the transport stream
     if (!fetcher->fetchAndPlay(_ip_id, audio_id, gs, _bitrate, flac_found, _audio_backend_lib_path))

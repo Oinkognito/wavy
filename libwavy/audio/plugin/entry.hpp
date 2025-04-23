@@ -32,6 +32,7 @@
 #include <dlfcn.h>
 #include <functional>
 #include <libwavy/audio/interface.hpp> // Defines IAudioBackend
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <memory>
 #include <stdexcept>
@@ -42,7 +43,7 @@ namespace libwavy::audio::plugin
 class WavyAudioBackend
 {
 public:
-  static auto load(const std::string& plugin_path)
+  static auto load(const RelPath& plugin_path)
     -> std::unique_ptr<IAudioBackend, std::function<void(IAudioBackend*)>>
   {
     using BackendCreateFunc = IAudioBackend* (*)();

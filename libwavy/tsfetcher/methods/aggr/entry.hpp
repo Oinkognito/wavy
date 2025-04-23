@@ -28,19 +28,20 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy/common/state.hpp"
 #include <cstdlib>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/state.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/network/entry.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
 #include <libwavy/utils/audio/entry.hpp>
 #include <libwavy/utils/io/dbg/entry.hpp>
+#include <memory>
 
 namespace libwavy::fetch
 {
@@ -48,7 +49,7 @@ namespace libwavy::fetch
 class TSegFetcher : public ISegmentFetcher
 {
 public:
-  TSegFetcher(std::string server)
+  TSegFetcher(IPAddr server)
       : ioc_(std::make_shared<asio::io_context>()),
         ctx_(std::make_shared<ssl::context>(ssl::context::tlsv12_client)),
         server_(std::move(server))
@@ -56,9 +57,9 @@ public:
     ctx_->set_verify_mode(ssl::verify_none);
   }
 
-  auto fetchAndPlay(const std::string& ip_id, const std::string& audio_id, GlobalState& gs,
-                    int desired_bandwidth, bool& flac_found,
-                    const std::string& audio_backend_lib_path) -> bool override
+  auto fetchAndPlay(const StorageOwnerID& ip_id, const StorageAudioID& audio_id, GlobalState& gs,
+                    int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path)
+    -> bool override
   {
     LOG_INFO << FETCH_LOG << "Request Owner: " << ip_id;
     LOG_INFO << FETCH_LOG << "Audio-ID: " << audio_id;
@@ -84,13 +85,13 @@ public:
       gs.appendSegmentsFLAC(std::move(init_mp4_data), std::move(m4s_segments));
     }
 
-    if (!libwavy::dbg::FileWriter<std::string>::write(gs.transport_segments, "audio.raw"))
+    if (!libwavy::dbg::FileWriter<AudioData>::write(gs.getAllSegments(), "audio.raw"))
     {
       LOG_ERROR << FETCH_LOG << "Error writing transport segments to file";
       return false;
     }
 
-    LOG_INFO << FETCH_LOG << "Stored " << gs.transport_segments.size() << " transport segments.";
+    LOG_INFO << FETCH_LOG << "Stored " << gs.segSizeAll() << " transport segments.";
 
     // Decode and play the fetched stream
     if (!decodeAndPlay(gs, flac_found, audio_backend_lib_path))
@@ -101,7 +102,7 @@ public:
     return true;
   }
 
-  auto fetch_client_list(const std::string& server, const std::string& target_ip_id)
+  auto fetch_client_list(const IPAddr& server, const StorageOwnerID& target_ip_id)
     -> std::vector<std::string> override
   {
     asio::io_context ioc;
@@ -109,14 +110,14 @@ public:
     ctx.set_verify_mode(ssl::verify_none);
     libwavy::network::HttpsClient client(ioc, ctx, server);
 
-    std::string response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
+    NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
 
     if (response.empty())
       return {};
 
     std::istringstream       iss(response);
     std::string              line;
-    std::string              current_ip_id;
+    StorageOwnerID           current_ip_id;
     std::vector<std::string> clients;
 
     while (std::getline(iss, line))
@@ -135,7 +136,7 @@ public:
         size_t pos = line.find("- ");
         if (pos != std::string::npos)
         {
-          std::string client_id = line.substr(pos + 2); // Extract client ID
+          StorageOwnerID client_id = line.substr(pos + 2); // Extract client ID
           clients.push_back(client_id);
         }
       }
@@ -147,19 +148,20 @@ public:
 private:
   std::shared_ptr<asio::io_context> ioc_;
   std::shared_ptr<ssl::context>     ctx_;
-  std::string                       server_;
+  IPAddr                            server_;
 
   auto make_client() -> std::unique_ptr<libwavy::network::HttpsClient>
   {
     return std::make_unique<libwavy::network::HttpsClient>(*ioc_, *ctx_, server_);
   }
 
-  auto fetch_master_playlist(const std::string& ip_id, const std::string& audio_id) -> std::string
+  auto fetch_master_playlist(const StorageOwnerID& ip_id, const StorageAudioID& audio_id)
+    -> PlaylistData
   {
-    std::string path =
+    NetTarget path =
       "/hls/" + ip_id + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
-    auto        client  = make_client();
-    std::string content = client->get(path);
+    auto         client  = make_client();
+    PlaylistData content = client->get(path);
     if (content.empty())
     {
       LOG_ERROR << FETCH_LOG << "Failed to fetch master playlist for " << ip_id << "/" << audio_id;
@@ -167,7 +169,7 @@ private:
     return content;
   }
 
-  auto select_playlist(const std::string& ip_id, const std::string& audio_id,
+  auto select_playlist(const StorageOwnerID& ip_id, const std::string& audio_id,
                        const std::string& content, int desired_bandwidth) -> std::string
   {
     std::string playlist_path = "/hls/" + ip_id + "/" + audio_id + "/";
@@ -218,8 +220,8 @@ private:
     return client->get(playlist_path);
   }
 
-  auto process_segments(const std::string& playlist, const std::string& ip_id,
-                        const std::string& audio_id, AudioData& init_mp4_data,
+  auto process_segments(const PlaylistData& playlist, const StorageOwnerID& ip_id,
+                        const StorageAudioID& audio_id, AudioData& init_mp4_data,
                         TotalAudioData& m4s_segments, GlobalState& gs) -> bool
   {
     std::istringstream stream(playlist);
@@ -254,7 +256,7 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        const std::string url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+        const NetTarget url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
         LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
         AudioData data = client->get(url);
 
@@ -263,7 +265,7 @@ private:
           if (line.ends_with(macros::M4S_FILE_EXT))
             m4s_segments.push_back(std::move(data));
           else if (line.ends_with(macros::TRANSPORT_STREAM_EXT))
-            gs.transport_segments.push_back(std::move(data));
+            gs.appendSegment(std::move(data));
 
           LOG_DEBUG << FETCH_LOG << "Fetched segment: " << line;
         }

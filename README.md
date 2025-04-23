@@ -1,6 +1,6 @@
 # **Wavy**
 
-A **local networking solution** for **audio streaming and sharing**, supporting **lossless and lossy audio formats** through a unified platform.
+A **local networking solution** for **audio streaming and sharing**, supporting **lossless and lossy audio formats** through a unified platform, written in C++20.
 
 > [!IMPORTANT]
 > 

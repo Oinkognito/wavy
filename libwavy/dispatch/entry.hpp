@@ -29,6 +29,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/common/state.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/algorithm/string.hpp>
@@ -40,9 +41,9 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
-#include <vector>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/zstd/compression.h>
 
@@ -144,7 +145,7 @@ enum class PlaylistFormat
 class Dispatcher
 {
 public:
-  Dispatcher(std::string server, std::string directory, std::string playlist_name)
+  Dispatcher(IPAddr server, Directory directory, FileName playlist_name)
       : ssl_ctx_(ssl::context::sslv23), resolver_(context_), stream_(context_, ssl_ctx_),
         server_(std::move(server)), directory_(std::move(directory)),
         playlist_name_(std::move(playlist_name))
@@ -165,12 +166,12 @@ public:
     {
       LOG_DEBUG << DISPATCH_LOG << "Payload already exists, checking for "
                 << macros::DISPATCH_ARCHIVE_NAME << "...";
-      std::string archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
+      AbsPath archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
       if (fs::exists(archive_path))
         return upload_to_server(archive_path);
     }
 
-    std::string master_playlist_path = fs::path(directory_) / playlist_name_;
+    AbsPath master_playlist_path = fs::path(directory_) / playlist_name_;
 
     if (!verify_master_playlist(master_playlist_path))
     {
@@ -184,7 +185,7 @@ public:
       return false;
     }
 
-    std::string metadata_path = fs::path(directory_) / macros::to_string(macros::METADATA_FILE);
+    AbsPath metadata_path = fs::path(directory_) / macros::to_string(macros::METADATA_FILE);
     if (!fs::exists(metadata_path))
     {
       LOG_ERROR << DISPATCH_LOG << "Missing metadata.toml in: " << directory_;
@@ -196,8 +197,8 @@ public:
     print_hierarchy();
 #endif
 
-    std::string archive_path  = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
-    bool        applyZSTDComp = true;
+    AbsPath archive_path  = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
+    bool    applyZSTDComp = true;
     if (playlist_format == PlaylistFormat::FMP4)
     {
       LOG_DEBUG << DISPATCH_LOG
@@ -221,13 +222,13 @@ private:
   ssl::context                   ssl_ctx_;
   tcp::resolver                  resolver_;
   beast::ssl_stream<tcp::socket> stream_;
-  std::string                    server_, directory_, playlist_name_;
+  DirPathHolder                  server_, directory_, playlist_name_;
 
-  std::unordered_map<std::string, std::vector<std::string>> reference_playlists_;
-  std::vector<std::string>                                  transport_streams_;
-  std::string                                               master_playlist_content_;
+  std::unordered_map<AbsPath, TotalAudioData> reference_playlists_;
+  TotalAudioData                              transport_streams_;
+  PlaylistData                                master_playlist_content_;
 
-  auto verify_master_playlist(const std::string& path) -> bool
+  auto verify_master_playlist(const AbsPath& path) -> bool
   {
     std::ifstream file(path);
     if (!file.is_open())
@@ -251,7 +252,7 @@ private:
           LOG_ERROR << DISPATCH_LOG << "Invalid reference playlist in master.";
           return false;
         }
-        std::string playlist_path           = fs::path(directory_) / line;
+        AbsPath playlist_path               = fs::path(directory_) / line;
         reference_playlists_[playlist_path] = {}; // Store referenced playlists
         LOG_INFO << DISPATCH_LOG << "Found reference playlist: " << playlist_path;
       }
@@ -270,8 +271,7 @@ private:
 
   auto verify_references() -> bool
   {
-    std::vector<std::string> mp4_segments_;
-    std::vector<std::string> transport_streams_;
+    TotalAudioData mp4_segments_, transport_streams_;
 
     for (auto& [playlist_path, segments] : reference_playlists_)
     {
@@ -286,7 +286,7 @@ private:
 
       while (std::getline(file, line))
       {
-        std::string segment_path = fs::path(directory_) / line;
+        AbsPath segment_path = fs::path(directory_) / line;
 
         if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
@@ -370,7 +370,7 @@ private:
     return true;
   }
 
-  auto validate_m4s(const std::string& m4s_path) -> bool
+  auto validate_m4s(const AbsPath& m4s_path) -> bool
   {
     std::ifstream file(m4s_path, std::ios::binary);
     if (!file.is_open())
@@ -391,7 +391,7 @@ private:
     return true;
   }
 
-  auto compress_files(const std::string& output_archive_path, const bool applyZSTDComp) -> bool
+  auto compress_files(const AbsPath& output_archive_path, const bool applyZSTDComp) -> bool
   {
     LOG_DEBUG << DISPATCH_LOG << "Beginning Compression Job in: " << output_archive_path << " from "
               << fs::absolute(directory_);
@@ -510,7 +510,7 @@ private:
     }
   }
 
-  void send_http_request(const std::string& method, const std::string& archive_path)
+  void send_http_request(NetMethods& method, const AbsPath& archive_path)
   {
     beast::error_code                  ec;
     beast::http::file_body::value_type body;

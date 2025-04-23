@@ -50,8 +50,8 @@ namespace libwavy::unix
 class UnixSocketBind
 {
 private:
-  int         lock_fd_;
-  int         server_fd_;
+  int         lock_fd_{};
+  int         server_fd_{};
   std::string socket_path_;
 
 public:

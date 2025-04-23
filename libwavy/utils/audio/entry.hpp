@@ -38,7 +38,9 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
 
   -> bool
 {
-  if (gs.transport_segments.empty())
+  auto segments = gs.getAllSegments();
+
+  if (segments.empty())
   {
     LOG_ERROR << DECODER_LOG << "No transport stream segments provided";
     return false;
@@ -47,8 +49,8 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found,
   LOG_INFO << "Decoding transport stream segments...";
 
   libwavy::ffmpeg::MediaDecoder decoder;
-  std::vector<unsigned char>    decoded_audio;
-  if (!decoder.decode(gs.transport_segments, decoded_audio))
+  TotalDecodedAudioData         decoded_audio;
+  if (!decoder.decode(segments, decoded_audio))
   {
     LOG_ERROR << DECODER_LOG << "Decoding failed";
     return false;

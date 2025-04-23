@@ -29,6 +29,8 @@
  ************************************************/
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/state.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/utils/io/dbg/entry.hpp>
 #include <libwavy/utils/math/entry.hpp>
 #include <vector>
@@ -42,8 +44,10 @@ extern "C"
 #include <libavutil/opt.h>
 }
 
+inline constexpr ByteCount DefaultAVIOBufferSize = 32768;
+
 // Custom AVIO read function
-static auto readAVIO(void* opaque, uint8_t* buf, int buf_size) -> int
+static auto readAVIO(void* opaque, AudioByte* buf, int buf_size) -> int
 {
   auto*         segments      = static_cast<std::vector<std::string>*>(opaque);
   static size_t segment_index = 0;
@@ -104,12 +108,11 @@ public:
                                                            : "This is a lossy codec");
   }
 
-  auto decode(std::vector<std::string>& ts_segments, std::vector<unsigned char>& output_audio)
-    -> bool
+  auto decode(TotalAudioData& ts_segments, TotalDecodedAudioData& output_audio) -> bool
   {
     AVFormatContext* input_ctx        = nullptr;
     AVCodecContext*  codec_ctx        = nullptr;
-    int              audio_stream_idx = -1;
+    AudioStreamIdx   audio_stream_idx = -1;
 
     if (!init_input_context(ts_segments, input_ctx))
       return false;
@@ -137,23 +140,22 @@ public:
       return false;
     }
 
-    libwavy::dbg::FileWriter<unsigned char>::write(output_audio, "final.pcm");
+    libwavy::dbg::FileWriter<DecodedAudioData>::write(output_audio, "final.pcm");
 
     cleanup(input_ctx, codec_ctx);
     return true;
   }
 
 private:
-  auto init_input_context(std::vector<std::string>& ts_segments, AVFormatContext*& ctx) -> bool
+  auto init_input_context(TotalAudioData& ts_segments, AVFormatContext*& ctx) -> bool
   {
-    ctx                   = avformat_alloc_context();
-    const size_t avio_buf = 32768;
-    auto*        buffer   = static_cast<unsigned char*>(av_malloc(avio_buf));
+    ctx          = avformat_alloc_context();
+    auto* buffer = static_cast<unsigned char*>(av_malloc(DefaultAVIOBufferSize));
     if (!buffer)
       return false;
 
-    AVIOContext* avio_ctx =
-      avio_alloc_context(buffer, avio_buf, 0, &ts_segments, &readAVIO, nullptr, nullptr);
+    AVIOContext* avio_ctx = avio_alloc_context(buffer, DefaultAVIOBufferSize, 0, &ts_segments,
+                                               &readAVIO, nullptr, nullptr);
     if (!avio_ctx)
       return false;
 
@@ -177,7 +179,7 @@ private:
       av_log(nullptr, AV_LOG_WARNING, "Unknown or unsupported format detected\n");
   }
 
-  auto find_audio_stream(AVFormatContext* ctx, int& index) -> bool
+  auto find_audio_stream(AVFormatContext* ctx, AudioStreamIdx& index) -> bool
   {
     for (unsigned int i = 0; i < ctx->nb_streams; i++)
     {
@@ -203,7 +205,7 @@ private:
 
     if (codec_params->extradata_size > 0)
     {
-      codec_ctx->extradata = static_cast<uint8_t*>(
+      codec_ctx->extradata = static_cast<AudioByte*>(
         av_malloc(codec_params->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE));
       memcpy(codec_ctx->extradata, codec_params->extradata, codec_params->extradata_size);
       codec_ctx->extradata_size = codec_params->extradata_size;
@@ -217,8 +219,8 @@ private:
     return true;
   }
 
-  auto process_packets(AVFormatContext* ctx, AVCodecContext* codec_ctx, int stream_idx,
-                       AVCodecParameters* codec_params, std::vector<unsigned char>& output) -> bool
+  auto process_packets(AVFormatContext* ctx, AVCodecContext* codec_ctx, AudioStreamIdx stream_idx,
+                       AVCodecParameters* codec_params, TotalDecodedAudioData& output) -> bool
   {
     AVPacket* packet  = av_packet_alloc();
     AVFrame*  frame   = av_frame_alloc();
