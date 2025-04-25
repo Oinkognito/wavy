@@ -31,14 +31,16 @@ class IAudioBackend
 public:
   virtual ~IAudioBackend() = default;
 
-  virtual auto initialize(const std::vector<unsigned char>& audioInput, bool isFlac,
+  virtual auto initialize(const TotalDecodedAudioData& audioInput, bool isFlac,
                           int preferredSampleRate = 0, int preferredChannels = 0, int bitDepth = 16)
     -> bool = 0;
 
   virtual void play() = 0;
 
-  [[nodiscard]] virtual auto name() const -> const char* = 0;
+  [[nodiscard]] virtual auto name() const -> AudioBackendPluginName = 0;
 };
+
+using AudioBackendPtr = std::unique_ptr<IAudioBackend, std::function<void(IAudioBackend*)>>;
 ```
 
 Quite a simple interface with only three functions to implement. 
@@ -62,7 +64,7 @@ The goal for `libwavy` is a simple and super handy abstration of existing librar
    - Begins audio playback using the previously supplied audio data.
    - Implementations should handle audio streaming and possible errors internally.
 
-3. **`name() -> const char*`**
+3. **`name() -> AudioBackendPluginName`**
    - Returns a human-readable name for the backend.
    - Useful for logging or debugging purposes to identify the active backend.
 
@@ -103,7 +105,7 @@ This class is responsible for:
 
 ```cpp
 static auto load(const std::string& plugin_path)
-  -> std::unique_ptr<IAudioBackend, std::function<void(IAudioBackend*)>>;
+  -> AudioBackendPtr;
 ```
 
 #### How It Works

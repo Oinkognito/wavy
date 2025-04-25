@@ -125,7 +125,7 @@ public:
   [[nodiscard]] auto getMetadata() const -> const AudioMetadata& { return metadata; }
 
 private:
-  std::string      filePath;
+  RelPath          filePath;
   AVFormatContext* fmt_ctx{};
   AudioMetadata    metadata;
   std::vector<int> bitrates;
@@ -184,7 +184,7 @@ private:
     }
 
     // Extract streams
-    for (unsigned i = 0; i < fmt_ctx->nb_streams; i++)
+    for (AudioStreamIdxIter i = 0; i < fmt_ctx->nb_streams; i++)
     {
       AVStream*          stream       = fmt_ctx->streams[i];
       AVCodecParameters* codec_params = stream->codecpar;

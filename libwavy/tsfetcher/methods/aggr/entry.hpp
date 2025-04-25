@@ -172,7 +172,6 @@ private:
   auto select_playlist(const StorageOwnerID& ip_id, const std::string& audio_id,
                        const std::string& content, int desired_bandwidth) -> std::string
   {
-    std::string playlist_path = "/hls/" + ip_id + "/" + audio_id + "/";
     if (content.find(macros::PLAYLIST_VARIANT_TAG) == std::string::npos)
       return content;
 
@@ -213,7 +212,7 @@ private:
       LOG_WARNING << FETCH_LOG << "Exact match not found. Using max bitrate: " << max_bandwidth;
     }
 
-    playlist_path += selected;
+    NetTarget playlist_path = "/hls/" + ip_id + "/" + audio_id + "/" + selected;
     LOG_INFO << FETCH_LOG << "Selected bitrate playlist: " << playlist_path;
 
     auto client = make_client();
@@ -241,7 +240,8 @@ private:
 
     if (has_m4s)
     {
-      init_mp4_data = client->get("/hls/" + ip_id + "/" + audio_id + "/init.mp4");
+      NetTarget initMp4Url = "/hls/" + ip_id + "/" + audio_id + "/init.mp4";
+      init_mp4_data        = client->get(initMp4Url);
       if (init_mp4_data.empty())
       {
         LOG_ERROR << FETCH_LOG << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
@@ -256,7 +256,7 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        const NetTarget url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+        NetTarget url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
         LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
         AudioData data = client->get(url);
 

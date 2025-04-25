@@ -34,7 +34,6 @@
 #include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
-#include <memory>
 #include <string>
 
 namespace libwavy::fetch::plugin
@@ -42,8 +41,7 @@ namespace libwavy::fetch::plugin
 class FetcherFactory
 {
 public:
-  static auto create(const AbsPath& plugin_path, const IPAddr& server)
-    -> std::unique_ptr<ISegmentFetcher, std::function<void(ISegmentFetcher*)>>
+  static auto create(const AbsPath& plugin_path, const IPAddr& server) -> SegmentFetcherPtr
   {
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);
 
