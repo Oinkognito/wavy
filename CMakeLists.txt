@@ -157,7 +157,7 @@ if (DEFINED BUILD_AUDIO_BACKEND_PLUGINS AND BUILD_AUDIO_BACKEND_PLUGINS)
 message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING AUDIO BACKEND PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY AUDIO BACKEND PLUGIN BUILD ]===================${RESET}")
 add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/pulseaudio)
-add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/alsa) # {TO TRY ALSA OUT JUST UNCOMMENT THIS LINE!}
+#add_subdirectory(${WAVY_AUDIO_BACKEND_PLUGIN_PATH}/alsa) # {TO TRY ALSA OUT JUST UNCOMMENT THIS LINE!}
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}=========================================================================${RESET}\n")
 ########################### END AUDIO BACKEND PLUGINS HERE #########################################

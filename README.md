@@ -93,11 +93,6 @@ sudo pacman -S --needed \
   libarchive lame flac++
 ```
 
-> **Note:** Qt6 (optional for GUI):
-```bash
-sudo pacman -S qt6-base qt6-tools
-```
-
 ### **Ubuntu / Debian**
 
 ```bash
@@ -105,11 +100,6 @@ sudo apt update && sudo apt install -y \
   ffmpeg build-essential libssl-dev libboost-all-dev libtbb-dev \
   libzstd-dev cmake make pkg-config libarchive-dev \
   libmp3lame-dev libflac++-dev
-```
-
-> **Optional GUI (Qt6):**
-```bash
-sudo apt install qt6-base-dev qt6-tools-dev
 ```
 
 ### **Fedora**
@@ -120,11 +110,6 @@ sudo dnf install -y \
     ffmpeg-free-devel libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
     zstd cmake make pkgconf \
     libarchive-devel lame-devel git wget tbb-devel
-```
-
-> **Optional GUI (Qt6):**
-```bash
-sudo dnf install qt6-qtbase-devel qt6-qttools-devel
 ```
 
 ## **Building**
