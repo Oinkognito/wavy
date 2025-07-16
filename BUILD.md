@@ -145,16 +145,15 @@ Both generate `server.key` and `server.crt` for TLS-enabled LAN usage.
 
 ## Third-party Dependencies
 
-These are auto-installed by `make init`, or implicitly on first build:
+These are resolved by cloning the repository **recursively**:
 
-- [`miniaudio.h`](https://github.com/mackron/miniaudio) — audio decoding
-- [`toml.hpp`](https://github.com/marzer/tomlplusplus) — TOML parsing
-
-Manual install:
-
-```sh
-make init
+```bash 
+git clone --recursive https://github.com/Oinkognito/Wavy
 ```
+
+Currently, the only third-party dependency we are using is:
+
+- [`toml.hpp`](https://github.com/marzer/tomlplusplus) — TOML parsing
 
 ## Build Artifacts
 

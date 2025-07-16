@@ -22,10 +22,6 @@ define configure
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" $(EXTRA_CMAKE_FLAGS) ..
 endef
 
-# Initialize dependencies
-init:
-	@wget -O $(TOMLPP_DEST_DIR)/toml.hpp $(TOMLPP_URL)
-
 # Build all targets
 all:
 	$(call configure,All,Release)
@@ -86,4 +82,4 @@ server-cert:
 server-cert-gen:
 	@openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 
-.PHONY: default all owner server client run-owner run-server verbose clean cleanup format tidy init server-cert server-cert-gen
+.PHONY: default all owner server client run-owner run-server verbose clean cleanup format tidy server-cert server-cert-gen
