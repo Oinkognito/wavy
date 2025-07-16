@@ -6,8 +6,17 @@
 #include <string>
 #include <vector>
 
+//[ Int types ]//
+using i8   = int8_t;
+using i16  = int16_t;
+using i32  = int32_t;
+using i64  = int64_t;
+using uint = unsigned int;
+using ui8  = uint8_t;
+
 //[ NETWORKING DEFS ]//
 using IPAddr      = std::string;       // IP Address typedef (typically for server ip)
+using Nickname    = std::string;       // Nickname to be stored in the server
 using PortNo      = int;               // Port number of the server
 using NetMethods  = const std::string; // Methods like "GET", "POST", etc.
 using NetTarget   = const std::string; // Requested target to check in server
@@ -41,12 +50,12 @@ using StorageAudioID = std::string;
 
 //[ AUDIO BACKEND PLUGIN DEFS ]//
 using AudioBackendPluginName               = const char*;
-using AudioByte                            = uint8_t;
+using AudioByte                            = ui8;
 using AudioBuffer                          = std::vector<AudioByte>;
 using AudioOffset                          = std::size_t;
 using AudioChunk                           = std::size_t;
 using SampleSize                           = std::size_t;
 using ByteCount                            = size_t;
 using AudioStreamIdx                       = int;
-using AudioStreamIdxIter                   = unsigned int;
+using AudioStreamIdxIter                   = uint;
 inline constexpr SampleSize BytesPerSample = sizeof(float) * 2; // stereo float

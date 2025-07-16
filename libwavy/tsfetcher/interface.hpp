@@ -42,11 +42,11 @@ class ISegmentFetcher
 public:
   virtual ~ISegmentFetcher() = default;
 
-  virtual auto fetchAndPlay(const StorageOwnerID& ip_id, const StorageAudioID& audio_id,
+  virtual auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id,
                             GlobalState& gs, int desired_bandwidth, bool& flac_found,
                             const RelPath& audio_backend_lib_path) -> bool = 0;
 
-  virtual auto fetch_client_list(const IPAddr& server, const StorageOwnerID& target_ip_id)
+  virtual auto fetch_client_list(const IPAddr& server, const StorageOwnerID& targetNickname)
     -> std::vector<std::string> = 0;
 };
 

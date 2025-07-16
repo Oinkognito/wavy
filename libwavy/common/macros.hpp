@@ -83,6 +83,7 @@ enum
   X(MP3_FILE_EXT, ".mp3")                                     \
   X(FLAC_FILE_EXT, ".flac")                                   \
   X(ZSTD_FILE_EXT, "zst")                                     \
+  X(OWNER_FILE_EXT, ".owner")                                 \
   X(TOML_FILE_EXT, ".toml")                                   \
   X(COMPRESSED_ARCHIVE_EXT, ".tar.gz")                        \
                                                               \
@@ -122,7 +123,7 @@ enum
   X(SERVER_PATH_PING, "/hls/ping")                            \
                                                               \
   /* Locking & Protocol Helpers */                            \
-  X(SERVER_LOCK_FILE, "/tmp/hls_server.lock")                 \
+  X(SERVER_LOCK_FILE, "/tmp/wavy_server.lock")                \
   X(NETWORK_TEXT_DELIM, "\r\n\r\n")                           \
                                                               \
   /* Certificate & Key Files */                               \
@@ -130,8 +131,8 @@ enum
   X(SERVER_PRIVATE_KEY, "server.key")                         \
                                                               \
   /* Directories */                                           \
-  X(SERVER_TEMP_STORAGE_DIR, "/tmp/hls_temp")                 \
-  X(SERVER_STORAGE_DIR, "/tmp/hls_storage") // tmp of server filesystem
+  X(SERVER_TEMP_STORAGE_DIR, "/tmp/wavy_temp")                \
+  X(SERVER_STORAGE_DIR, "/tmp/wavy_storage") // tmp of server filesystem
 
 #define PROTOCOL_CONSTANTS(X)                                                               \
   X(SERVER_ERROR_400, "HTTP/1.1 400 Bad Request" CRLF2 "Invalid request format")            \

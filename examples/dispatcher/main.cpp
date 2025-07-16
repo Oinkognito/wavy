@@ -36,21 +36,22 @@
 auto main(int argc, char* argv[]) -> int
 {
 
-  if (argc < 3)
+  if (argc < 4)
   {
-    LOG_ERROR << argv[0] << " <server-ip> <output-dir>";
+    LOG_ERROR << argv[0] << " <server-ip> <nickname> <output-dir>";
     LOG_ERROR << "Payload directory refers to the directory that contains the desired playlists "
                  "and transport segments.";
     return WAVY_RET_FAIL;
   }
 
   // Add your custom logic to validate these cmd-line args if needed...
-  const IPAddr    server = argv[1];
-  const Directory dir    = argv[2];
+  const IPAddr         server   = argv[1];
+  const StorageOwnerID nickname = argv[2];
+  const Directory      dir      = argv[3];
 
   try
   {
-    libwavy::dispatch::Dispatcher dispatcher(server, dir,
+    libwavy::dispatch::Dispatcher dispatcher(server, nickname, dir,
                                              macros::to_string(macros::MASTER_PLAYLIST));
     if (!dispatcher.process_and_upload())
     {

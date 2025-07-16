@@ -52,13 +52,14 @@ using namespace libwavy::ffmpeg;
  *
  */
 
-constexpr const char* HELP_STR = " --inputFile=<input file> --outputDir=<output directory> "
-                                 "--flacEncode=<true/false> [--avDbgLog] --serverIP=<server-ip>";
+constexpr const char* HELP_STR =
+  " --inputFile=<input file> --outputDir=<output directory> "
+  "--flacEncode=<true/false> [--avDbgLog] --serverIP=<server-ip> --nickname=<unique string>";
 
-auto exportTOMLFile(const FileName& filename, const Directory& output_dir,
-                    vector<int> found_bitrates) -> int
+auto exportTOMLFile(const FileName& filename, const StorageOwnerID& nickname,
+                    const Directory& output_dir, vector<int> found_bitrates) -> int
 {
-  libwavy::registry::RegisterAudio parser(filename, found_bitrates);
+  libwavy::registry::RegisterAudio parser(filename, nickname, found_bitrates);
   if (!parser.parse())
   {
     LOG_ERROR << OWNER_LOG << "Failed to parse audio file.";
@@ -95,13 +96,14 @@ auto main(int argc, char* argv[]) -> int
   libwavy::utils::cmdline::CmdLineParser cmdLineParser(std::span<char* const>(argv, argc),
                                                        HELP_STR);
 
-  bool            avdebug_mode = cmdLineParser.get("avDbgLog") == "true" ? true : false;
-  bool            use_flac     = cmdLineParser.get("flacEncode") == "true"
-                                   ? true
-                                   : false; // This is to encode in lossless FLAC format
-  const RelPath   input_file   = cmdLineParser.get("inputFile");
-  const IPAddr    server       = cmdLineParser.get("serverIP");
-  const Directory output_dir   = cmdLineParser.get("outputDir");
+  bool                 avdebug_mode = cmdLineParser.get("avDbgLog") == "true" ? true : false;
+  bool                 use_flac     = cmdLineParser.get("flacEncode") == "true"
+                                        ? true
+                                        : false; // This is to encode in lossless FLAC format
+  const RelPath        input_file   = cmdLineParser.get("inputFile");
+  const IPAddr         server       = cmdLineParser.get("serverIP");
+  const StorageOwnerID nickname     = cmdLineParser.get("nickname");
+  const Directory      output_dir   = cmdLineParser.get("outputDir");
 
   cmdLineParser.requireMinArgs(5, argc);
 
@@ -174,11 +176,11 @@ auto main(int argc, char* argv[]) -> int
     seg.createSegmentsFLAC(input_file, output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
     int ret =
-      exportTOMLFile(input_file.c_str(), output_dir,
+      exportTOMLFile(input_file.c_str(), nickname, output_dir,
                      {}); // just give empty array as we are not transcoding to diff bitrates
     if (ret == 0)
     {
-      return dispatch(server, output_dir);
+      return dispatch(server, nickname, output_dir);
     }
 
     LOG_ERROR << OWNER_LOG << "Failed to export metadata. Quiting dispatch JOB.";
@@ -236,11 +238,11 @@ auto main(int argc, char* argv[]) -> int
 
   seg.createMasterPlaylistMP3(output_dir, output_dir);
 
-  if (exportTOMLFile(input_file, output_dir, found_bitrates) > 0)
+  if (exportTOMLFile(input_file, nickname, output_dir, found_bitrates) > 0)
   {
     LOG_ERROR << OWNER_LOG << "Failed to export metadata to `metadata.toml`. Exiting...";
     return WAVY_RET_FAIL;
   }
 
-  return dispatch(server, output_dir);
+  return dispatch(server, nickname, output_dir);
 }

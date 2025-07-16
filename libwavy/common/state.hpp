@@ -29,6 +29,7 @@
  ************************************************/
 
 #include <iterator>
+#include <libwavy/common/types.hpp>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
@@ -54,6 +55,8 @@ struct StreamMetadata
 
 struct AudioMetadata
 {
+  StorageOwnerID nickname;
+
   int         bitrate;
   int         duration;
   string      path;

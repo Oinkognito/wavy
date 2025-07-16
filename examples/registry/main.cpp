@@ -33,16 +33,17 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  if (argc < 3)
+  if (argc < 4)
   {
-    std::cerr << "Usage: " << argv[0] << " <input_audio_file> <output_toml_file>\n";
+    std::cerr << "Usage: " << argv[0] << " <input_audio_file> <nickname> <output_toml_file>\n";
     return 1;
   }
 
-  RelPath inputFile  = argv[1];
-  RelPath outputFile = argv[2];
+  RelPath        inputFile  = argv[1];
+  StorageOwnerID nickname   = argv[2];
+  RelPath        outputFile = argv[3];
 
-  libwavy::registry::RegisterAudio parser(inputFile,
+  libwavy::registry::RegisterAudio parser(inputFile, nickname,
                                           {}); // just give empty vector for found bitrates
   if (!parser.parse())
   {

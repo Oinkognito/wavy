@@ -27,14 +27,17 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "libwavy/common/types.hpp"
 #include "server.hpp"
+#include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
+#include <libwavy/logger.hpp>
 
 auto is_valid_extension(const FileName& filename) -> bool
 {
   return filename.ends_with(macros::PLAYLIST_EXT) ||
          filename.ends_with(macros::TRANSPORT_STREAM_EXT) ||
-         filename.ends_with(macros::M4S_FILE_EXT) || filename.ends_with(macros::TOML_FILE_EXT);
+         filename.ends_with(macros::M4S_FILE_EXT) || filename.ends_with(macros::TOML_FILE_EXT) ||
+         filename.ends_with(macros::OWNER_FILE_EXT);
 }
 
 auto validate_m3u8_format(const PlaylistData& content) -> bool
@@ -50,47 +53,47 @@ auto validate_ts_file(const AudioBuffer& data) -> bool
 // This validation is NOT correct, will change this in future.
 auto validate_m4s(const RelPath& m4s_path) -> bool
 {
-  std::ifstream file(m4s_path, std::ios::binary);
-  if (!file.is_open())
-  {
-    LOG_ERROR << SERVER_VALIDATE_LOG << "Failed to open .m4s file: " << m4s_path;
-    return false;
-  }
+  // std::ifstream file(m4s_path, std::ios::binary);
+  // if (!file.is_open())
+  // {
+  //   LOG_ERROR << SERVER_VALIDATE_LOG << "Failed to open .m4s file: " << m4s_path;
+  //   return false;
+  // }
+  //
+  // // Read the first 12 bytes (enough to check for 'ftyp' and a major brand)
+  // std::vector<uint8_t> header(12);
+  // file.read(reinterpret_cast<char*>(header.data()), header.size());
+  //
+  // if (file.gcount() < 12)
+  // {
+  //   LOG_ERROR << SERVER_VALIDATE_LOG << ".m4s file too small: " << m4s_path;
+  //   return false;
+  // }
+  //
+  // // First 4 bytes: Box size (big-endian)
+  // uint32_t box_size = boost::endian::big_to_native(*reinterpret_cast<uint32_t*>(header.data()));
+  //
+  // // Next 4 bytes: Box type (should be 'ftyp')
+  // std::string box_type(reinterpret_cast<char*>(header.data() + 4), 4);
+  //
+  // if (box_type != "ftyp")
+  // {
+  //   LOG_WARNING << SERVER_VALIDATE_LOG << "Missing 'ftyp' header in .m4s: " << m4s_path;
+  //   return false;
+  // }
+  //
+  // // Ensure the file contains 'moof' (Movie Fragment) and 'mdat' (Media Data)
+  // file.seekg(0, std::ios::beg);
+  // std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  //
+  // if (content.find("moof") == std::string::npos || content.find("mdat") == std::string::npos)
+  // {
+  //   LOG_WARNING << SERVER_VALIDATE_LOG
+  //               << "Possible invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
+  //   return false;
+  // }
 
-  // Read the first 12 bytes (enough to check for 'ftyp' and a major brand)
-  std::vector<uint8_t> header(12);
-  file.read(reinterpret_cast<char*>(header.data()), header.size());
-
-  if (file.gcount() < 12)
-  {
-    LOG_ERROR << SERVER_VALIDATE_LOG << ".m4s file too small: " << m4s_path;
-    return false;
-  }
-
-  // First 4 bytes: Box size (big-endian)
-  uint32_t box_size = boost::endian::big_to_native(*reinterpret_cast<uint32_t*>(header.data()));
-
-  // Next 4 bytes: Box type (should be 'ftyp')
-  std::string box_type(reinterpret_cast<char*>(header.data() + 4), 4);
-
-  if (box_type != "ftyp")
-  {
-    LOG_WARNING << SERVER_VALIDATE_LOG << "Missing 'ftyp' header in .m4s: " << m4s_path;
-    return false;
-  }
-
-  // Ensure the file contains 'moof' (Movie Fragment) and 'mdat' (Media Data)
-  file.seekg(0, std::ios::beg);
-  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-  if (content.find("moof") == std::string::npos || content.find("mdat") == std::string::npos)
-  {
-    LOG_WARNING << SERVER_VALIDATE_LOG
-                << "Possible invalid .m4s segment (missing 'moof' or 'mdat'): " << m4s_path;
-    return false;
-  }
-
-  LOG_INFO << SERVER_VALIDATE_LOG << "Valid .m4s segment: " << m4s_path;
+  LOG_TRACE << SERVER_VALIDATE_LOG << "Validation for m4s coming soon!!!";
   return true;
 }
 
@@ -121,8 +124,8 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
     RelPath filename    = archive_entry_pathname(entry);
     AbsPath output_file = extract_path + "/" + filename;
 
-    LOG_INFO << SERVER_EXTRACT_LOG
-             << "Extracting file: " << bfs::relative(output_file, macros::SERVER_STORAGE_DIR);
+    LOG_TRACE << SERVER_EXTRACT_LOG
+              << "Extracting file: " << bfs::relative(output_file, macros::SERVER_STORAGE_DIR);
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -181,12 +184,9 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
   return valid_files_found;
 }
 
-auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id,
-                          const StorageOwnerID& ip_id) -> bool
+auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id) -> bool
 {
   LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and extracting GZIP file: " << gzip_path;
-
-  int metadataFileCount = 0;
 
   if (!bfs::exists(gzip_path))
   {
@@ -194,7 +194,8 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     return false;
   }
 
-  AbsPath temp_extract_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
+  const AbsPath temp_extract_path =
+    macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
   bfs::create_directories(temp_extract_path);
 
   if (!extract_payload(gzip_path, temp_extract_path))
@@ -203,19 +204,58 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     return false;
   }
 
-  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction complete, validating files...";
+  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction complete. Scanning for owner file...";
 
-  AbsPath storage_path =
-    macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_id + "/" + audio_id;
-  bfs::create_directories(storage_path);
+  StorageOwnerID ownerNickname;
+  bool           ownerFound = false;
 
-  int valid_file_count = 0;
-
+  // First pass: find the owner file
   for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
   {
-    std::string          fname = file.path().filename().string();
-    std::ifstream        infile(file.path().string(), std::ios::binary);
-    std::vector<uint8_t> data((std::istreambuf_iterator<char>(infile)), {});
+    FileName fname = file.path().filename().string();
+    if (fname.ends_with(macros::OWNER_FILE_EXT))
+    {
+      ownerNickname = fname;
+      ownerFound    = true;
+      LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Found OWNER nickname file: " << fname;
+      break;
+    }
+  }
+
+  if (!ownerFound)
+  {
+    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG
+                    << " Missing OWNER file. Cannot determine destination path.";
+    return false;
+  }
+
+  const AbsPath storage_path =
+    macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ownerNickname + "/" + audio_id;
+  bfs::create_directories(storage_path);
+
+  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and moving extracted files...";
+
+  int valid_file_count  = 0;
+  int metadataFileCount = 0;
+
+  // Second pass: validate and move files
+  for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
+  {
+    FileName fname = file.path().filename().string();
+
+    // Skip the owner file, we already handled it
+    if (fname.ends_with(macros::OWNER_FILE_EXT))
+      continue;
+
+    std::ifstream infile(file.path().string(), std::ios::binary);
+    if (!infile)
+    {
+      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Could not open file: " << fname;
+      bfs::remove(file.path());
+      continue;
+    }
+
+    std::vector<ui8> data((std::istreambuf_iterator<char>(infile)), {});
 
     if (fname.ends_with(macros::PLAYLIST_EXT))
     {
@@ -239,34 +279,41 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     {
       if (!validate_m4s(file.path().string()))
       {
-        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Possibly invalid M4S segment: " << fname;
+        LOG_TRACE_ASYNC << SERVER_EXTRACT_LOG << " Possibly invalid M4S segment: " << fname;
       }
     }
     else if (fname.ends_with(macros::MP4_FILE_EXT))
     {
       LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found MP4 file: " << fname;
     }
-    else if (fname.ends_with(macros::TOML_FILE_EXT) && metadataFileCount == 0)
+    else if (fname.ends_with(macros::TOML_FILE_EXT))
     {
+      if (metadataFileCount++ > 0)
+      {
+        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Extra metadata TOML file ignored: " << fname;
+        bfs::remove(file.path());
+        continue;
+      }
+
       LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found metadata TOML file: " << fname;
-      metadataFileCount++;
     }
     else
     {
-      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Skipping unknown file: " << fname;
+      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Unknown file, removing: " << fname;
       bfs::remove(file.path());
       continue;
     }
 
+    // Move to storage
     bfs::rename(file.path(), storage_path + "/" + fname);
-    LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " File stored in HLS storage: " << fname;
+    LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " File stored: " << fname;
     valid_file_count++;
   }
 
   if (valid_file_count == 0)
   {
     LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG
-                    << " No valid files remain after validation, extraction failed!";
+                    << " No valid files remain after validation. Extraction failed.";
     return false;
   }
 

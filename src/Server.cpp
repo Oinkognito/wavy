@@ -41,6 +41,7 @@ auto main() -> int
   try
   {
     libwavy::log::init_logging();
+    libwavy::log::set_log_level(libwavy::log::TRACE);
     asio::io_context io_context;
     ssl::context     ssl_context(ssl::context::sslv23);
 

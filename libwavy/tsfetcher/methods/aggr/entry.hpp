@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/logger.hpp"
 #include <cstdlib>
 #include <sstream>
 #include <string>
@@ -57,26 +58,26 @@ public:
     ctx_->set_verify_mode(ssl::verify_none);
   }
 
-  auto fetchAndPlay(const StorageOwnerID& ip_id, const StorageAudioID& audio_id, GlobalState& gs,
+  auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id, GlobalState& gs,
                     int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path)
     -> bool override
   {
-    LOG_INFO << FETCH_LOG << "Request Owner: " << ip_id;
+    LOG_INFO << FETCH_LOG << "Request Owner: " << nickname;
     LOG_INFO << FETCH_LOG << "Audio-ID: " << audio_id;
     LOG_INFO << FETCH_LOG << "Bitrate: " << desired_bandwidth;
 
-    auto master_playlist = fetch_master_playlist(ip_id, audio_id);
+    auto master_playlist = fetch_master_playlist(nickname, audio_id);
     std::cout << master_playlist << std::endl;
     if (master_playlist.empty())
       return false;
 
-    auto content = select_playlist(ip_id, audio_id, master_playlist, desired_bandwidth);
+    auto content = select_playlist(nickname, audio_id, master_playlist, desired_bandwidth);
     if (content.empty())
       return false;
 
     AudioData      init_mp4_data;
     TotalAudioData m4s_segments;
-    if (!process_segments(content, ip_id, audio_id, init_mp4_data, m4s_segments, gs))
+    if (!process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments, gs))
       return false;
 
     if (!m4s_segments.empty())
@@ -102,13 +103,16 @@ public:
     return true;
   }
 
-  auto fetch_client_list(const IPAddr& server, const StorageOwnerID& target_ip_id)
+  auto fetch_client_list(const IPAddr& server, const StorageOwnerID& targetNickname)
     -> std::vector<std::string> override
   {
     asio::io_context ioc;
     ssl::context     ctx(ssl::context::tlsv12_client);
     ctx.set_verify_mode(ssl::verify_none);
     libwavy::network::HttpsClient client(ioc, ctx, server);
+
+    LOG_TRACE << FETCH_LOG << "Attempting to fetch client list of owner " << targetNickname
+              << " through Wavy server at: " << server;
 
     NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
 
@@ -117,7 +121,7 @@ public:
 
     std::istringstream       iss(response);
     std::string              line;
-    StorageOwnerID           current_ip_id;
+    StorageOwnerID           currentNickname;
     std::vector<std::string> clients;
 
     while (std::getline(iss, line))
@@ -127,11 +131,11 @@ public:
 
       if (line.find(':') != std::string::npos)
       {
-        current_ip_id = line.substr(0, line.find(':')); // Extract the IP-ID
+        currentNickname = line.substr(0, line.find(':')); // Extract the Owner Nickname
         continue;
       }
 
-      if (current_ip_id == target_ip_id) // Filter by the provided IP-ID
+      if (currentNickname == targetNickname) // Filter by the provided Owner Nickname
       {
         size_t pos = line.find("- ");
         if (pos != std::string::npos)
@@ -155,21 +159,25 @@ private:
     return std::make_unique<libwavy::network::HttpsClient>(*ioc_, *ctx_, server_);
   }
 
-  auto fetch_master_playlist(const StorageOwnerID& ip_id, const StorageAudioID& audio_id)
+  auto fetch_master_playlist(const StorageOwnerID& nickname, const StorageAudioID& audio_id)
     -> PlaylistData
   {
-    NetTarget path =
-      "/hls/" + ip_id + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+    const NetTarget masterPlaylistPath =
+      "/hls/" + nickname + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+
+    LOG_DEBUG << FETCH_LOG << "Fetching Master Playlist from: " << masterPlaylistPath;
+
     auto         client  = make_client();
-    PlaylistData content = client->get(path);
+    PlaylistData content = client->get(masterPlaylistPath);
     if (content.empty())
     {
-      LOG_ERROR << FETCH_LOG << "Failed to fetch master playlist for " << ip_id << "/" << audio_id;
+      LOG_ERROR << FETCH_LOG << "Failed to fetch master playlist for owner + audio ID: " << nickname
+                << "/" << audio_id;
     }
     return content;
   }
 
-  auto select_playlist(const StorageOwnerID& ip_id, const std::string& audio_id,
+  auto select_playlist(const StorageOwnerID& nickname, const std::string& audio_id,
                        const std::string& content, int desired_bandwidth) -> std::string
   {
     if (content.find(macros::PLAYLIST_VARIANT_TAG) == std::string::npos)
@@ -212,14 +220,14 @@ private:
       LOG_WARNING << FETCH_LOG << "Exact match not found. Using max bitrate: " << max_bandwidth;
     }
 
-    NetTarget playlist_path = "/hls/" + ip_id + "/" + audio_id + "/" + selected;
+    const NetTarget playlist_path = "/hls/" + nickname + "/" + audio_id + "/" + selected;
     LOG_INFO << FETCH_LOG << "Selected bitrate playlist: " << playlist_path;
 
     auto client = make_client();
     return client->get(playlist_path);
   }
 
-  auto process_segments(const PlaylistData& playlist, const StorageOwnerID& ip_id,
+  auto process_segments(const PlaylistData& playlist, const StorageOwnerID& nickname,
                         const StorageAudioID& audio_id, AudioData& init_mp4_data,
                         TotalAudioData& m4s_segments, GlobalState& gs) -> bool
   {
@@ -240,11 +248,11 @@ private:
 
     if (has_m4s)
     {
-      NetTarget initMp4Url = "/hls/" + ip_id + "/" + audio_id + "/init.mp4";
-      init_mp4_data        = client->get(initMp4Url);
+      const NetTarget initMp4Url = "/hls/" + nickname + "/" + audio_id + "/init.mp4";
+      init_mp4_data              = client->get(initMp4Url);
       if (init_mp4_data.empty())
       {
-        LOG_ERROR << FETCH_LOG << "Failed to fetch init.mp4 for " << ip_id << "/" << audio_id;
+        LOG_ERROR << FETCH_LOG << "Failed to fetch init.mp4 for " << nickname << "/" << audio_id;
         return false;
       }
       LOG_INFO << FETCH_LOG << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
@@ -256,7 +264,7 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        NetTarget url = "/hls/" + ip_id + "/" + audio_id + "/" + line;
+        const NetTarget url = "/hls/" + nickname + "/" + audio_id + "/" + line;
         LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
         AudioData data = client->get(url);
 

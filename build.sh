@@ -87,10 +87,6 @@ echo -e "\n${CYAN}${SECTION}${RESET}"
 echo -e "${MAGENTA}Starting Build Process${RESET}"
 echo -e "${CYAN}${SECTION}${RESET}\n"
 
-# Run make init
-echo -e "${BLUE}Running 'make init'...${RESET}"
-make init || { echo -e "${RED}Initialization failed.${RESET}"; exit 1; }
-
 # Ask for build target
 echo -e "\n${YELLOW}Enter build target (default: all):${RESET} "
 read -r TARGET

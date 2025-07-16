@@ -50,8 +50,9 @@ using namespace libwavy::Toml;
 class RegisterAudio
 {
 public:
-  RegisterAudio(AbsPath filePath, std::vector<int> bitrates)
-      : filePath(std::move(filePath)), bitrates(std::move(bitrates))
+  RegisterAudio(AbsPath filePath, StorageOwnerID nickname, std::vector<int> bitrates)
+      : m_filePath(std::move(filePath)), m_nickname(std::move(nickname)),
+        m_bitrates(std::move(bitrates))
   {
   }
 
@@ -67,9 +68,9 @@ public:
   {
     int ret;
 
-    if ((ret = avformat_open_input(&fmt_ctx, filePath.c_str(), nullptr, nullptr)) < 0)
+    if ((ret = avformat_open_input(&fmt_ctx, m_filePath.c_str(), nullptr, nullptr)) < 0)
     {
-      std::cerr << "Error opening input file: " << filePath << std::endl;
+      std::cerr << "Error opening input file: " << m_filePath << std::endl;
       return false;
     }
 
@@ -91,61 +92,64 @@ public:
     // Do NOT put this in global context to avoid confusion!!
     using namespace TomlKeys;
 
-    tomlGen.addTableValue(Audio::Parser, Audio::Path, metadata.path);
-    tomlGen.addTableValue(Audio::Parser, Audio::FileFormat, metadata.file_format);
-    tomlGen.addTableValue(Audio::Parser, Audio::FileFormatLong, metadata.file_format_long);
-    tomlGen.addTableValue(Audio::Parser, Audio::Duration, metadata.duration);
-    tomlGen.addTableValue(Audio::Parser, Audio::Bitrate, metadata.bitrate);
-    tomlGen.addTableArray(Audio::Parser, Audio::TranscodedRates, bitrates);
+    tomlGen.addTableValue(Owner::OwnerID, Owner::Nickname, m_nickname);
 
-    tomlGen.addTableValue(Metadata::Root, Metadata::Title, metadata.title);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Artist, metadata.artist);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Album, metadata.album);
+    tomlGen.addTableValue(Audio::Parser, Audio::Path, m_metadata.path);
+    tomlGen.addTableValue(Audio::Parser, Audio::FileFormat, m_metadata.file_format);
+    tomlGen.addTableValue(Audio::Parser, Audio::FileFormatLong, m_metadata.file_format_long);
+    tomlGen.addTableValue(Audio::Parser, Audio::Duration, m_metadata.duration);
+    tomlGen.addTableValue(Audio::Parser, Audio::Bitrate, m_metadata.bitrate);
+    tomlGen.addTableArray(Audio::Parser, Audio::TranscodedRates, m_bitrates);
+
+    tomlGen.addTableValue(Metadata::Root, Metadata::Title, m_metadata.title);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Artist, m_metadata.artist);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Album, m_metadata.album);
     tomlGen.addTableValue(Metadata::Root, Metadata::Track,
-                          std::to_string(metadata.track.first) + "/" +
-                            std::to_string(metadata.track.second));
+                          std::to_string(m_metadata.track.first) + "/" +
+                            std::to_string(m_metadata.track.second));
     tomlGen.addTableValue(Metadata::Root, Metadata::Disc,
-                          std::to_string(metadata.disc.first) + "/" +
-                            std::to_string(metadata.disc.second));
-    tomlGen.addTableValue(Metadata::Root, Metadata::Copyright, metadata.copyright);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Genre, metadata.genre);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Comment, metadata.comment);
-    tomlGen.addTableValue(Metadata::Root, Metadata::AlbumArtist, metadata.album_artist);
-    tomlGen.addTableValue(Metadata::Root, Metadata::TSRC, metadata.tsrc);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Encoder, metadata.encoder);
-    tomlGen.addTableValue(Metadata::Root, Metadata::EncodedBy, metadata.encoded_by);
-    tomlGen.addTableValue(Metadata::Root, Metadata::Date, metadata.date);
+                          std::to_string(m_metadata.disc.first) + "/" +
+                            std::to_string(m_metadata.disc.second));
+    tomlGen.addTableValue(Metadata::Root, Metadata::Copyright, m_metadata.copyright);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Genre, m_metadata.genre);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Comment, m_metadata.comment);
+    tomlGen.addTableValue(Metadata::Root, Metadata::AlbumArtist, m_metadata.album_artist);
+    tomlGen.addTableValue(Metadata::Root, Metadata::TSRC, m_metadata.tsrc);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Encoder, m_metadata.encoder);
+    tomlGen.addTableValue(Metadata::Root, Metadata::EncodedBy, m_metadata.encoded_by);
+    tomlGen.addTableValue(Metadata::Root, Metadata::Date, m_metadata.date);
 
-    saveStreamMetadataToToml(tomlGen, metadata.audio_stream, Stream::Stream0);
-    saveStreamMetadataToToml(tomlGen, metadata.video_stream, Stream::Stream1);
+    saveStreamMetadataToToml(tomlGen, m_metadata.audio_stream, Stream::Stream0);
+    saveStreamMetadataToToml(tomlGen, m_metadata.video_stream, Stream::Stream1);
 
     tomlGen.saveToFile(outputFile);
   }
 
-  [[nodiscard]] auto getMetadata() const -> const AudioMetadata& { return metadata; }
+  [[nodiscard]] auto getMetadata() const -> const AudioMetadata& { return m_metadata; }
 
 private:
-  RelPath          filePath;
+  RelPath          m_filePath;
   AVFormatContext* fmt_ctx{};
-  AudioMetadata    metadata;
-  std::vector<int> bitrates;
+  AudioMetadata    m_metadata;
+  std::vector<int> m_bitrates;
+  StorageOwnerID   m_nickname;
 
   void populateMetadata()
   {
-    metadata.path = filePath;
+    m_metadata.path = m_filePath;
 
     using namespace TomlKeys;
 
     if (fmt_ctx->iformat)
     {
-      metadata.file_format = fmt_ctx->iformat->name ? std::string(fmt_ctx->iformat->name) : "";
-      metadata.file_format_long =
+      m_metadata.file_format = fmt_ctx->iformat->name ? std::string(fmt_ctx->iformat->name) : "";
+      m_metadata.file_format_long =
         fmt_ctx->iformat->long_name ? std::string(fmt_ctx->iformat->long_name) : "";
     }
 
-    metadata.duration =
+    m_metadata.duration =
       (fmt_ctx->duration != AV_NOPTS_VALUE) ? fmt_ctx->duration / AV_TIME_BASE : -1;
-    metadata.bitrate = (fmt_ctx->bit_rate > 0) ? fmt_ctx->bit_rate / 1000 : -1;
+    m_metadata.bitrate = (fmt_ctx->bit_rate > 0) ? fmt_ctx->bit_rate / 1000 : -1;
 
     const AVDictionaryEntry* tag = nullptr;
     while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
@@ -156,31 +160,31 @@ private:
       std::ranges::transform(key, key.begin(), [](unsigned char c) { return std::tolower(c); });
 
       if (key == Metadata::Title)
-        metadata.title = value;
+        m_metadata.title = value;
       else if (key == Metadata::Artist)
-        metadata.artist = value;
+        m_metadata.artist = value;
       else if (key == Metadata::Album)
-        metadata.album = value;
+        m_metadata.album = value;
       else if (key == Metadata::Track)
-        metadata.track = parseFraction(value);
+        m_metadata.track = parseFraction(value);
       else if (key == Metadata::Disc)
-        metadata.disc = parseFraction(value);
+        m_metadata.disc = parseFraction(value);
       else if (key == Metadata::Copyright)
-        metadata.copyright = value;
+        m_metadata.copyright = value;
       else if (key == Metadata::Genre)
-        metadata.genre = value;
+        m_metadata.genre = value;
       else if (key == Metadata::Comment)
-        metadata.comment = value;
+        m_metadata.comment = value;
       else if (key == Metadata::AlbumArtist)
-        metadata.album_artist = value;
+        m_metadata.album_artist = value;
       else if (key == Metadata::TSRC)
-        metadata.tsrc = value;
+        m_metadata.tsrc = value;
       else if (key == Metadata::Encoder)
-        metadata.encoder = value;
+        m_metadata.encoder = value;
       else if (key == Metadata::EncodedBy)
-        metadata.encoded_by = value;
+        m_metadata.encoded_by = value;
       else if (key == Metadata::Date)
-        metadata.date = value;
+        m_metadata.date = value;
     }
 
     // Extract streams
@@ -212,11 +216,11 @@ private:
         av_channel_layout_describe(&codec_params->ch_layout, ch_layout_str, sizeof(ch_layout_str));
         streamMetadata.channel_layout = ch_layout_str;
 
-        metadata.audio_stream = streamMetadata;
+        m_metadata.audio_stream = streamMetadata;
       }
       else if (codec_params->codec_type == AVMEDIA_TYPE_VIDEO)
       {
-        metadata.video_stream = streamMetadata;
+        m_metadata.video_stream = streamMetadata;
       }
     }
   }

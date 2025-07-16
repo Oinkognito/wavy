@@ -39,18 +39,19 @@ namespace libwavy::components::client
 class WavyClient
 {
 private:
-  StorageOwnerID _ip_id;
-  IPAddr         _server;
-  RelPath        _plugin_path;
-  GlobalState    gs;
-  int            _bitrate;
-  RelPath        _audio_backend_lib_path;
+  StorageOwnerID m_nickname;
+  IPAddr         m_server;
+  RelPath        m_pluginPath;
+  GlobalState    m_globalState;
+  int            m_bitrate;
+  RelPath        m_audioBackendLibPath;
 
 public:
-  WavyClient(StorageOwnerID ip_id, IPAddr server, RelPath plugin_path, const int bitrate,
+  WavyClient(StorageOwnerID nickname, IPAddr server, RelPath plugin_path, const int bitrate,
              const RelPath& audioBackendLibPath)
-      : _ip_id(std::move(ip_id)), _server(std::move(server)), _plugin_path(std::move(plugin_path)),
-        _bitrate(bitrate), _audio_backend_lib_path(std::move(audioBackendLibPath))
+      : m_nickname(std::move(nickname)), m_server(std::move(server)),
+        m_pluginPath(std::move(plugin_path)), m_bitrate(bitrate),
+        m_audioBackendLibPath(std::move(audioBackendLibPath))
   {
   }
 
@@ -63,7 +64,7 @@ public:
     try
     {
       // Attempt to load the plugin dynamically based on the path
-      fetcher = libwavy::fetch::plugin::FetcherFactory::create(_plugin_path, _ip_id);
+      fetcher = libwavy::fetch::plugin::FetcherFactory::create(m_pluginPath, m_server);
     }
     catch (const std::exception& e)
     {
@@ -72,7 +73,7 @@ public:
     }
 
     // Fetch client list and audio ID
-    const std::vector<std::string> clients = fetcher->fetch_client_list(_server, _ip_id);
+    const std::vector<std::string> clients = fetcher->fetch_client_list(m_server, m_nickname);
     if (clients.empty())
     {
       LOG_ERROR << "Failed to fetch clients. Exiting...";
@@ -89,7 +90,8 @@ public:
     StorageAudioID audio_id = clients[index];
 
     // Fetch the transport stream
-    if (!fetcher->fetchAndPlay(_ip_id, audio_id, gs, _bitrate, flac_found, _audio_backend_lib_path))
+    if (!fetcher->fetchAndPlay(m_nickname, audio_id, m_globalState, m_bitrate, flac_found,
+                               m_audioBackendLibPath))
     {
       LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
       return WAVY_RET_FAIL;

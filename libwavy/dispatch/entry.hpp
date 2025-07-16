@@ -145,16 +145,27 @@ enum class PlaylistFormat
 class Dispatcher
 {
 public:
-  Dispatcher(IPAddr server, Directory directory, FileName playlist_name)
+  Dispatcher(IPAddr server, StorageOwnerID nickname, Directory directory, FileName playlist_name)
       : ssl_ctx_(ssl::context::sslv23), resolver_(context_), stream_(context_, ssl_ctx_),
-        server_(std::move(server)), directory_(std::move(directory)),
-        playlist_name_(std::move(playlist_name))
+        server_(std::move(server)), nickname_(std::move(nickname)),
+        directory_(std::move(directory)), playlist_name_(std::move(playlist_name))
   {
     if (!fs::exists(directory_))
     {
       LOG_ERROR << DISPATCH_LOG << "Directory does not exist: " << directory_;
       throw std::runtime_error("Directory does not exist: " + directory_);
     }
+
+    fs::path nickname_file_path =
+      fs::path(directory_) / (nickname_ + macros::to_string(macros::OWNER_FILE_EXT));
+    std::ofstream file(nickname_file_path);
+    if (!file)
+    {
+      LOG_ERROR << DISPATCH_LOG << "Failed to create file: " << nickname_file_path;
+      throw std::runtime_error("Failed to create file: " + nickname_file_path.string());
+    }
+    file << "Created for user: " << nickname_ << "\n";
+    file.close();
 
     ssl_ctx_.set_default_verify_paths();
     stream_.set_verify_mode(ssl::verify_none); // [TODO]: Improve SSL verification
@@ -223,6 +234,7 @@ private:
   tcp::resolver                  resolver_;
   beast::ssl_stream<tcp::socket> stream_;
   DirPathHolder                  server_, directory_, playlist_name_;
+  StorageOwnerID                 nickname_;
 
   std::unordered_map<AbsPath, TotalAudioData> reference_playlists_;
   TotalAudioData                              transport_streams_;
@@ -341,7 +353,7 @@ private:
           }
 
           mp4_segments_.push_back(segment_path);
-          LOG_INFO << DISPATCH_LOG << "Found valid .m4s segment: " << segment_path;
+          LOG_TRACE << DISPATCH_LOG << "Found valid .m4s segment: " << segment_path;
         }
       }
     }
@@ -367,27 +379,31 @@ private:
 
     LOG_INFO << DISPATCH_LOG
              << "All referenced playlists and their respective segment types verified.";
+    LOG_INFO << DISPATCH_LOG << "Found "
+             << (playlist_format == PlaylistFormat::TRANSPORT_STREAM ? transport_streams_.size()
+                                                                     : mp4_segments_.size())
+             << " transport streams";
     return true;
   }
 
   auto validate_m4s(const AbsPath& m4s_path) -> bool
   {
-    std::ifstream file(m4s_path, std::ios::binary);
-    if (!file.is_open())
-    {
-      LOG_ERROR << DISPATCH_LOG << "Failed to open .m4s file: " << m4s_path;
-      return false;
-    }
+    // std::ifstream file(m4s_path, std::ios::binary);
+    // if (!file.is_open())
+    // {
+    //   LOG_ERROR << DISPATCH_LOG << "Failed to open .m4s file: " << m4s_path;
+    //   return false;
+    // }
+    //
+    // char header[8] = {0};
+    // file.read(header, 8); // Read the first 8 bytes
+    //
+    // if (std::string(header, 4) != "ftyp" && std::string(header, 4) != "moof")
+    // {
+    //   return false;
+    // }
 
-    char header[8] = {0};
-    file.read(header, 8); // Read the first 8 bytes
-
-    if (std::string(header, 4) != "ftyp" && std::string(header, 4) != "moof")
-    {
-      return false;
-    }
-
-    LOG_INFO << DISPATCH_LOG << "Valid .m4s file: " << m4s_path;
+    LOG_TRACE << DISPATCH_LOG << "Coming soon!!";
     return true;
   }
 
@@ -417,7 +433,7 @@ private:
       return false;
     }
 
-    auto add_file_to_archive = [&](const std::string& file_path) -> bool
+    auto AddFileToArchive = [&](const std::string& file_path) -> bool
     {
       std::ifstream file(file_path, std::ios::binary);
       if (!file)
@@ -453,7 +469,7 @@ private:
     {
       if (entry.is_regular_file())
       {
-        if (!add_file_to_archive(entry.path().string()))
+        if (!AddFileToArchive(entry.path().string()))
         {
           LOG_ERROR << DISPATCH_LOG << "Failed to add file: " << entry.path();
           archive_write_close(archive);

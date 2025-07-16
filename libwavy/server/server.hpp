@@ -28,6 +28,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
+#include "libwavy/logger.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/asio/ip/tcp.hpp>
@@ -68,8 +69,8 @@
  *
  *  Server HLS Storage Organization:
  *
- *  hls_storage/
- *  ├── 192.168.1.10/                                    # AUDIO OWNER IP Address 192.168.1.10 (example)
+ *  wavy_storage/
+ *  ├── <nickname>/                                      # AUDIO OWNER provided nickname
  *  │   ├── 1435f431-a69a-4027-8661-44c31cd11ef6/        # Randomly generated audio id
  *  │   │   ├── index.m3u8
  *  │   │   ├── hls_mp3_64.m3u8                          # HLS MP3 encoded playlist (64-bit)
@@ -113,10 +114,9 @@ using boost::asio::ip::tcp;
 /* PROTOTYPES DEFINITION FOR VALIDATION IN SERVER */
 auto is_valid_extension(const AbsPath& filename) -> bool;
 auto validate_m3u8_format(const PlaylistData& content) -> bool;
-auto validate_ts_file(const std::vector<uint8_t>& data) -> bool;
+auto validate_ts_file(const std::vector<ui8>& data) -> bool;
 auto validate_m4s(const AbsPath& m4s_path) -> bool;
-auto extract_and_validate(const AbsPath& gzip_path, const std::string& audio_id,
-                          const std::string& ip_id) -> bool;
+auto extract_and_validate(const AbsPath& gzip_path, const StorageAudioID& audio_id) -> bool;
 void removeBodyPadding(std::string& body);
 auto tokenizePath(std::istringstream& iss) -> vector<std::string>;
 
@@ -127,7 +127,7 @@ class WavySession : public std::enable_shared_from_this<WavySession>
 {
 public:
   explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const IPAddr ip)
-      : socket_(std::move(socket)), ip_id_(std::move(ip))
+      : socket_(std::move(socket)), m_ipID(std::move(ip))
   {
   }
 
@@ -141,7 +141,7 @@ private:
   boost::asio::ssl::stream<tcp::socket> socket_;
   beast::flat_buffer                    buffer_;
   http::request<http::string_body>      request_;
-  IPAddr                                ip_id_;
+  IPAddr                                m_ipID;
 
   void do_handshake()
   {
@@ -164,13 +164,13 @@ private:
   {
     try
     {
-      ip_id_ = socket_.lowest_layer().remote_endpoint().address().to_string();
-      LOG_INFO_ASYNC << SERVER_LOG << "Resolved IP: " << ip_id_;
+      m_ipID = socket_.lowest_layer().remote_endpoint().address().to_string();
+      LOG_INFO_ASYNC << SERVER_LOG << "Resolved IP: " << m_ipID;
     }
     catch (const std::exception& e)
     {
       LOG_ERROR_ASYNC << SERVER_LOG << "Failed to resolve IP: " << e.what();
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -196,7 +196,7 @@ private:
           if (ec == http::error::body_limit)
           {
             LOG_ERROR_ASYNC << SERVER_LOG << "Upload size exceeded the limit!";
-            send_response(macros::to_string(macros::SERVER_ERROR_413));
+            SendResponse(macros::to_string(macros::SERVER_ERROR_413));
           }
           return;
         }
@@ -204,7 +204,7 @@ private:
         LOG_INFO_ASYNC << SERVER_LOG << "Received " << bytes_to_mib(bytes_transferred) << " MiB ("
                        << bytes_transferred << ") bytes";
         request_ = parser->release();
-        process_request();
+        ProcessRequest();
       });
 
     // Timeout to prevent indefinite read
@@ -222,19 +222,19 @@ private:
       AudioMetadata metadata = parseAudioMetadata(metadata_path);
       LOG_DEBUG_ASYNC << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
 
-      auto responseWrite = [&](int index, const std::string& label, const std::string& value)
+      auto ResponseWrite = [&](int index, const std::string& label, const std::string& value)
       { response_stream << "      " << index << ". " << label << ": " << value << "\n"; };
 
       response_stream << "  - " << audio_id << "\n";
-      responseWrite(1, "Title", metadata.title);
-      responseWrite(2, "Artist", metadata.artist);
-      responseWrite(3, "Duration", std::to_string(metadata.duration) + " secs");
-      responseWrite(4, "Album", metadata.album);
-      responseWrite(5, "Bitrate", std::to_string(metadata.bitrate) + " kbps");
-      responseWrite(6, "Sample Rate", std::to_string(metadata.audio_stream.sample_rate) + " Hz");
-      responseWrite(7, "Sample Format", metadata.audio_stream.sample_format);
-      responseWrite(8, "Audio Bitrate", std::to_string(metadata.audio_stream.bitrate) + " kbps");
-      responseWrite(9, "Codec", metadata.audio_stream.codec);
+      ResponseWrite(1, "Title", metadata.title);
+      ResponseWrite(2, "Artist", metadata.artist);
+      ResponseWrite(3, "Duration", std::to_string(metadata.duration) + " secs");
+      ResponseWrite(4, "Album", metadata.album);
+      ResponseWrite(5, "Bitrate", std::to_string(metadata.bitrate) + " kbps");
+      ResponseWrite(6, "Sample Rate", std::to_string(metadata.audio_stream.sample_rate) + " Hz");
+      ResponseWrite(7, "Sample Format", metadata.audio_stream.sample_format);
+      ResponseWrite(8, "Audio Bitrate", std::to_string(metadata.audio_stream.bitrate) + " kbps");
+      ResponseWrite(9, "Codec", metadata.audio_stream.codec);
 
       response_stream << "      10. Available Bitrates: [";
       std::ranges::for_each(metadata.bitrates, [&](auto br) { response_stream << br << ","; });
@@ -249,31 +249,33 @@ private:
     return true;
   }
 
-  void handle_list_audio_info()
+  // Handle listing the audio metadata request.
+  void HandleAMLRequest()
   {
-    LOG_INFO_ASYNC << "Handling audio metadata listing request";
+    LOG_INFO_ASYNC << "Handling Audio Metadata Listing request (AMLR)";
 
     std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
       LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
     std::ostringstream response_stream;
     bool               entries_found = false;
 
-    for (const bfs::directory_entry& ip_entry : bfs::directory_iterator(storage_path))
+    for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(storage_path))
     {
-      if (bfs::is_directory(ip_entry.status()))
+      if (bfs::is_directory(nickname_entry.status()))
       {
-        StorageOwnerID ip_id = ip_entry.path().filename().string();
-        LOG_DEBUG_ASYNC << "Processing IP-ID: " << ip_id;
-        response_stream << ip_id << ":\n";
+        StorageOwnerID nickname = nickname_entry.path().filename().string();
+        LOG_DEBUG_ASYNC << "Processing nickname: " << nickname;
+        response_stream << nickname << ":\n";
 
         bool audio_found = false;
-        for (const bfs::directory_entry& audio_entry : bfs::directory_iterator(ip_entry.path()))
+        for (const bfs::directory_entry& audio_entry :
+             bfs::directory_iterator(nickname_entry.path()))
         {
           if (bfs::is_directory(audio_entry.status()))
           {
@@ -297,7 +299,7 @@ private:
 
         if (!audio_found)
         {
-          LOG_WARNING_ASYNC << "No metadata found for any audio IDs under IP-ID: " << ip_id;
+          LOG_WARNING_ASYNC << "No metadata found for any audio IDs under nickname: " << nickname;
           response_stream << "  (No metadata found for any audio IDs)\n";
         }
 
@@ -307,39 +309,41 @@ private:
 
     if (!entries_found)
     {
-      LOG_ERROR_ASYNC << "No IPs or Audio-IDs with metadata found in storage";
-      send_response(macros::to_string(macros::SERVER_ERROR_404));
+      LOG_ERROR_ASYNC << "No nicknames or Audio-IDs with metadata found in storage";
+      SendResponse(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
 
     // Return the hierarchical list of IP-IDs, Audio-IDs, and metadata
-    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
+    SendResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
   }
 
-  void handle_list_ips()
+  // will list all owners' nicknames available in SERVER_STORAGE_DIR.
+  void HandleNLRequest()
   {
-    LOG_INFO_ASYNC << "Handling IP listing request";
+    LOG_INFO_ASYNC << "Handling Nicknames Listing Request (NLR)";
 
     AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
       LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
     std::ostringstream response_stream;
     bool               entries_found = false;
 
-    for (const bfs::directory_entry& ip_entry : bfs::directory_iterator(storage_path))
+    for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(storage_path))
     {
-      if (bfs::is_directory(ip_entry.status()))
+      if (bfs::is_directory(nickname_entry.status()))
       {
-        StorageOwnerID ip_id = ip_entry.path().filename().string();
-        response_stream << ip_id << ":\n"; // IP-ID Header
+        StorageOwnerID nickname = nickname_entry.path().filename().string();
+        response_stream << nickname << ":\n"; // nickname chosen by the owner
 
         bool audio_found = false;
-        for (const bfs::directory_entry& audio_entry : bfs::directory_iterator(ip_entry.path()))
+        for (const bfs::directory_entry& audio_entry :
+             bfs::directory_iterator(nickname_entry.path()))
         {
           if (bfs::is_directory(audio_entry.status()))
           {
@@ -360,21 +364,21 @@ private:
     if (!entries_found)
     {
       LOG_ERROR_ASYNC << "No IPs or Audio-IDs found in storage";
-      send_response(macros::to_string(macros::SERVER_ERROR_404));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
 
-    // Return the list of IP-IDs and their respective Audio-IDs
-    send_response("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
+    // Return the list of Nicknames and their respective Audio-IDs
+    SendResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + response_stream.str());
   }
 
-  void process_request()
+  void ProcessRequest()
   {
     if (request_.method() == http::verb::post)
     {
       // Check if this is a TOML file upload request.
       // For example, if the request target is "/toml/upload"...
-      std::string target(request_.target().begin(), request_.target().end());
+      NetTarget target(request_.target().begin(), request_.target().end());
       if (target == macros::SERVER_PATH_TOML_UPLOAD)
       {
         // Remove padding text before parsing
@@ -386,49 +390,49 @@ private:
         if (toml_data_opt.path.empty())
         {
           LOG_ERROR_ASYNC << "[TOML] Failed to parse TOML data";
-          send_response(macros::to_string(macros::SERVER_ERROR_400));
+          SendResponse(macros::to_string(macros::SERVER_ERROR_400));
           return;
         }
 
-        send_response("HTTP/1.1 200 OK\r\n\r\nTOML parsed\r\n");
+        SendResponse("HTTP/1.1 200 OK\r\n\r\nTOML parsed\r\n");
         return;
       }
-      handle_upload();
+      HandleUpload();
     }
     else if (request_.method() == http::verb::get)
     {
       if (request_.target() == macros::SERVER_PATH_HLS_CLIENTS) // Request for all client IDs
       {
-        handle_list_ips();
+        HandleNLRequest();
       }
       else if (request_.target() == macros::SERVER_PATH_AUDIO_INFO)
       {
-        handle_list_audio_info();
+        HandleAMLRequest();
       }
       else if (request_.target() == macros::SERVER_PATH_PING)
       {
-        handle_send_pong();
+        HandleSendPong();
       }
       else
       {
-        handle_download();
+        HandleDownload();
       }
     }
     else
     {
-      send_response(macros::to_string(macros::SERVER_ERROR_405));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_405));
     }
   }
 
-  void handle_send_pong()
+  void HandleSendPong()
   {
     LOG_INFO_ASYNC << "Sending pong to client...";
-    send_response(macros::to_string(macros::SERVER_PONG_MSG));
+    SendResponse(macros::to_string(macros::SERVER_PONG_MSG));
   }
 
-  void handle_upload()
+  void HandleUpload()
   {
-    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "Handling GZIP file upload";
+    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "Handling GZIP file upload for owner (IP): " << m_ipID;
 
     StorageAudioID audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
     AbsPath        gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
@@ -439,7 +443,7 @@ private:
     if (!output_file)
     {
       LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to open output file for writing: " << gzip_path;
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -448,7 +452,7 @@ private:
     if (!output_file.good())
     {
       LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to write data to file: " << gzip_path;
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -457,20 +461,20 @@ private:
     if (!bfs::exists(gzip_path) || bfs::file_size(gzip_path) == 0)
     {
       LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
-      send_response("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
+      SendResponse("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
       return;
     }
 
     LOG_INFO_ASYNC << SERVER_UPLD_LOG << "File successfully written: " << gzip_path;
 
-    if (extract_and_validate(gzip_path, audio_id, ip_id_))
+    if (extract_and_validate(gzip_path, audio_id))
     {
-      send_response("HTTP/1.1 200 OK\r\nClient-ID: " + audio_id + "\r\n\r\n");
+      SendResponse("HTTP/1.1 200 OK\r\nClient-ID: " + audio_id + "\r\n\r\n");
     }
     else
     {
       LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Extraction or validation failed!";
-      send_response(macros::to_string(macros::SERVER_ERROR_400));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_400));
     }
 
     bfs::remove(gzip_path);
@@ -491,7 +495,7 @@ private:
    * are removed from server's filesystem.
    *
    */
-  void handle_download()
+  void HandleDownload()
   {
     // Parse request target (expected: /hls/<audio_id>/<filename>)
     std::string        target(request_.target().begin(), request_.target().end());
@@ -504,7 +508,7 @@ private:
     if (parts.size() < 4 || parts[0] != "hls")
     {
       LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Invalid request path: " << target;
-      send_response(macros::to_string(macros::SERVER_ERROR_400));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
 
@@ -528,7 +532,7 @@ private:
     {
       LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Failed to open file: " << file_path
                       << " Error: " << ec.message();
-      send_response(macros::to_string(macros::SERVER_ERROR_500));
+      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
@@ -574,7 +578,7 @@ private:
                    << audio_id << ")";
   }
 
-  void send_response(const std::string& msg)
+  void SendResponse(const std::string& msg)
   {
     LOG_DEBUG << SERVER_LOG << "Attempting to send " << msg;
     auto self(shared_from_this());
@@ -625,6 +629,7 @@ public:
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), ssl_context_(ssl_context),
         signals_(io_context, SIGINT, SIGTERM, SIGHUP),
         socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), wavySocketBind(socketPath)
+
   {
     wavySocketBind.ensure_single_instance();
     LOG_INFO << SERVER_LOG << "Starting HLS server on port " << port;

@@ -22,3 +22,4 @@ logs*/
 */**/toml.hpp
 */**/nuklear.h 
 */**/stb_image.h
+autogen/

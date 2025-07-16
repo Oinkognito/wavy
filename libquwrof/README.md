@@ -1,5 +1,11 @@
 # libquwrof (Wavy Project)
 
+> [!WARNING]
+> 
+> This library is being abandoned in the hopes
+> of a Web UI instead.
+> 
+
 libquwrof is the Qt interface of the **libwavy**.
 
 It aims to integrate all the aspects of **libwavy** in a clean UI and is the UI architecture for Wavy-UI.

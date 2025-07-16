@@ -34,12 +34,12 @@
 
 // A neat wrapper for dispatcher that works right out of the box
 
-auto dispatch(const IPAddr& server, const Directory& dir) -> int
+auto dispatch(const IPAddr& server, const StorageOwnerID& nickname, const Directory& dir) -> int
 {
 
   try
   {
-    libwavy::dispatch::Dispatcher dispatcher(server, dir,
+    libwavy::dispatch::Dispatcher dispatcher(server, nickname, dir,
                                              macros::to_string(macros::MASTER_PLAYLIST));
     if (!dispatcher.process_and_upload())
     {

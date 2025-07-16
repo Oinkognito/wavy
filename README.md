@@ -129,6 +129,15 @@ sudo dnf install qt6-qtbase-devel qt6-qttools-devel
 
 ## **Building**
 
+> [!NOTE]
+> 
+> Ensure you clone this repository **recursively**!
+> 
+> ```bash 
+> git clone --recursive https://github.com/Oinkognito/wavy.git
+> ```
+> 
+
 Wavy has a lot of targets that can be built with a lot of customizability.
 
 In general if you want things to just work: 
@@ -204,6 +213,10 @@ Wavy relies on **FFmpeg's core libraries** for processing audio:
 
 For detailed API documentation, see:  
 [APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
+
+## **Trial Run**
+
+### Native server (not docker)
 
 ## **Examples**
 

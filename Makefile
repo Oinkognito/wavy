@@ -10,10 +10,6 @@ OWNER_BIN := wavy_owner
 SERVER_BIN := wavy_server
 CLIENT_BIN := wavy_client
 
-# Third-party dependencies
-TOMLPP_URL := https://raw.githubusercontent.com/marzer/tomlplusplus/refs/heads/master/toml.hpp
-TOMLPP_DEST_DIR := libwavy/toml/
-
 # Allow extra flags for CMake
 EXTRA_CMAKE_FLAGS ?=
 
@@ -32,7 +28,6 @@ init:
 
 # Build all targets
 all:
-	@$(MAKE) init
 	$(call configure,All,Release)
 	@$(MAKE) -C $(BUILD_DIR)
 

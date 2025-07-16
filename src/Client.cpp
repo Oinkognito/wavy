@@ -59,16 +59,16 @@ auto main(int argc, char* argv[]) -> int
     libwavy::log::DEBUG); // anything with INFO and above priority will be printed
 
   std::string usage = std::string(argv[0]) +
-                      ": --ipAddr=<ip-id> --index=<index> --serverIP=<server-ip> "
+                      ": --nickname=<owner-nickname> --index=<index> --serverIP=<server-ip> "
                       "--bitrate-stream=<bitrate-stream> --tsfetchMode=<mode> "
                       "[--tsfetchLib=<so_file>] --audioBackendLibPath=<so_file>";
 
   libwavy::utils::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
 
-  const StorageOwnerID ip_id   = parser.get("ipAddr");
-  const int            index   = parser.get_int("index", -1); // Safe parsing of integer
-  const IPAddr         server  = parser.get("serverIP");
-  const int            bitrate = parser.get_int("bitrate-stream", 0);
+  const StorageOwnerID nickname = parser.get("nickname");
+  const int            index    = parser.get_int("index", -1); // Safe parsing of integer
+  const IPAddr         server   = parser.get("serverIP");
+  const int            bitrate  = parser.get_int("bitrate-stream", 0);
   const RelPath        audioBackendLibPath =
     parser.get("audioBackendLibPath"); // relative to WAVY_FETCHER_PLUGIN_OUTPUT_PATH
   const std::string fetch_mode =
@@ -130,7 +130,7 @@ auto main(int argc, char* argv[]) -> int
 
   bool flac_found = parser.get("--playFlac") == "true" ? true : false;
 
-  libwavy::components::client::WavyClient wavyClient(ip_id, server, plugin_path, bitrate,
+  libwavy::components::client::WavyClient wavyClient(nickname, server, plugin_path, bitrate,
                                                      audioBackendLibPath);
 
   return wavyClient.start(flac_found, index);

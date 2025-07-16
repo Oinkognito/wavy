@@ -28,13 +28,18 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "toml.hpp"
 #include <cstdlib>
+#include <external/toml++/toml.hpp>
 #include <libwavy/common/state.hpp>
 #include <string_view>
 
 namespace TomlKeys
 {
+namespace Owner
+{
+inline constexpr auto OwnerID  = "owner_id";
+inline constexpr auto Nickname = "nickname";
+} // namespace Owner
 namespace Audio
 {
 inline constexpr auto Parser          = "audio_parser";
