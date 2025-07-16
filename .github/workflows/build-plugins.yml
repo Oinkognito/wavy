@@ -15,8 +15,10 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout repository
+    - name: Checkout repository with submodules
       uses: actions/checkout@v3
+      with:
+        submodules: recursive
 
     - name: Install dependencies for Wavy
       run: |

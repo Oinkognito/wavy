@@ -22,8 +22,10 @@ jobs:
           zstd cmake make pkgconf \
           libarchive-devel lame-devel git wget tbb-devel
 
-    - name: Checkout repository
+    - name: Checkout repository with submodules
       uses: actions/checkout@v3
+      with:
+        submodules: recursive
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC
       run: |

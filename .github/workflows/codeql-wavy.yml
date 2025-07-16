@@ -20,8 +20,10 @@ jobs:
         language: [ "cpp" ]  # Specify the primary language as C++
 
     steps:
-    - name: Checkout repository
+    - name: Checkout repository with submodules
       uses: actions/checkout@v3
+      with:
+        submodules: recursive
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3

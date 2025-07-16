@@ -13,13 +13,16 @@ RUN apk add --no-cache \
     openssl-dev \
     openssl \
     zstd \
+    git \
     pkgconf \
     libarchive-dev \
     pulseaudio-dev
 
-COPY . /app
+RUN git clone --recursive https://github.com/Oinkognito/Wavy
 
-RUN make clean && make init && make server-cert-gen && make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON -DNO_TBB=ON"
+WORKDIR /app/Wavy
+
+RUN make server-cert-gen && make server EXTRA_CMAKE_FLAGS="-DNO_FFMPEG=ON -DNO_TBB=ON"
 
 EXPOSE 8080
 
