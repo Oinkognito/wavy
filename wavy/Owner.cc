@@ -32,7 +32,7 @@
 #include <span>
 #include <unordered_set>
 
-#include "helpers/dispatcher.hpp"
+#include "helpers/Dispatcher.hpp"
 #include <libwavy/ffmpeg/hls/entry.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>

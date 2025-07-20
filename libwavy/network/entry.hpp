@@ -52,7 +52,7 @@ class HttpsClient
 {
 public:
   HttpsClient(asio::io_context& ioc, ssl::context& ssl_ctx, IPAddr server)
-      : ioc_(ioc), ssl_ctx_(ssl_ctx), server_(std::move(server))
+      : m_ioCtx(ioc), m_sslCtx(ssl_ctx), m_server(std::move(server))
   {
   }
 
@@ -66,11 +66,11 @@ public:
     try
     {
       // Create a new resolver and SSL stream for each request
-      tcp::resolver                  resolver{ioc_};
-      beast::ssl_stream<tcp::socket> stream{ioc_, ssl_ctx_};
+      tcp::resolver                  resolver{m_ioCtx};
+      beast::ssl_stream<tcp::socket> stream{m_ioCtx, m_sslCtx};
 
       // Resolve the host
-      auto const results = resolver.resolve(server_, WAVY_SERVER_PORT_NO_STR);
+      auto const results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
 
       // Connect the socket
       asio::connect(stream.next_layer(), results.begin(), results.end());
@@ -80,7 +80,7 @@ public:
 
       // Set up HTTP GET request
       http::request<http::string_body> req{http::verb::get, target, 11};
-      req.set(http::field::host, server_);
+      req.set(http::field::host, m_server);
       req.set(http::field::user_agent, "WavyClient");
 
       // Send the request
@@ -116,9 +116,9 @@ public:
   }
 
 private:
-  asio::io_context& ioc_;
-  ssl::context&     ssl_ctx_;
-  IPAddr            server_;
+  asio::io_context& m_ioCtx;
+  ssl::context&     m_sslCtx;
+  IPAddr            m_server;
 };
 
 } // namespace libwavy::network

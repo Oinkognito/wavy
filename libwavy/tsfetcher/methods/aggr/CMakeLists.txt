@@ -11,7 +11,7 @@ set(WAVY_FETCHER_PLUGIN_ENTRIES "${WAVY_FETCHER_PLUGIN_ENTRIES}${FETCHER_PLUGIN_
 
 add_library(${FETCHER_PLUGIN_NAME} SHARED ${FETCHER_PLUGIN_SRC})
 target_include_directories(${FETCHER_PLUGIN_NAME} PRIVATE ${CMAKE_SOURCE_DIR} ${ZSTD_INCLUDE_DIRS})
-target_link_libraries(${FETCHER_PLUGIN_NAME} PRIVATE Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ZSTD_LIBRARIES})
+target_link_libraries(${FETCHER_PLUGIN_NAME} PRIVATE wavy-utils Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ZSTD_LIBRARIES})
 
 set_target_properties(${FETCHER_PLUGIN_NAME} PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${WAVY_FETCHER_PLUGIN_OUTPUT_PATH}

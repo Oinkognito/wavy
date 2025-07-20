@@ -32,7 +32,7 @@ add_executable(example_decoder ${DECODE_SRC})
 target_include_directories(example_decoder PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(example_decoder PRIVATE 
+target_link_libraries(example_decoder PRIVATE wavy-ffmpeg 
     Boost::log Boost::log_setup Boost::system Boost::thread 
     PkgConfig::LIBAV
 )

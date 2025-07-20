@@ -179,8 +179,8 @@ extern "C"
     double reduction = (1.0 - ((double)totalCompressedSize / (double)totalOriginalSize)) * 100.0;
 
     printf("--------------- ZSTD Total Compression Statistics ---------------\n");
-    printf("> Original size: %.3f MiB\n", bytes_to_mib((unsigned)totalOriginalSize));
-    printf("> Compressed size: %.3f MiB\n", bytes_to_mib((unsigned)totalCompressedSize));
+    printf("> Original size: %.3f MiB\n", ZSTD_bytes_to_mib((unsigned)totalOriginalSize));
+    printf("> Compressed size: %.3f MiB\n", ZSTD_bytes_to_mib((unsigned)totalCompressedSize));
     printf("> Total reduction: %.2f%%\n", reduction);
     printf("--------------- ZSTD Total Compression Statistics ---------------\n");
   }

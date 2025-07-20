@@ -46,6 +46,8 @@
 #include <format>
 #include <iostream>
 
+#include <libwavy/common/api/entry.hpp>
+
 /*
  * LOGGER
  *
@@ -87,25 +89,25 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
 
 #define LOG_FMT(str) BOLD str RESET
 
-#define LOG_CATEGORIES                                                \
-  X(DECODER,           "#DECODER_LOG         ")                       \
-  X(TRANSCODER,        "#TRANSCODER_LOG      ")                       \
-  X(LIBAV,             "#LIBAV_LOG           ")                       \
-  X(AUDIO,             "#AUDIO_LOG           ")                       \
-  X(NET,               "#NETWORK_LOG         ")                       \
-  X(FETCH,             "#TSFETCH_LOG         ")                       \
-  X(PLUGIN,            "#PLUGIN_LOG          ")                       \
-  X(HLS,               "#HLS_LOG             ")                       \
-  X(M3U8_PARSER,       "#M3U8_PARSER_LOG     ")                       \
-  X(UNIX,              "#UNIX_LOG            ")                       \
-  X(DISPATCH,          "#DISPATCH_LOG        ")                       \
-  X(SERVER,            "#SERVER_LOG          ")                       \
-  X(SERVER_DWNLD,      "#SERVER_DWNLD_LOG    ")                       \
-  X(SERVER_UPLD,       "#SERVER_UPLD_LOG     ")                       \
-  X(SERVER_EXTRACT,    "#SERVER_EXTRACT_LOG  ")                       \
-  X(SERVER_VALIDATE,   "#SERVER_VALIDATE_LOG ")                       \
-  X(OWNER,             "#OWNER_LOG           ")                       \
-  X(RECEIVER,          "#RECEIVER_LOG        ")
+#define LOG_CATEGORIES                        \
+  X(DECODER, "#DECODER_LOG         ")         \
+  X(TRANSCODER, "#TRANSCODER_LOG      ")      \
+  X(LIBAV, "#LIBAV_LOG           ")           \
+  X(AUDIO, "#AUDIO_LOG           ")           \
+  X(NET, "#NETWORK_LOG         ")             \
+  X(FETCH, "#TSFETCH_LOG         ")           \
+  X(PLUGIN, "#PLUGIN_LOG          ")          \
+  X(HLS, "#HLS_LOG             ")             \
+  X(M3U8_PARSER, "#M3U8_PARSER_LOG     ")     \
+  X(UNIX, "#UNIX_LOG            ")            \
+  X(DISPATCH, "#DISPATCH_LOG        ")        \
+  X(SERVER, "#SERVER_LOG          ")          \
+  X(SERVER_DWNLD, "#SERVER_DWNLD_LOG    ")    \
+  X(SERVER_UPLD, "#SERVER_UPLD_LOG     ")     \
+  X(SERVER_EXTRACT, "#SERVER_EXTRACT_LOG  ")  \
+  X(SERVER_VALIDATE, "#SERVER_VALIDATE_LOG ") \
+  X(OWNER, "#OWNER_LOG           ")           \
+  X(RECEIVER, "#RECEIVER_LOG        ")
 
 // Generate string constants
 #define X(name, str) constexpr const char* name##_LOG = LOG_FMT(str);
@@ -143,7 +145,7 @@ inline auto get_current_timestamp() -> std::string
   return std::format("{:%Y-%m-%d %H:%M:%S}.{:03}", now_time, now_ms.count());
 }
 
-void init_logging()
+inline void init_logging()
 {
   namespace bfs     = boost::filesystem;
   namespace logging = boost::log;

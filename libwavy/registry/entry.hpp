@@ -45,8 +45,6 @@ extern "C"
 namespace libwavy::registry
 {
 
-using namespace libwavy::Toml;
-
 class RegisterAudio
 {
 public:
@@ -87,7 +85,7 @@ public:
 
   void exportToTOML(const AbsPath& outputFile) const
   {
-    TomlGenerator tomlGen;
+    Toml::TomlGenerator tomlGen;
 
     // Do NOT put this in global context to avoid confusion!!
     using namespace TomlKeys;
@@ -225,7 +223,7 @@ private:
     }
   }
 
-  static void saveStreamMetadataToToml(TomlGenerator& tomlGen, const StreamMetadata& stream,
+  static void saveStreamMetadataToToml(Toml::TomlGenerator& tomlGen, const StreamMetadata& stream,
                                        const std::string& parent)
   {
 

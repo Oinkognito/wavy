@@ -95,7 +95,7 @@ public:
     LOG_INFO << FETCH_LOG << "Stored " << gs.segSizeAll() << " transport segments.";
 
     // Decode and play the fetched stream
-    if (!decodeAndPlay(gs, flac_found, audio_backend_lib_path))
+    if (!utils::audio::decodeAndPlay(gs, flac_found, audio_backend_lib_path))
     {
       return WAVY_RET_FAIL;
     }

@@ -27,10 +27,7 @@
  * See LICENSE file for full details.
  ************************************************/
 
-#include "server.hpp"
-#include <libwavy/common/macros.hpp>
-#include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/server/server.hpp>
 
 auto is_valid_extension(const FileName& filename) -> bool
 {

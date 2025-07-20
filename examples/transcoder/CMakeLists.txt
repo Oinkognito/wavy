@@ -35,7 +35,7 @@ add_executable(transcode_mp3 ${ENCODE_MP3_SRC})
 target_include_directories(transcode_mp3 PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(transcode_mp3 PRIVATE 
+target_link_libraries(transcode_mp3 PRIVATE wavy-ffmpeg 
     Boost::log Boost::log_setup Boost::system Boost::thread 
     PkgConfig::LIBAV
 )

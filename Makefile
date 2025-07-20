@@ -51,11 +51,11 @@ verbose:
 
 # Code formatting
 format:
-	@find src libwavy examples libquwrof examples -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
+	@find src libwavy examples libquwrof examples -type f \( -name "*.cc" -o -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" -exec clang-format -i {} +
 
 # Code linting/fixing
 tidy:
-	@find src libwavy libquwrof -type f \( -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" | xargs clang-tidy -p $(BUILD_DIR)
+	@find src libwavy libquwrof -type f \( -name "*.cc" -o -name "*.cpp" -o -name "*.hpp" \) ! -name "toml.hpp" | xargs clang-tidy -p $(BUILD_DIR)
 
 prepend-license-src:
 	@find src libwavy libquwrof examples -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) ! -name "toml.hpp" -exec ./scripts/license-prepend.sh {} +

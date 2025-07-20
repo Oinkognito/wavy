@@ -59,7 +59,7 @@ auto main() -> int
   }
   catch (std::exception& e)
   {
-    LOG_ERROR << SERVER_LOG << "Exception: " << e.what();
+    LOG_ERROR << SERVER_LOG << "Wavy Server Exception: " << e.what();
   }
 
   return 0;

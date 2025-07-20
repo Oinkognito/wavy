@@ -33,6 +33,10 @@
 #include <sstream>
 #include <string>
 
+#define ONE_KIB 1024
+#define ONE_MIB ONE_KIB * 1024
+#define ONE_GIB ONE_MIB * 1024
+
 namespace libwavy::utils::math
 {
 
@@ -46,7 +50,7 @@ inline auto formatSize(double size, const std::string& unit) -> std::string
 inline auto bytesFormat(size_t bytes) -> std::string
 {
   static constexpr std::array<const char*, 4> units    = {"B", "KiB", "MiB", "GiB"};
-  static constexpr std::array<size_t, 4>      divisors = {1, 1024, 1024 * 1024, 1024 * 1024 * 1024};
+  static constexpr std::array<size_t, 4>      divisors = {1, ONE_KIB, ONE_MIB, ONE_GIB};
 
   for (size_t i = 0; i < units.size(); ++i)
   {

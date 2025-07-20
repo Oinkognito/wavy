@@ -32,6 +32,7 @@
 #include <cmath>
 #include <future>
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/types.hpp>
 #include <libwavy/logger.hpp>
 #include <libwavy/network/entry.hpp>
 #include <vector>
@@ -107,7 +108,7 @@ private:
   std::string                       server_url_;
   time_point<high_resolution_clock> start_time_;
 
-  void parseUrl(const std::string& url, std::string& host, std::string& port, std::string& target)
+  void parseUrl(NetTarget& url, IPAddr& host, std::string& port, std::string& target)
   {
     size_t      pos       = url.find("//");
     size_t      start     = (pos == std::string::npos) ? 0 : pos + 2;
@@ -127,7 +128,7 @@ private:
     target = (end == std::string::npos) ? "/" : url.substr(end);
   }
 
-  auto sendProbe(const std::string& server, int timeout_ms) -> int
+  auto sendProbe(const IPAddr& server, int timeout_ms) -> int
   {
     asio::io_context ioc;
     ssl::context     ctx{ssl::context::sslv23_client};
@@ -140,7 +141,8 @@ private:
       std::async(std::launch::async,
                  [&]()
                  {
-                   return client.get("/hls/ping"); // Assuming a simple ping request
+                   return client.get(
+                     macros::to_string(macros::SERVER_PATH_PING)); // Assuming a simple ping request
                  });
 
     if (future.wait_for(std::chrono::milliseconds(timeout_ms)) == std::future_status::timeout)

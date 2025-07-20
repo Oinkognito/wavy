@@ -32,7 +32,7 @@ add_executable(example_hls_seg ${SOURCES})
 target_include_directories(example_hls_seg PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(example_hls_seg PRIVATE 
+target_link_libraries(example_hls_seg PRIVATE wavy-ffmpeg
     Boost::log Boost::log_setup Boost::system Boost::thread 
     PkgConfig::LIBAV
 )
