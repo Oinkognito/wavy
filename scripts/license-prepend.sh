@@ -7,7 +7,7 @@ read -r -d '' LICENSE_COMMENT <<EOF
  *                                Wavy Project                                  *
  *                         High-Fidelity Audio Streaming                        *
  *                                                                              *
- *  Copyright (c) ${YEAR} Oinkognito                                            *
+ *  Copyright (c) ${YEAR} Oinkognito                                               *
  *  All rights reserved.                                                        *
  *                                                                              *
  *  License:                                                                    *
