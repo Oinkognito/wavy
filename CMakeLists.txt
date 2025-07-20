@@ -165,8 +165,8 @@ endif()
 ########################### -- MISC CPP FILES (WAVY-UTILS) -- #########################################
 file(GLOB WAVY_UTILS_SOURCES "src/utils/*.cc")
 add_library(wavy-utils SHARED ${WAVY_UTILS_SOURCES})
-target_include_directories(wavy-utils PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(wavy-utils PUBLIC Boost::log Boost::log_setup)
+target_include_directories(wavy-utils PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_link_libraries(wavy-utils PUBLIC ${FFMPEG_LIBRARIES} Boost::log Boost::log_setup)
 ########################### -- MISC CPP FILES -- #########################################
 
 ########################### -- WAVY CLIENT -- #########################################
