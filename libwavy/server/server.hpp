@@ -23,7 +23,6 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include "libwavy/log-macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <libwavy/common/api/entry.hpp>

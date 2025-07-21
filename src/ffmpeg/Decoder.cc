@@ -22,7 +22,10 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <boost/date_time/gregorian/greg_month.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
+
+using Decoder = libwavy::log::DECODER;
 
 namespace libwavy::ffmpeg
 {
@@ -39,15 +42,14 @@ auto MediaDecoder::is_lossless_codec(AVCodecID codec_id) -> bool
 
 void MediaDecoder::print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams)
 {
-  LOG_DEBUG << DECODER_LOG << "Audio File Metadata:";
-  LOG_DEBUG << DECODER_LOG << "Codec: " << avcodec_get_name(codecParams->codec_id);
-  LOG_DEBUG << DECODER_LOG << "Bitrate: " << (double)codecParams->bit_rate / 1000.0 << " kbps";
-  LOG_DEBUG << DECODER_LOG << "Sample Rate: " << codecParams->sample_rate << " Hz";
-  LOG_DEBUG << DECODER_LOG << "Channels: " << codecParams->ch_layout.nb_channels;
-  LOG_DEBUG << DECODER_LOG << "Format: " << formatCtx->iformat->long_name;
-  LOG_DEBUG << DECODER_LOG
-            << (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
-                                                         : "This is a lossy codec");
+  log::DBG<Decoder>("Audio File Metadata:");
+  log::DBG<Decoder>("Codec: {}", avcodec_get_name(codecParams->codec_id));
+  log::DBG<Decoder>("Bitrate: {} kbps", (double)codecParams->bit_rate / 1000.0);
+  log::DBG<Decoder>("Sample Rate: {} Hz", codecParams->sample_rate);
+  log::DBG<Decoder>("Channels: {}", codecParams->ch_layout.nb_channels);
+  log::DBG<Decoder>("Format: {}", formatCtx->iformat->long_name);
+  log::DBG<Decoder>("{}", (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
+                                                         : "This is a lossy codec"));
 }
 
 auto MediaDecoder::decode(TotalAudioData& ts_segments, TotalDecodedAudioData& output_audio) -> bool
@@ -193,7 +195,7 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
     {
       char errbuf[128];
       av_strerror(ret, errbuf, sizeof(errbuf));
-      LOG_ERROR << DECODER_LOG << "Error sending packet: " << errbuf;
+      log::ERROR<Decoder>("Error sending packet: {}", errbuf);
       av_packet_unref(packet);
       continue;
     }
@@ -221,8 +223,7 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
         size_t actual_added  = output.size() - before_size;
         if (expected_size != actual_added)
         {
-          LOG_WARNING << DECODER_LOG << "Size mismatch in planar data: expected " << expected_size
-                      << ", got " << actual_added;
+          log::WARN<Decoder>("Size mismatch in planar data: expected {}, got {}", expected_size, actual_added);
         }
       }
       else
@@ -235,8 +236,7 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
           size_t actual_added = output.size() - before_size;
           if (actual_added != dataSize)
           {
-            LOG_WARNING << DECODER_LOG << "Size mismatch in interleaved data: expected " << dataSize
-                        << ", got " << actual_added;
+            log::WARN<Decoder>("Size mismatch in interleaved data: expected {}, got {}", dataSize, actual_added);
           }
         }
       }
@@ -246,7 +246,7 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
     {
       char errbuf[128];
       av_strerror(ret, errbuf, sizeof(errbuf));
-      LOG_ERROR << DECODER_LOG << "Error receiving frame: " << errbuf;
+      log::ERROR<Decoder>("Error receiving frame: {}", errbuf);
     }
 
     av_packet_unref(packet);
@@ -266,7 +266,7 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
       {
         for (int ch = 0; ch < channels; ++ch)
         {
-          uint8_t* src = frame->data[ch] + i * bytesPerSample;
+          ui8* src = frame->data[ch] + i * bytesPerSample;
           output.insert(output.end(), src, src + bytesPerSample);
         }
       }
@@ -284,11 +284,8 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
   av_frame_free(&frame);
   av_packet_free(&packet);
 
-  LOG_INFO << DECODER_LOG
-           << "Decoding complete: " << libwavy::utils::math::bytesFormat(output.size())
-           << " bytes of raw audio data generated";
-  LOG_INFO << DECODER_LOG << "Sample format: " << av_get_sample_fmt_name(codec_ctx->sample_fmt)
-           << ", Bytes per sample: " << av_get_bytes_per_sample(codec_ctx->sample_fmt);
+  log::INFO<Decoder>("Decoding complete: {} bytes of raw audio data generated!", libwavy::utils::math::bytesFormat(output.size()));
+  log::INFO<Decoder>("Sample format: {}, Bytes per sample: {}", av_get_sample_fmt_name(codec_ctx->sample_fmt), av_get_bytes_per_sample(codec_ctx->sample_fmt));
 
   return !output.empty();
 }

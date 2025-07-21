@@ -37,12 +37,12 @@ public:
   struct FlacMetadata
   {
     double                                       bitrate;
-    uint64_t                                     total_samples;
-    uint32_t                                     sample_rate;
-    uint32_t                                     bits_per_sample;
-    uint32_t                                     channels;
+    ui64                                         total_samples;
+    ui32                                         sample_rate;
+    ui32                                         bits_per_sample;
+    ui32                                         channels;
     double                                       duration;
-    uint64_t                                     file_size;
+    ui64                                         file_size;
     std::string                                  vendor_string;
     std::unordered_map<std::string, std::string> tags;
   };
@@ -70,7 +70,7 @@ public:
         auto* stream_info = dynamic_cast<FLAC::Metadata::StreamInfo*>(block);
         if (!stream_info)
         {
-          LOG_ERROR << "[FLAC] Failed to cast to StreamInfo.\n";
+          log::ERROR<log::FLAC>("Failed to cast to StreamInfo.");
           return metadata;
         }
 
@@ -81,7 +81,7 @@ public:
 
         if (metadata.total_samples == 0 || metadata.sample_rate == 0)
         {
-          LOG_ERROR << "[FLAC] Invalid FLAC metadata values.\n";
+          log::ERROR<log::FLAC>("Invalid FLAC metadata values.");
           return metadata;
         }
 
@@ -92,7 +92,7 @@ public:
         struct stat file_stat;
         if (stat(filename.c_str(), &file_stat) != 0)
         {
-          LOG_ERROR << "[FLAC] Failed to get file size.\n";
+          log::ERROR<log::FLAC>("Failed to get file size.");
           return metadata;
         }
         metadata.file_size = file_stat.st_size;
@@ -107,7 +107,7 @@ public:
         auto* vorbis = dynamic_cast<FLAC::Metadata::VorbisComment*>(block);
         if (!vorbis)
         {
-          LOG_ERROR << "[FLAC] Failed to cast to VorbisComment.\n";
+          log::ERROR<log::FLAC>("Failed to cast to VorbisComment.");
           return metadata;
         }
 

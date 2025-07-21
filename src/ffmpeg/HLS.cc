@@ -28,6 +28,7 @@
 #include <regex>
 
 namespace fs = std::filesystem;
+using HLS = libwavy::log::HLS;
 
 namespace libwavy::ffmpeg::hls
 {
@@ -47,8 +48,8 @@ auto HLS_Segmenter::createSegmentsFLAC(const AbsPath& input_file, const Director
   const AbsPath    segment_file_format = output_dir + "/hls_flac_%d.m4s";
   const AbsPath    output_playlist_str = output_dir + "/" + output_playlist;
 
-  LOG_DEBUG << HLS_LOG << "Segments format: " << segment_file_format;
-  LOG_DEBUG << HLS_LOG << "Playlist destination: " << output_playlist_str;
+  log::DBG<HLS>("Segments format: {}", segment_file_format);
+  log::DBG<HLS>("Playlist destination: {}", output_playlist_str);
 
   if ((ret = avformat_open_input(&input_ctx, input_file.c_str(), nullptr, nullptr)) < 0)
     return ret;
@@ -196,7 +197,7 @@ void HLS_Segmenter::createMasterPlaylistMP3(const Directory& input_dir, const Di
 
   if (playlists.empty())
   {
-    LOG_ERROR << HLS_LOG << "No playlists found in directory: " << input_dir;
+    log::ERROR<HLS>("No playlists found in directory: {}", input_dir);
     return;
   }
 
@@ -219,9 +220,7 @@ void HLS_Segmenter::createMasterPlaylistMP3(const Directory& input_dir, const Di
 
   m3u8.close();
 
-  LOG_INFO << HLS_LOG
-           << "Created HLS segments for LOSSY with references written to master playlist: "
-           << macros::to_string(macros::MASTER_PLAYLIST);
+  log::INFO<HLS>("Created HLS segments for LOSSY with references written to master playlist: {}", macros::to_string(macros::MASTER_PLAYLIST));
 }
 
 auto HLS_Segmenter::encode_variant(CStrRelPath input_file, CStrRelPath output_playlist, int bitrate)

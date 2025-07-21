@@ -22,8 +22,17 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <libwavy/log-macros.hpp>
 #include <libwavy/common/api/entry.hpp>
 #include <libwavy/server/server.hpp>
+
+using SExtract = libwavy::log::SERVER_EXTRACT;
+using SDwnld = libwavy::log::SERVER_DWNLD;
+using SUpload = libwavy::log::SERVER_UPLD;
+using SValid = libwavy::log::SERVER_VALIDATE;
+
+namespace libwavy::server::helpers
+{
 
 auto is_valid_extension(const FileName& filename) -> bool
 {
@@ -87,13 +96,12 @@ auto  validate_m4s(const RelPath& m4s_path) -> bool
   //   return false;
   // }
 
-  LOG_TRACE << SERVER_VALIDATE_LOG << "Validation for m4s coming soon!!!";
   return true;
 }
 
 auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -> bool
 {
-  LOG_INFO << SERVER_EXTRACT_LOG << "Extracting PAYLOAD: " << payload_path;
+  log::INFO<SExtract>("Extracting PAYLOAD: {}", payload_path);
 
   struct archive*       a   = archive_read_new();
   struct archive*       ext = archive_write_disk_new();
@@ -105,7 +113,7 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
 
   if (archive_read_open_filename(a, payload_path.c_str(), ARCHIVE_READ_BUFFER_SIZE) != ARCHIVE_OK)
   {
-    LOG_ERROR << SERVER_EXTRACT_LOG << "Failed to open archive: " << archive_error_string(a);
+    log::ERROR<SExtract>("Failed to open archive: {}", archive_error_string(a));
     archive_read_free(a);
     archive_write_free(ext);
     return false;
@@ -118,8 +126,7 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
     RelPath filename    = archive_entry_pathname(entry);
     AbsPath output_file = extract_path + "/" + filename;
 
-    LOG_TRACE << SERVER_EXTRACT_LOG
-              << "Extracting file: " << bfs::relative(output_file, macros::SERVER_STORAGE_DIR);
+    log::TRACE<SExtract>("Extracting file: {}", bfs::relative(output_file, macros::SERVER_STORAGE_DIR).string());
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -128,7 +135,7 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
       std::ofstream ofs(output_file, std::ios::binary);
       if (!ofs)
       {
-        LOG_ERROR << SERVER_EXTRACT_LOG << "Failed to open file for writing: " << output_file;
+        log::ERROR<SExtract>("Failed to open file for writing: {}", output_file);
         continue;
       }
 
@@ -145,28 +152,24 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
       // If the extracted file is a .zst file, decompress it
       if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
-        LOG_INFO << "[ZSTD] Decompressing .zst file: "
-                 << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+        log::INFO<log::NONE>("[ZSTD] Decompressing .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         if (!ZSTD_decompress_file(output_file.c_str()))
         {
-          LOG_ERROR << "[ZSTD] Failed to decompress .zst file: " << output_file;
+          log::ERROR<log::NONE>("[ZSTD] Failed to decompress .zst file: {}", output_file);
           continue;
         }
 
-        std::string decompressed_filename =
+        RelPath decompressed_filename =
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
-        LOG_INFO << SERVER_EXTRACT_LOG << "Decompressed file: "
-                 << bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR);
+        log::INFO<SExtract>("Decompressed file: {}", bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR).string());
 
         if (std::remove(output_file.c_str()) == 0)
         {
-          LOG_INFO << "[ZSTD] Deleted the original .zst file: "
-                   << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+          log::INFO<log::NONE>("[ZSTD] Deleted the original .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
         else
         {
-          LOG_ERROR << "[ZSTD] Failed to delete .zst file: "
-                    << bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR);
+          log::ERROR<log::NONE>("[ZSTD] Failed to delete .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
       }
     }
@@ -180,11 +183,11 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
 
 auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id) -> bool
 {
-  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and extracting GZIP file: " << gzip_path;
+  log::INFO<SExtract>(LogMode::Async, " Validating and extracting GZIP file: {}", gzip_path);
 
   if (!bfs::exists(gzip_path))
   {
-    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG << " File does not exist: " << gzip_path;
+    log::ERROR<SExtract>(LogMode::Async, " File does not exist: {}", gzip_path);
     return false;
   }
 
@@ -194,11 +197,11 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
 
   if (!extract_payload(gzip_path, temp_extract_path))
   {
-    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG << " Extraction failed!";
+    log::ERROR<SExtract>(LogMode::Async, " Extraction failed!");
     return false;
   }
 
-  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction complete. Scanning for owner file...";
+  log::INFO<SExtract>(LogMode::Async, " Extraction complete. Scanning for owner file...");
 
   StorageOwnerID ownerNickname;
   bool           ownerFound = false;
@@ -211,15 +214,14 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     {
       ownerNickname = fname;
       ownerFound    = true;
-      LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Found OWNER nickname file: " << fname;
+      log::INFO<SExtract>(LogMode::Async, " Found OWNER nickname file: {}", fname);
       break;
     }
   }
 
   if (!ownerFound)
   {
-    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG
-                    << " Missing OWNER file. Cannot determine destination path.";
+    log::ERROR<SExtract>(LogMode::Async, " Missing OWNER file. Cannot determine destination path.");
     return false;
   }
 
@@ -227,7 +229,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ownerNickname + "/" + audio_id;
   bfs::create_directories(storage_path);
 
-  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Validating and moving extracted files...";
+  log::INFO<SExtract>(LogMode::Async, " Validating and moving extracted files...");
 
   int valid_file_count  = 0;
   int metadataFileCount = 0;
@@ -244,7 +246,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     std::ifstream infile(file.path().string(), std::ios::binary);
     if (!infile)
     {
-      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Could not open file: " << fname;
+      log::WARN<SExtract>(LogMode::Async, " Could not open file: {}", fname);
       bfs::remove(file.path());
       continue;
     }
@@ -255,7 +257,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     {
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
-        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Invalid M3U8 file, removing: " << fname;
+        log::WARN<SExtract>(LogMode::Async, " Invalid M3U8 file, removing: {}", fname);
         bfs::remove(file.path());
         continue;
       }
@@ -264,7 +266,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     {
       if (!validate_ts_file(data))
       {
-        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Invalid TS file, removing: " << fname;
+        log::WARN<SExtract>(LogMode::Async, " Invalid TS file, removing: {}", fname);
         bfs::remove(file.path());
         continue;
       }
@@ -273,45 +275,44 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     {
       if (!validate_m4s(file.path().string()))
       {
-        LOG_TRACE_ASYNC << SERVER_EXTRACT_LOG << " Possibly invalid M4S segment: " << fname;
+        log::TRACE<SExtract>(LogMode::Async, " Possibly invalid M4S segment: {}", fname);
       }
     }
     else if (fname.ends_with(macros::MP4_FILE_EXT))
     {
-      LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found MP4 file: " << fname;
+      log::DBG<SExtract>(LogMode::Async, " Found MP4 file: {}", fname);
     }
     else if (fname.ends_with(macros::TOML_FILE_EXT))
     {
       if (metadataFileCount++ > 0)
       {
-        LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Extra metadata TOML file ignored: " << fname;
+        log::WARN<SExtract>(LogMode::Async, " Extra metadata TOML file ignored: {}", fname);
         bfs::remove(file.path());
         continue;
       }
 
-      LOG_DEBUG_ASYNC << SERVER_EXTRACT_LOG << " Found metadata TOML file: " << fname;
+      log::DBG<SExtract>(LogMode::Async, " Found metadata TOML file: {}", fname);
     }
     else
     {
-      LOG_WARNING_ASYNC << SERVER_EXTRACT_LOG << " Unknown file, removing: " << fname;
+      log::WARN<SExtract>(" Unknown file, removing: {}", fname);
       bfs::remove(file.path());
       continue;
     }
 
     // Move to storage
     bfs::rename(file.path(), storage_path + "/" + fname);
-    LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " File stored: " << fname;
+    log::INFO<SExtract>(LogMode::Async, " File stored: {}", fname);
     valid_file_count++;
   }
 
   if (valid_file_count == 0)
   {
-    LOG_ERROR_ASYNC << SERVER_EXTRACT_LOG
-                    << " No valid files remain after validation. Extraction failed.";
+    log::ERROR<SExtract>(LogMode::Async, " No valid files remain after validation. Extraction failed.");
     return false;
   }
 
-  LOG_INFO_ASYNC << SERVER_EXTRACT_LOG << " Extraction and validation successful.";
+  log::INFO<SExtract>(LogMode::Async, " Extraction and validation successful.");
   return true;
 }
 
@@ -346,3 +347,5 @@ auto tokenizePath(std::istringstream& iss) -> vector<std::string>
 
   return parts;
 }
+
+} //namespace libwavy::server::helpers

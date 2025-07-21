@@ -35,8 +35,8 @@ auto main() -> int
 {
   try
   {
-    libwavy::log::init_logging();
-    libwavy::log::set_log_level(libwavy::log::__TRACE__);
+    INIT_WAVY_LOGGER();
+    lwlog::set_log_level(libwavy::log::__TRACE__);
     asio::io_context io_context;
     ssl::context     ssl_context(ssl::context::sslv23);
 
@@ -44,17 +44,17 @@ auto main() -> int
                             ssl::context::no_sslv3 | ssl::context::single_dh_use);
 
     ssl_context.use_certificate_file(macros::to_string(macros::SERVER_CERT), ssl::context::pem);
-    LOG_TRACE << "Loaded server certificate: " << macros::SERVER_CERT;
+    lwlog::TRACE<_>("Loaded server certificate: {}", macros::SERVER_CERT);
     ssl_context.use_private_key_file(macros::to_string(macros::SERVER_PRIVATE_KEY),
                                      ssl::context::pem);
-    LOG_TRACE << "Loaded private key file: " << macros::SERVER_PRIVATE_KEY;
+    lwlog::TRACE<_>("Loaded private key file: {}", macros::SERVER_PRIVATE_KEY);
 
     libwavy::server::WavyServer server(io_context, ssl_context, WAVY_SERVER_PORT_NO);
     io_context.run();
   }
   catch (std::exception& e)
   {
-    LOG_ERROR << SERVER_LOG << "Wavy Server Exception: " << e.what();
+    libwavy::log::ERROR<libwavy::log::SERVER>("Wavy Server Exception: {}", e.what());
   }
 
   return 0;

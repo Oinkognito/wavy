@@ -362,7 +362,7 @@ private:
     {
       if (!fs::exists(ts))
       {
-        LOG_ERROR << DISPATCH_LOG << "Missing transport stream: " << ts;
+        log::ERROR<Dispatch>("Missing transport stream: {}", ts);
         return false;
       }
     }
@@ -371,17 +371,16 @@ private:
     {
       if (!fs::exists(m4s))
       {
-        LOG_ERROR << DISPATCH_LOG << "Missing .m4s segment: " << m4s;
+        log::ERROR<Dispatch>("Missing .m4s segment: {}", m4s);
         return false;
       }
     }
 
-    LOG_INFO << DISPATCH_LOG
-             << "All referenced playlists and their respective segment types verified.";
-    LOG_INFO << DISPATCH_LOG << "Found "
-             << (playlist_format == PlaylistFormat::TRANSPORT_STREAM ? transport_streams_.size()
-                                                                     : mp4_segments_.size())
-             << " transport streams";
+    log::INFO<Dispatch>("All referenced playlists and their respective segment types verified.");
+    log::INFO<Dispatch>("Found {} transport streams.",
+                        (playlist_format == PlaylistFormat::TRANSPORT_STREAM
+                           ? transport_streams_.size()
+                           : mp4_segments_.size()));
     return true;
   }
 
@@ -408,8 +407,8 @@ private:
 
   auto compress_files(const AbsPath& output_archive_path, const bool applyZSTDComp) -> bool
   {
-    LOG_DEBUG << DISPATCH_LOG << "Beginning Compression Job in: " << output_archive_path << " from "
-              << fs::absolute(directory_);
+    log::DBG<Dispatch>("Beginning Compression Job in: {} from {}", output_archive_path,
+                       fs::absolute(directory_).string());
     /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
     if (applyZSTDComp)
     {
@@ -417,7 +416,7 @@ private:
             fs::path(directory_).c_str(),
             macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
       {
-        LOG_ERROR << DISPATCH_LOG << "Something went wrong with Zstd compression.";
+        log::ERROR<Dispatch>("Something went wrong with ZSTD compression!");
         return false;
       }
     }
@@ -428,7 +427,7 @@ private:
 
     if (archive_write_open_filename(archive, output_archive_path.c_str()) != ARCHIVE_OK)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to create archive: " << output_archive_path;
+      log::ERROR<Dispatch>("Failed to create archive: {}", output_archive_path);
       return false;
     }
 
@@ -437,7 +436,7 @@ private:
       std::ifstream file(file_path, std::ios::binary);
       if (!file)
       {
-        LOG_ERROR << DISPATCH_LOG << "Failed to open file: " << file_path;
+        log::ERROR<Dispatch>("Failed to open file: {}", file_path);
         return false;
       }
 
@@ -462,7 +461,7 @@ private:
     fs::path payloadTarget =
       applyZSTDComp ? fs::path(macros::DISPATCH_ARCHIVE_REL_PATH) : fs::path(directory_);
 
-    LOG_DEBUG << DISPATCH_LOG << "Making payload target: " << payloadTarget;
+    log::DBG<Dispatch>("Making payload target: {}", payloadTarget.string());
 
     for (const auto& entry : fs::directory_iterator(payloadTarget))
     {
@@ -470,7 +469,7 @@ private:
       {
         if (!AddFileToArchive(entry.path().string()))
         {
-          LOG_ERROR << DISPATCH_LOG << "Failed to add file: " << entry.path();
+          log::ERROR<Dispatch>("Failed to add file: {}", entry.path().string());
           archive_write_close(archive);
           archive_write_free(archive);
           return false;
@@ -481,14 +480,14 @@ private:
     // Close the archive
     if (archive_write_close(archive) != ARCHIVE_OK)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to close archive properly";
+      log::ERROR<Dispatch>("Failed to close archive properly!!");
       archive_write_free(archive);
       return false;
     }
 
     archive_write_free(archive);
-    LOG_INFO << DISPATCH_LOG << "ZSTD compression of " << directory_ << " to "
-             << output_archive_path << " with final GNU tar job done.";
+    log::INFO<Dispatch>("ZSTD compression of {} to {} with final GNU TAR job done.", directory_,
+                        output_archive_path);
     return true;
   }
 
@@ -512,15 +511,15 @@ private:
       }
       else if (ec)
       {
-        LOG_ERROR << DISPATCH_LOG << "SSL shutdown failed: " << ec.message();
+        log::ERROR<Dispatch>("SSL shutdown failed: {}", ec.message());
       }
 
-      LOG_INFO << DISPATCH_LOG << "Upload process completed successfully.";
+      log::INFO<Dispatch>("Upload process completed successfully.");
       return true;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << DISPATCH_LOG << "Upload failed: " << e.what();
+      log::ERROR<Dispatch>("Upload failed: {}", e.what());
       return false;
     }
   }
@@ -532,7 +531,7 @@ private:
     body.open(archive_path.c_str(), beast::file_mode::scan, ec);
     if (ec)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to open archive file: " << archive_path;
+      log::ERROR<Dispatch>("Failed to open archive file: {}", archive_path);
       return;
     }
 
@@ -546,7 +545,7 @@ private:
     http::write(stream_, req, ec);
     if (ec)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to send request: " << ec.message();
+      log::ERROR<Dispatch>("Failed to send request: {}", ec.message());
       return;
     }
 
@@ -557,25 +556,26 @@ private:
 
     if (ec)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to read response: " << ec.message();
+      log::ERROR<Dispatch>("Failed to read response: {}", ec.message());
       return;
     }
 
-    // Extract and log Client-ID separately
-    auto client_id_it = res.find("Client-ID");
-    if (client_id_it != res.end())
+    // Extract and log Audio-ID separately
+    auto audio_id_it = res.find("Audio-ID");
+    if (audio_id_it != res.end())
     {
-      LOG_INFO << "Parsed Client-ID: " << client_id_it->value();
+      auto AUDIO_ID = audio_id_it->value();
+      log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(AUDIO_ID));
     }
     else
     {
-      LOG_WARNING << "Client-ID not found in response headers.";
+      log::WARN<Dispatch>("Audio-ID not found in response headers.");
     }
   }
 
   void print_hierarchy()
   {
-    LOG_INFO << "\n HLS Playlist Hierarchy:\n";
+    log::INFO<log::NONE>("\n HLS Playlist Hierarchy:\n");
     std::cout << ">> " << playlist_name_ << "\n";
 
     for (const auto& [playlist, segments] : reference_playlists_)

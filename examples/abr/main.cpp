@@ -64,7 +64,7 @@ auto main(int argc, char* argv[]) -> int
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "Exception: " << e.what();
+    lwlog::ERROR<_>("Exception: {}", e.what());
     return EXIT_FAILURE;
   }
 

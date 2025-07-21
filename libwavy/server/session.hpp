@@ -322,7 +322,7 @@ private:
       {
         // Remove padding text before parsing
         std::string body = m_request.body();
-        removeBodyPadding(body);
+        helpers::removeBodyPadding(body);
 
         // Call your TOML parsing function.
         auto toml_data_opt = parseAudioMetadataFromDataString(body);
@@ -407,9 +407,9 @@ private:
 
     log::INFO<ServerUpload>(LogMode::Async, "File successfully written: {}", gzip_path);
 
-    if (extract_and_validate(gzip_path, audio_id))
+    if (helpers::extract_and_validate(gzip_path, audio_id))
     {
-      SendResponse("HTTP/1.1 200 OK\r\nClient-ID: " + audio_id + "\r\n\r\n");
+      SendResponse("HTTP/1.1 200 OK\r\nAudio-ID: " + audio_id + "\r\n\r\n");
     }
     else
     {
@@ -445,7 +445,7 @@ private:
 
     log::DBG<ServerDownload>(LogMode::Async, "Processing target request: {}", target);
 
-    std::vector<std::string> parts = tokenizePath(iss);
+    std::vector<std::string> parts = helpers::tokenizePath(iss);
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
@@ -523,7 +523,7 @@ private:
 
   void SendResponse(const NetResponse& msg)
   {
-    LOG_DEBUG_ASYNC << SERVER_LOG << "Attempting to send " << msg;
+    log::DBG<Server>(LogMode::Async, "Attempting to send {}", msg);
     auto self(shared_from_this());
     boost::asio::async_write(
       m_socket, boost::asio::buffer(msg),

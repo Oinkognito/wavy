@@ -39,13 +39,13 @@ auto main(int argc, char* argv[]) -> int
     }
     else
     {
-      LOG_ERROR << argv[0] << " <input-file> " << "<output-dir>";
+      lwlog::ERROR<_>("{} <input-file> <output-dir>", argv[0]);
       return 1;
     }
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "Something went wrong!";
+    lwlog::ERROR<_>("Something went wrong!");
     return 1;
   }
 
