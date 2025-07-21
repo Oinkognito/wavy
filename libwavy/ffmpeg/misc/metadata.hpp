@@ -29,6 +29,8 @@ extern "C"
 #include <libavutil/dict.h>
 }
 
+#include <libwavy/common/api/entry.hpp>
+
 namespace libwavy::ffmpeg
 {
 
@@ -36,7 +38,7 @@ namespace libwavy::ffmpeg
  * @class Metadata
  * @brief A class for extracting metadata from multimedia files using FFmpeg.
  */
-class Metadata
+class WAVY_API Metadata
 {
 public:
   /**

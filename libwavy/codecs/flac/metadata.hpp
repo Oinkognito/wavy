@@ -24,7 +24,8 @@
  ********************************************************************************/
 
 #include <FLAC++/metadata.h>
-#include <libwavy/logger.hpp>
+#include <libwavy/common/types.hpp>
+#include <libwavy/log-macros.hpp>
 #include <sys/stat.h> // For file size
 
 namespace libwavy::codecs
@@ -46,14 +47,14 @@ public:
     std::unordered_map<std::string, std::string> tags;
   };
 
-  static auto parse_metadata(const std::string& filename) -> FlacMetadata
+  static auto parse_metadata(const AbsPath& filename) -> FlacMetadata
   {
     FlacMetadata          metadata{};
     FLAC::Metadata::Chain chain;
 
     if (!chain.read(filename.c_str()))
     {
-      LOG_ERROR << "[FLAC] Failed to read FLAC metadata.\n";
+      log::ERROR<log::FLAC>("Failed to read FLAC metadata!");
       return metadata;
     }
 

@@ -27,8 +27,9 @@
 #include <autogen/config.h>
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <libwavy/common/api/entry.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/parser/ast/entry.hpp>
 #include <libwavy/parser/macros.hpp>
 #include <string>
@@ -36,6 +37,7 @@
 #include <type_traits>
 
 namespace bfs = boost::filesystem;
+using M3U8    = libwavy::log::M3U8_PARSER;
 
 // Template-based playlist parser that can handle both file paths and string content
 //
@@ -52,7 +54,7 @@ template <typename T>
 concept StringLike =
   std::is_convertible_v<T, std::string> || std::is_convertible_v<T, std::string_view>;
 
-class M3U8Parser
+class WAVY_API M3U8Parser
 {
 public:
   // Parse master playlist from either a file path or direct content
@@ -65,8 +67,7 @@ public:
     {
       // If a base path is not provided, use current directory
       AbsPath base = base_path.value_or(".");
-      LOG_DEBUG << M3U8_PARSER_LOG << "Using provided base path '" << base
-                << "' for master playlist.";
+      log::DBG<M3U8>("Using provided base path '{}' for master playlist.", base);
       return parseMaster(std::string(source), base);
     }
     else
@@ -75,7 +76,7 @@ public:
       std::ifstream file(source);
       if (!file)
       {
-        LOG_ERROR << M3U8_PARSER_LOG << "Cannot open master playlist: " << source;
+        log::ERROR<M3U8>("Cannot open master playlist: {}", source);
         return {};
       }
 
@@ -94,7 +95,7 @@ public:
         base                   = derived_base.string();
       }
 
-      LOG_DEBUG << "Using base path '" << base << "' for master playlist.";
+      log::DBG<M3U8>("Using base path '{}' for master playlist.", base);
       return parseMaster(ss.str(), base);
     }
   }
@@ -109,7 +110,7 @@ public:
     {
       // Direct content
       bfs::path base_path = bfs::path(base_dir).lexically_normal();
-      LOG_DEBUG << M3U8_PARSER_LOG << "Using base path for media segments: " << base_path.string();
+      log::DBG<M3U8>("Using base path for media segments: {}", base_path.string());
       return parseMedia(std::string(source), bitrate, base_path.string());
     }
     else
@@ -118,7 +119,7 @@ public:
       std::ifstream file(source);
       if (!file)
       {
-        LOG_ERROR << M3U8_PARSER_LOG << "Cannot open media playlist file: " << source;
+        log::ERROR<M3U8>("Cannot open media playlist file: {}", source);
         return {};
       }
 
@@ -126,7 +127,7 @@ public:
       buffer << file.rdbuf();
 
       bfs::path base_path = bfs::path(base_dir).lexically_normal();
-      LOG_DEBUG << M3U8_PARSER_LOG << "Using base path for media segments: " << base_path.string();
+      log::DBG<M3U8>("Using base path for media segments: '{}'", base_path.string());
 
       return parseMedia(buffer.str(), bitrate, base_path.string());
     }
@@ -152,7 +153,7 @@ private:
       else if (!sv.empty() && sv[0] != '#' && pending)
       {
         bfs::path uri_path = bfs::path(base_path) / std::string(sv);
-        LOG_DEBUG << M3U8_PARSER_LOG << "Found URI Path: " << uri_path;
+        log::DBG<M3U8>("Found URI Path: '{}'", uri_path.string());
         pending->uri = uri_path.lexically_normal().string();
         master.variants.push_back(*pending);
         pending.reset();
@@ -195,7 +196,7 @@ private:
               bfs::path   full_path = bfs::path(base_path) / map_uri;
               media.map_uri         = full_path.lexically_normal().string();
               map_found             = true;
-              LOG_DEBUG << M3U8_PARSER_LOG << "Found EXT-X-MAP URI: " << media.map_uri.value();
+              log::DBG<M3U8>("Found EXT-X-MAP URI: {}", media.map_uri.value());
             }
           }
         }
@@ -211,11 +212,11 @@ private:
         {
           float duration   = std::stof(std::string(duration_str));
           pending_duration = duration;
-          LOG_DEBUG << M3U8_PARSER_LOG << "Parsed EXTINF: duration=" << duration;
+          log::DBG<M3U8>("Parsed EXTINF: duration={}", duration);
         }
         catch (...)
         {
-          LOG_WARNING << M3U8_PARSER_LOG << "Failed to parse EXTINF duration: " << duration_str;
+          log::WARN<M3U8>("Failed to parse EXTINF duration: {}", duration_str);
           pending_duration.reset(); // Defensive
         }
       }
@@ -229,23 +230,22 @@ private:
 
           media.segments.emplace_back(ast::Segment{.duration = *pending_duration, .uri = norm_uri});
 
-          LOG_DEBUG << "Added Segment: duration=" << *pending_duration << ", uri=" << norm_uri;
+          log::DBG<M3U8>("Added Segment: duration={}, uri={}", *pending_duration, norm_uri);
           pending_duration.reset();
         }
         else
         {
-          LOG_WARNING << M3U8_PARSER_LOG << "Skipping segment without preceding EXTINF: " << sv;
+          log::WARN<M3U8>("Skipping segment without preceding EXTINF: {}", sv);
         }
       }
     }
 
     if (!map_found)
     {
-      LOG_INFO << HLS_LOG << "No EXT-X-MAP field found in media playlist: " << base_path;
+      log::INFO<M3U8>("No EXT-X-MAP field found in media playlist: '{}'", base_path);
     }
 
-    LOG_DEBUG << M3U8_PARSER_LOG << "Parsed media playlist with " << media.segments.size()
-              << " segments.";
+    log::DBG<M3U8>("Parsed media playlist with {} segments.", media.segments.size());
     return media;
   }
 
@@ -287,31 +287,31 @@ template <typename T> inline void printAST(const T& node)
 {
   if constexpr (std::is_same_v<T, ast::MasterPlaylist>)
   {
-    LOG_INFO << "=== Master Playlist AST ===";
-    LOG_INFO << "Master AST represents " << node.variants.size() << " node:";
+    log::INFO<M3U8>("=== Master Playlist AST ===");
+    log::INFO<M3U8>("Master AST represents {} node: ", node.variants.size());
     for (const auto& variant : node.variants)
     {
-      LOG_INFO << "  - Bitrate: " << variant.bitrate;
+      log::INFO<M3U8>("  - Bitrate: {}", variant.bitrate);
       if (variant.resolution)
-        LOG_INFO << "    Resolution: " << *variant.resolution;
+        log::INFO<M3U8>("    Resolution: {}", *variant.resolution);
       if (variant.codecs)
-        LOG_INFO << "    Codecs: " << *variant.codecs;
-      LOG_INFO << "    URI: " << variant.uri;
+        log::INFO<M3U8>("    Codecs: {}", *variant.codecs);
+      log::INFO<M3U8>("    URI: {}", variant.uri);
     }
   }
   else if constexpr (std::is_same_v<T, ast::MediaPlaylist>)
   {
-    LOG_INFO << "=== Media Playlist AST ===";
-    LOG_INFO << "AST represents " << node.segments.size() << " segments:";
-    LOG_INFO << "Bitrate: " << node.bitrate;
+    log::INFO<M3U8>("=== Media Playlist AST ===");
+    log::INFO<M3U8>("AST represents {} segments.", node.segments.size());
+    log::INFO<M3U8>("Bitrate: {}", node.bitrate);
     for (const auto& segment : node.segments)
     {
-      LOG_INFO << "  - Duration: " << segment.duration;
-      LOG_INFO << "    URI: " << segment.uri;
+      log::INFO<M3U8>("  - Duration: {}", segment.duration);
+      log::INFO<M3U8>("    URI: {}", segment.uri);
     }
 
     if (node.map_uri)
-      LOG_INFO << M3U8_PARSER_LOG << "Init segment URI: " << *node.map_uri;
+      log::INFO<M3U8>("Init segment URI: {}", *node.map_uri);
   }
   else
   {

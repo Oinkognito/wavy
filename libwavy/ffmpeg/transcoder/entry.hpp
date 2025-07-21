@@ -23,8 +23,9 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <libwavy/common/api/entry.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 
 extern "C"
 {
@@ -69,7 +70,7 @@ inline constexpr float FLOAT_TO_INT16 = static_cast<float>(1 << 15);
 namespace libwavy::ffmpeg
 {
 
-class Transcoder
+class WAVY_API Transcoder
 {
 private:
   AVFormatContext* in_format_ctx   = nullptr; // Format context for the input media file

@@ -25,10 +25,12 @@
 
 #include <autogen/config.h>
 #include <fstream>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <string>
 #include <type_traits>
 #include <vector>
+
+using Decoder = libwavy::log::DECODER;
 
 namespace libwavy::dbg
 {
@@ -44,7 +46,7 @@ public:
     std::ofstream output_file(filename, std::ios::binary);
     if (!output_file)
     {
-      LOG_ERROR << DECODER_LOG << "Failed to open output file: " << filename;
+      log::ERROR<Decoder>("Failed to open output file: {}", filename);
       return false;
     }
 
@@ -54,12 +56,12 @@ public:
       {
         output_file.write(segment.data(), segment.size());
       }
-      LOG_INFO << DECODER_LOG << "Successfully wrote transport streams to " << filename;
+      log::INFO<Decoder>("Successfully wrote transport streams to '{}'!", filename);
     }
     else
     {
       output_file.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(T));
-      LOG_INFO << DECODER_LOG << "Successfully wrote decoded audio stream to " << filename;
+      log::INFO<Decoder>("Successfully wrote decoded audio stream to '{}'!", filename);
     }
 
     output_file.close();

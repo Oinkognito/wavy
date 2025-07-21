@@ -23,7 +23,6 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include "libwavy/common/state.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <boost/algorithm/string.hpp>
@@ -34,11 +33,13 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <libwavy/common/api/entry.hpp>
 #include <unordered_map>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/zstd/compression.h>
 
 /*
@@ -126,6 +127,8 @@ namespace ssl   = boost::asio::ssl;
 namespace fs    = std::filesystem;
 using tcp       = asio::ip::tcp;
 
+using Dispatch = libwavy::log::DISPATCH;
+
 namespace libwavy::dispatch
 {
 
@@ -146,7 +149,7 @@ public:
   {
     if (!fs::exists(directory_))
     {
-      LOG_ERROR << DISPATCH_LOG << "Directory does not exist: " << directory_;
+      log::ERROR<Dispatch>("Directory does not exist: {}", directory_);
       throw std::runtime_error("Directory does not exist: " + directory_);
     }
 
@@ -155,7 +158,7 @@ public:
     std::ofstream file(nickname_file_path);
     if (!file)
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to create file: " << nickname_file_path;
+      log::ERROR<Dispatch>("Failed to create file: '{}'", nickname_file_path.string());
       throw std::runtime_error("Failed to create file: " + nickname_file_path.string());
     }
     file << "Created for user: " << nickname_ << "\n";
@@ -169,8 +172,8 @@ public:
   {
     if (fs::exists(macros::DISPATCH_ARCHIVE_REL_PATH))
     {
-      LOG_DEBUG << DISPATCH_LOG << "Payload already exists, checking for "
-                << macros::DISPATCH_ARCHIVE_NAME << "...";
+      log::DBG<Dispatch>("Payload already exists, checking for {}...",
+                         macros::DISPATCH_ARCHIVE_NAME);
       AbsPath archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
       if (fs::exists(archive_path))
         return upload_to_server(archive_path);
@@ -180,23 +183,23 @@ public:
 
     if (!verify_master_playlist(master_playlist_path))
     {
-      LOG_ERROR << DISPATCH_LOG << "Master playlist verification failed.";
+      log::ERROR<Dispatch>("Master playlist verification failed!");
       return false;
     }
 
     if (!verify_references())
     {
-      LOG_ERROR << DISPATCH_LOG << "Reference playlists or transport streams are invalid.";
+      log::ERROR<Dispatch>("Reference playlists or transport streams are invalid.");
       return false;
     }
 
     AbsPath metadata_path = fs::path(directory_) / macros::to_string(macros::METADATA_FILE);
     if (!fs::exists(metadata_path))
     {
-      LOG_ERROR << DISPATCH_LOG << "Missing metadata.toml in: " << directory_;
+      log::ERROR<Dispatch>("Missing metadata.toml in: {}", directory_);
       return false;
     }
-    LOG_INFO << DISPATCH_LOG << "Found metadata.toml: " << metadata_path;
+    log::INFO<Dispatch>("Found metadata.toml: {}", metadata_path);
 
 #ifdef DEBUG_RUN
     print_hierarchy();
@@ -206,15 +209,14 @@ public:
     bool    applyZSTDComp = true;
     if (playlist_format == PlaylistFormat::FMP4)
     {
-      LOG_DEBUG << DISPATCH_LOG
-                << "Found FMP4 files, no point in compressing them. Skipping ZSTD "
-                   "compression job";
+      log::DBG<Dispatch>(
+        "Found FMP4 files, no point in compressing them. Skipping ZSTD compression job..");
       applyZSTDComp = false;
     }
 
     if (!compress_files(archive_path, applyZSTDComp))
     {
-      LOG_ERROR << DISPATCH_LOG << "Compression failed.";
+      log::ERROR<Dispatch>("Compression failed!!");
       return false;
     }
 
@@ -239,11 +241,11 @@ private:
     std::ifstream file(path);
     if (!file.is_open())
     {
-      LOG_ERROR << DISPATCH_LOG << "Failed to open master playlist: " << path;
+      log::ERROR<Dispatch>("Failed to open master playlist: '{}'", path);
       return false;
     }
 
-    LOG_INFO << DISPATCH_LOG << "Found master playlist: " << path;
+    log::INFO<Dispatch>("Found master playlist: '{}'!", path);
 
     std::string line;
     bool        has_stream_inf = false;
@@ -255,23 +257,23 @@ private:
         if (!std::getline(file, line) || line.empty() ||
             line.find(macros::PLAYLIST_EXT) == std::string::npos)
         {
-          LOG_ERROR << DISPATCH_LOG << "Invalid reference playlist in master.";
+          log::ERROR<Dispatch>("Invalid reference playlist in master!");
           return false;
         }
         AbsPath playlist_path               = fs::path(directory_) / line;
         reference_playlists_[playlist_path] = {}; // Store referenced playlists
-        LOG_INFO << DISPATCH_LOG << "Found reference playlist: " << playlist_path;
+        log::INFO<Dispatch>("Found reference playlist: {}", playlist_path);
       }
     }
 
     if (!has_stream_inf)
     {
-      LOG_WARNING << DISPATCH_LOG << "No valid streams found in master playlist.";
+      log::WARN<Dispatch>("No valid streams found in master playlist!");
       return false;
     }
 
     master_playlist_content_ = std::string(std::istreambuf_iterator<char>(file), {});
-    LOG_INFO << DISPATCH_LOG << "Master playlist verified successfully.";
+    log::INFO<Dispatch>("Master playlist verified successfully.");
     return true;
   }
 
@@ -284,7 +286,7 @@ private:
       std::ifstream file(playlist_path);
       if (!file.is_open())
       {
-        LOG_ERROR << DISPATCH_LOG << "Missing referenced playlist: " << playlist_path;
+        log::ERROR<Dispatch>("Missing referenced playlist: {}", playlist_path);
         return false;
       }
 
@@ -298,8 +300,9 @@ private:
         {
           if (playlist_format == PlaylistFormat::FMP4)
           {
-            LOG_ERROR << DISPATCH_LOG << "Inconsistent playlist format in: " << playlist_path
-                      << " (Cannot mix .ts and .m4s segments)";
+            log::ERROR<Dispatch>(
+              "Inconsistent playlist format in: {} (Cannot mix .ts and .m4s segments!!)",
+              playlist_path);
             return false;
           }
           playlist_format = PlaylistFormat::TRANSPORT_STREAM;
@@ -307,7 +310,7 @@ private:
           std::ifstream ts_file(segment_path, std::ios::binary);
           if (!ts_file.is_open())
           {
-            LOG_ERROR << DISPATCH_LOG << "Failed to open transport stream: " << segment_path;
+            log::ERROR<Dispatch>("Failed to open transport stream: {}", segment_path);
             return false;
           }
 
@@ -315,21 +318,22 @@ private:
           ts_file.read(&sync_byte, 1);
           if (sync_byte != TRANSPORT_STREAM_START_BYTE)
           {
-            LOG_ERROR << DISPATCH_LOG << "Invalid transport stream: " << segment_path
-                      << " (Missing 0x47 sync byte)";
+            log::ERROR<Dispatch>("Invalid transport stream: {} (Missing 0x47 sync byte)!",
+                                 segment_path);
             return false;
           }
 
           segments.push_back(segment_path);
           transport_streams_.push_back(segment_path);
-          LOG_INFO << DISPATCH_LOG << "Found valid transport stream: " << segment_path;
+          log::INFO<Dispatch>("Found valid transport stream: {}", segment_path);
         }
         else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
         {
           if (playlist_format == PlaylistFormat::TRANSPORT_STREAM)
           {
-            LOG_ERROR << DISPATCH_LOG << "Inconsistent playlist format in: " << playlist_path
-                      << " (Cannot mix .ts and .m4s segments)";
+            log::ERROR<Dispatch>(
+              "Inconsistent playlist format in: {} (Cannot mix .ts and .m4s segments!!)",
+              playlist_path);
             return false;
           }
           playlist_format = PlaylistFormat::FMP4;
@@ -337,17 +341,18 @@ private:
           std::ifstream m4s_file(segment_path, std::ios::binary);
           if (!m4s_file.is_open())
           {
-            LOG_ERROR << DISPATCH_LOG << "Failed to open .m4s file: " << segment_path;
+            log::ERROR<Dispatch>("Failed to open .m4s file: {}", segment_path);
             return false;
           }
 
+          /* ------ DEPRECATED API -------- */
           if (!validate_m4s(segment_path))
           {
-            LOG_WARNING << DISPATCH_LOG << "M4S segment check failed: " << segment_path;
+            // [TODO] Add logs but in the future will have better solution for this.
           }
 
           mp4_segments_.push_back(segment_path);
-          LOG_TRACE << DISPATCH_LOG << "Found valid .m4s segment: " << segment_path;
+          log::INFO<Dispatch>("Found valid .m4s segment: {}", segment_path);
         }
       }
     }
@@ -380,6 +385,7 @@ private:
     return true;
   }
 
+  WAVY_DEPRECATED("Validating an M4S file is coming soon!")
   auto validate_m4s(const AbsPath& m4s_path) -> bool
   {
     // std::ifstream file(m4s_path, std::ios::binary);
@@ -397,7 +403,6 @@ private:
     //   return false;
     // }
 
-    LOG_TRACE << DISPATCH_LOG << "Coming soon!!";
     return true;
   }
 
@@ -534,7 +539,7 @@ private:
     http::request<http::file_body> req{http::string_to_verb(method), "/", 11};
     req.set(http::field::host, server_);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.set(http::field::content_type, "application/gzip");
+    req.set(http::field::content_type, macros::CONTENT_TYPE_GZIP);
     req.body() = std::move(body);
     req.prepare_payload();
 

@@ -24,7 +24,6 @@
 
 #include <cstdlib>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
 #include <libwavy/network/entry.hpp>
 
 /*
@@ -43,10 +42,11 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
+  INIT_WAVY_LOGGER();
+
   if (argc < 3)
   {
-    LOG_ERROR << argv[0] << " <server-ip>" << " <path>";
+    lwlog::ERROR<_>("{} <server-ip> <path>", argv[0]);
     return EXIT_FAILURE;
   }
   const IPAddr     server_ip = argv[1];
@@ -61,14 +61,14 @@ auto main(int argc, char* argv[]) -> int
     NetResponse result = client.get(route);
 
     if (result.empty())
-      LOG_WARNING << "Found nothing.";
+      lwlog::WARN<_>("Found nothing.");
     else
-      LOG_INFO << "Received: " << std::endl
-               << result; // std::endl just to make the result string look better and not deformed
+      // \n to make result look better
+      lwlog::INFO<_>("Received: \n{}", result);
   }
   catch (std::exception& e)
   {
-    LOG_ERROR << e.what();
+    lwlog::ERROR<_>("Failed: {}", e.what());
   }
 
   return EXIT_SUCCESS;

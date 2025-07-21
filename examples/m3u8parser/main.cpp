@@ -24,11 +24,10 @@
 
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
 #include <libwavy/parser/entry.hpp>
 #include <libwavy/utils/io/file/entry.hpp>
 
-namespace fs = boost::filesystem;
+namespace bfs = boost::filesystem;
 using namespace libwavy::hls::parser;
 using StdFileUtil = libwavy::utils::FileUtil<PlaylistData>;
 
@@ -49,8 +48,8 @@ auto readContentIfRequired(const RelPath& path, bool use_string_parser) -> Playl
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
-  libwavy::log::set_log_level(libwavy::log::INFO);
+  INIT_WAVY_LOGGER();
+  libwavy::log::set_log_level(libwavy::log::__INFO__);
 
   if (argc < 4)
   {
@@ -62,13 +61,13 @@ auto main(int argc, char* argv[]) -> int
   const bool    is_master_playlist = (argc > 2) && std::stoi(argv[2]) > 0;
   const bool    use_string_parser  = (argc > 3) && std::stoi(argv[3]) > 0;
 
-  LOG_INFO << "Parsing: " << playlist_path << " using "
-           << (use_string_parser ? "string" : "file path") << " parser";
-  LOG_INFO << "Job to parse MASTER Playlist: " << (is_master_playlist ? "TRUE" : "FALSE");
+  lwlog::INFO<_>("Parsing: {} using {} parser...", playlist_path,
+                 (use_string_parser ? "string" : "file path"));
+  lwlog::INFO<_>("Job to parse MASTER Playlist: {}", (is_master_playlist ? "TRUE" : "FALSE"));
 
   try
   {
-    const auto base_dir = fs::path(playlist_path).parent_path().string();
+    const auto base_dir = bfs::path(playlist_path).parent_path().string();
 
     if (is_master_playlist)
     {
@@ -76,19 +75,19 @@ auto main(int argc, char* argv[]) -> int
       auto       master  = use_string_parser ? M3U8Parser::parseMasterPlaylist(content)
                                              : M3U8Parser::parseMasterPlaylist(content, base_dir);
 
-      LOG_INFO << "Parsed master playlist with " << master.variants.size() << " variants";
+      lwlog::INFO<_>("Parsed master playlist with {} variants.", master.variants.size());
 
       for (const auto& variant : master.variants)
       {
         const auto& uri      = variant.uri;
-        const auto  mediaDir = fs::path(uri).parent_path().string();
+        const auto  mediaDir = bfs::path(uri).parent_path().string();
         const auto  mediaStr = readContentIfRequired(uri, use_string_parser);
 
         auto media = use_string_parser
                        ? M3U8Parser::parseMediaPlaylist(mediaStr, variant.bitrate, mediaDir)
                        : M3U8Parser::parseMediaPlaylist(mediaStr, variant.bitrate, mediaDir);
 
-        LOG_INFO << "Parsed media playlist @ bitrate " << variant.bitrate;
+        lwlog::INFO<_>("Parsed media playlist @bitrate: {}", variant.bitrate);
         printAST(media);
         master.media_playlists[variant.bitrate] = std::move(media);
       }
@@ -102,16 +101,16 @@ auto main(int argc, char* argv[]) -> int
                              ? M3U8Parser::parseMediaPlaylist(content, /*bitrate=*/0, base_dir)
                              : M3U8Parser::parseMediaPlaylist(content, /*bitrate=*/0, base_dir);
 
-      LOG_INFO << "Parsed media playlist successfully";
+      lwlog::INFO<_>("Parsed media playlist successfully!!");
       printAST(media);
     }
 
-    LOG_INFO << "All playlists parsed successfully";
+    lwlog::INFO<_>("All playlists parsed successfully");
     return WAVY_RET_SUC;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "Parsing failed: " << e.what();
+    lwlog::ERROR<_>("Parsing failed: {}", e.what());
     return WAVY_RET_FAIL;
   }
 }

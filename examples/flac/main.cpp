@@ -24,35 +24,34 @@
 
 #include <libwavy/codecs/flac/metadata.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
+  INIT_WAVY_LOGGER();
 
   if (argc > 1)
   {
     const RelPath file     = argv[1];
     auto          metadata = libwavy::codecs::FlacMetadataParser::parse_metadata(file);
 
-    LOG_INFO << "Bitrate:         " << metadata.bitrate << " bps";
-    LOG_INFO << "Total Samples:   " << metadata.total_samples;
-    LOG_INFO << "Sample Rate:     " << metadata.sample_rate << " Hz";
-    LOG_INFO << "Bits Per Sample: " << metadata.bits_per_sample;
-    LOG_INFO << "Channels:        " << metadata.channels;
-    LOG_INFO << "Duration:        " << metadata.duration << " secs";
-    LOG_INFO << "File Size:       " << metadata.file_size << " bytes";
-    LOG_INFO << "Vendor String:   " << metadata.vendor_string;
+    lwlog::INFO<lwlog::FLAC>("Bitrate:         {} bps", metadata.bitrate);
+    lwlog::INFO<lwlog::FLAC>("Total Samples:   {}", metadata.total_samples);
+    lwlog::INFO<lwlog::FLAC>("Sample Rate:     {} Hz", metadata.sample_rate);
+    lwlog::INFO<lwlog::FLAC>("Bits Per Sample: {}", metadata.bits_per_sample);
+    lwlog::INFO<lwlog::FLAC>("Channels:        {}", metadata.channels);
+    lwlog::INFO<lwlog::FLAC>("Duration:        {} secs", metadata.duration);
+    lwlog::INFO<lwlog::FLAC>("File Size:       {} bytes", metadata.file_size);
+    lwlog::INFO<lwlog::FLAC>("Vendor String:   {}", metadata.vendor_string);
 
-    LOG_INFO << "--------- Tags: ----------";
+    lwlog::INFO<lwlog::FLAC>("--------- Tags: ----------");
     for (const auto& [key, value] : metadata.tags)
     {
-      LOG_INFO << "  " << key << ": " << value;
+      lwlog::INFO<lwlog::FLAC>("  {}: {}", key, value);
     }
   }
   else
   {
-    LOG_ERROR << argv[0] << " <input-flac-file> ";
+    lwlog::ERROR<lwlog::FLAC>("{} <input-flac-file>", argv[0]);
   }
 
   return 0;

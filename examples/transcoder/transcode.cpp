@@ -37,14 +37,14 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
+  INIT_WAVY_LOGGER();
   // Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
   libwavy::ffmpeg::Transcoder trns;
 
   if (argc != 4)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <input-file> <output-mp3-file> <bitrate-in-bits/sec>";
-    LOG_INFO << "Example: " << argv[0] << " input.flac output.mp3 128000";
+    lwlog::ERROR<_>("Usage: {} <input-file> <output-mp3-file> <bitrate-in-bits/sec>", argv[0]);
+    lwlog::INFO<_>("Example: {} input.flac output.mp3 128000", argv[0]);
     return 1;
   }
 
@@ -58,13 +58,13 @@ auto main(int argc, char* argv[]) -> int
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "Error: Bitrate must be a valid integer";
+    lwlog::ERROR<_>("Bitrate must be a valid integer!");
     return 1;
   }
 
   if (bitrate <= 0)
   {
-    LOG_ERROR << "Error: Bitrate must be positive";
+    lwlog::ERROR<_>("itrate must be positive! (>0)");
     return 1;
   }
 

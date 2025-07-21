@@ -30,19 +30,20 @@
 
 auto main(int argc, char* argv[]) -> int
 {
+  INIT_WAVY_LOGGER();
 
   if (argc < 4)
   {
-    LOG_ERROR << argv[0] << " <server-ip> <nickname> <output-dir>";
-    LOG_ERROR << "Payload directory refers to the directory that contains the desired playlists "
-                 "and transport segments.";
+    lwlog::ERROR<_>("{} <server-ip> <nickname> <output-dir>", argv[0]);
+    lwlog::ERROR<_>("Payload directory refers to the directory that contains the desired playlists "
+                    "and transport segments.");
     return WAVY_RET_FAIL;
   }
 
   // Add your custom logic to validate these cmd-line args if needed...
-  const IPAddr         server   = argv[1];
-  const StorageOwnerID nickname = argv[2];
-  const Directory      dir      = argv[3];
+  const IPAddr         server   = IPAddr(argv[1]);
+  const StorageOwnerID nickname = StorageOwnerID(argv[2]);
+  const Directory      dir      = Directory(argv[3]);
 
   try
   {
@@ -50,16 +51,16 @@ auto main(int argc, char* argv[]) -> int
                                              macros::to_string(macros::MASTER_PLAYLIST));
     if (!dispatcher.process_and_upload())
     {
-      LOG_ERROR << DISPATCH_LOG << "Upload process failed.";
+      lwlog::ERROR<lwlog::DISPATCH>("Upload process failed!");
       return WAVY_RET_FAIL;
     }
 
-    LOG_INFO << DISPATCH_LOG << "Upload successful.";
+    lwlog::INFO<lwlog::DISPATCH>("Upload successful!!");
     return WAVY_RET_SUC;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << "[Main] Error: " << e.what();
+    lwlog::ERROR<_>("[Main] Error: {}", e.what());
     return WAVY_RET_SUC;
   }
 

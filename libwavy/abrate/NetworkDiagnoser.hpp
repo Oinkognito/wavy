@@ -28,7 +28,7 @@
 #include <future>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/network/entry.hpp>
 #include <vector>
 
@@ -56,9 +56,9 @@ public:
 
   auto diagnoseNetworkSpeed() -> NetworkStats
   {
-    std::string host, port, target;
-    parseUrl(server_url_, host, port, target);
-    NetworkStats stats = {.latency = -1, .jitter = 0.0, .packet_loss = 0.0};
+    std::string  host, port;
+    NetTarget    target = parseUrl(server_url_, host, port);
+    NetworkStats stats  = {.latency = -1, .jitter = 0.0, .packet_loss = 0.0};
 
     try
     {
@@ -90,7 +90,7 @@ public:
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "Network diagnosis failed: " << e.what();
+      log::ERROR<log::NET>("Network diagnosis failed: {}", e.what());
     }
 
     return stats;
@@ -103,7 +103,7 @@ private:
   std::string                       server_url_;
   time_point<high_resolution_clock> start_time_;
 
-  void parseUrl(NetTarget& url, IPAddr& host, std::string& port, std::string& target)
+  auto parseUrl(NetTarget& url, IPAddr& host, std::string& port) -> NetTarget
   {
     size_t      pos       = url.find("//");
     size_t      start     = (pos == std::string::npos) ? 0 : pos + 2;
@@ -120,7 +120,10 @@ private:
       host = full_host;
       port = WAVY_SERVER_PORT_NO_STR; // fallback to wavys default port
     }
-    target = (end == std::string::npos) ? "/" : url.substr(end);
+
+    NetTarget target = (end == std::string::npos) ? "/" : url.substr(end);
+
+    return target;
   }
 
   auto sendProbe(const IPAddr& server, int timeout_ms) -> int

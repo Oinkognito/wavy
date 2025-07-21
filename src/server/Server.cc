@@ -22,6 +22,7 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <libwavy/common/api/entry.hpp>
 #include <libwavy/server/server.hpp>
 
 auto is_valid_extension(const FileName& filename) -> bool
@@ -43,7 +44,8 @@ auto validate_ts_file(const AudioBuffer& data) -> bool
 }
 
 // This validation is NOT correct, will change this in future.
-auto validate_m4s(const RelPath& m4s_path) -> bool
+WAVY_DEPRECATED("Validating m4s files feature is deprecated and a new one is coming soon!")
+auto  validate_m4s(const RelPath& m4s_path) -> bool
 {
   // std::ifstream file(m4s_path, std::ios::binary);
   // if (!file.is_open())

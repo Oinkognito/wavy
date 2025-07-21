@@ -25,8 +25,6 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 
-using namespace libwavy::ffmpeg;
-
 auto main() -> int
 {
   GlobalState gs;
@@ -39,8 +37,8 @@ auto main() -> int
     return 1;
   }
 
-  MediaDecoder          decoder;
-  TotalDecodedAudioData decoded_audio;
+  libwavy::ffmpeg::MediaDecoder decoder;
+  TotalDecodedAudioData         decoded_audio;
   if (!decoder.decode(ts_segments, decoded_audio))
   {
     av_log(nullptr, AV_LOG_ERROR, "Decoding failed\n");

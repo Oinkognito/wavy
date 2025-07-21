@@ -39,7 +39,7 @@
 
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/server/prototypes.hpp>
 #include <libwavy/toml/toml_parser.hpp>
 #include <libwavy/unix/domainBind.hpp>
@@ -51,6 +51,10 @@ namespace beast = boost::beast;
 namespace http  = beast::http;
 using boost::asio::ip::tcp;
 
+using Server         = libwavy::log::SERVER;
+using ServerUpload   = libwavy::log::SERVER_UPLD;
+using ServerDownload = libwavy::log::SERVER_DWNLD;
+
 namespace libwavy::server
 {
 
@@ -58,49 +62,49 @@ class WavySession : public std::enable_shared_from_this<WavySession>
 {
 public:
   explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const IPAddr ip)
-      : socket_(std::move(socket)), m_ipID(std::move(ip))
+      : m_socket(std::move(socket)), m_ipID(std::move(ip))
   {
   }
 
   void start()
   {
-    LOG_INFO_ASYNC << SERVER_LOG << "Starting new session";
+    log::INFO<Server>(LogMode::Async, "Starting new session...");
     do_handshake();
   }
 
 private:
-  boost::asio::ssl::stream<tcp::socket> socket_;
-  beast::flat_buffer                    buffer_;
+  boost::asio::ssl::stream<tcp::socket> m_socket;
+  beast::flat_buffer                    m_buffer;
   http::request<http::string_body>      m_request;
   IPAddr                                m_ipID;
 
   void do_handshake()
   {
     auto self(shared_from_this());
-    socket_.async_handshake(boost::asio::ssl::stream_base::server,
-                            [this, self](boost::system::error_code ec)
-                            {
-                              if (ec)
-                              {
-                                LOG_ERROR_ASYNC << SERVER_LOG
-                                                << "SSL handshake failed: " << ec.message();
-                                return;
-                              }
-                              LOG_INFO_ASYNC << SERVER_LOG << "SSL handshake successful";
-                              do_read();
-                            });
+    m_socket.async_handshake(boost::asio::ssl::stream_base::server,
+                             [this, self](boost::system::error_code ec)
+                             {
+                               if (ec)
+                               {
+                                 log::ERROR<Server>(LogMode::Async, "SSL handshake failed: {}",
+                                                    ec.message());
+                                 return;
+                               }
+                               log::INFO<Server>(LogMode::Async, "SSL handshake successful!");
+                               do_read();
+                             });
   }
 
   void resolve_ip()
   {
     try
     {
-      m_ipID = socket_.lowest_layer().remote_endpoint().address().to_string();
-      LOG_INFO_ASYNC << SERVER_LOG << "Resolved IP: " << m_ipID;
+      m_ipID = m_socket.lowest_layer().remote_endpoint().address().to_string();
+      log::INFO<Server>(LogMode::Async, "Resolved IP: {}", m_ipID);
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR_ASYNC << SERVER_LOG << "Failed to resolve IP: " << e.what();
+      log::ERROR<Server>(LogMode::Async, "Failed to resolve IP: {}", e.what());
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -113,45 +117,45 @@ private:
     auto self(shared_from_this());
 
     auto parser = std::make_shared<http::request_parser<http::string_body>>();
-    parser->body_limit(WAVY_SERVER_AUDIO_SIZE_LIMIT * 1024 *
-                       1024); // for now 200MiB is alright, when lossless codecs come
-                              // in the picture we will have to think about it.
+    parser->body_limit(WAVY_SERVER_AUDIO_SIZE_LIMIT *
+                       ONE_MIB); // for now 200MiB is alright, when lossless codecs come
+                                 // in the picture we will have to think about it.
 
     http::async_read(
-      socket_, buffer_, *parser,
+      m_socket, m_buffer, *parser,
       [this, self, parser](boost::system::error_code ec, std::size_t bytes_transferred)
       {
         if (ec)
         {
-          LOG_ERROR_ASYNC << SERVER_LOG << "Read error: " << ec.message();
+          log::ERROR<Server>(LogMode::Async, "Read error: {}", ec.message());
           if (ec == http::error::body_limit)
           {
-            LOG_ERROR_ASYNC << SERVER_LOG << "Upload size exceeded the limit!";
+            log::ERROR<Server>(LogMode::Async, "Upload size exceeded the limit!");
             SendResponse(macros::to_string(macros::SERVER_ERROR_413));
           }
           return;
         }
-        /* bytes_to_mib is a C FFI from common.h */
-        LOG_INFO_ASYNC << SERVER_LOG << "Received " << ZSTD_bytes_to_mib(bytes_transferred)
-                       << " MiB (" << bytes_transferred << ") bytes";
+        /* ZSTD_bytes_to_mib is a C FFI from common.h */
+        log::INFO<Server>("Received {} MiB ({} bytes)", ZSTD_bytes_to_mib(bytes_transferred),
+                          bytes_transferred);
         m_request = parser->release();
         ProcessRequest();
       });
 
     // Timeout to prevent indefinite read
     boost::asio::socket_base::keep_alive option(true);
-    socket_.next_layer().set_option(option);
+    m_socket.next_layer().set_option(option);
   }
 
   auto fetch_metadata(const AbsPath& metadata_path, std::ostringstream& response_stream,
                       const StorageAudioID& audio_id) -> bool
   {
-    LOG_TRACE_ASYNC << "Processing file: " << metadata_path;
+    log::TRACE<Server>(LogMode::Async, "Processing file: {}", metadata_path);
 
     try
     {
       AudioMetadata metadata = parseAudioMetadata(metadata_path);
-      LOG_DEBUG_ASYNC << "[Fetch Metadata] Successfully parsed metadata for Audio-ID: " << audio_id;
+      log::DBG<Server>(LogMode::Async, "Successfully parsed metadata for Audio-ID: {}", audio_id);
 
       auto ResponseWrite = [&](int index, const std::string& label, const std::string& value)
       { response_stream << "      " << index << ". " << label << ": " << value << "\n"; };
@@ -173,7 +177,8 @@ private:
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR_ASYNC << "Error parsing metadata for Audio-ID " << audio_id << ": " << e.what();
+      log::ERROR<Server>(LogMode::Async, "Error parsing metadata for Audio-ID {}: {}", audio_id,
+                         e.what());
       return false;
     }
 
@@ -183,12 +188,12 @@ private:
   // Handle listing the audio metadata request.
   void HandleAMLRequest()
   {
-    LOG_INFO_ASYNC << "Handling Audio Metadata Listing request (AMLR)";
+    log::INFO<Server>(LogMode::Async, "Handling Audio Metadata Listing request (AMLR)");
 
-    std::string storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
+    AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
+      log::ERROR<Server>(LogMode::Async, "Storage directory not found: {}", storage_path);
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -201,7 +206,7 @@ private:
       if (bfs::is_directory(nickname_entry.status()))
       {
         StorageOwnerID nickname = nickname_entry.path().filename().string();
-        LOG_DEBUG_ASYNC << "Processing nickname: " << nickname;
+        log::DBG<Server>(LogMode::Async, "Processing nickname: {}", nickname);
         response_stream << nickname << ":\n";
 
         bool audio_found = false;
@@ -211,26 +216,28 @@ private:
           if (bfs::is_directory(audio_entry.status()))
           {
             StorageAudioID audio_id = audio_entry.path().filename().string();
-            LOG_TRACE_ASYNC << "Found Audio-ID: " << audio_id;
+            log::TRACE<Server>(LogMode::Async, "Found Audio-ID: {}", audio_id);
 
             RelPath metadata_path =
               audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
             if (bfs::exists(metadata_path))
             {
-              LOG_TRACE_ASYNC << "Found metadata file: " << metadata_path;
+              log::TRACE<Server>(LogMode::Async, "Found metadata file: {}", metadata_path);
               if (fetch_metadata(metadata_path, response_stream, audio_id))
                 audio_found = true;
             }
             else
             {
-              LOG_WARNING_ASYNC << "No metadata file found for Audio-ID: " << audio_id;
+              log::WARN<Server>(LogMode::Async, "No metadata file found for Audio-ID: {}",
+                                audio_id);
             }
           }
         }
 
         if (!audio_found)
         {
-          LOG_WARNING_ASYNC << "No metadata found for any audio IDs under nickname: " << nickname;
+          log::WARN<Server>(LogMode::Async,
+                            "No metadata found for any Audio IDs under nickname: {}", nickname);
           response_stream << "  (No metadata found for any audio IDs)\n";
         }
 
@@ -240,7 +247,8 @@ private:
 
     if (!entries_found)
     {
-      LOG_ERROR_ASYNC << "No nicknames or Audio-IDs with metadata found in storage";
+      log::ERROR<Server>(LogMode::Async,
+                         "No nicknames or Audio-IDs with metadata found in storage!");
       SendResponse(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -252,12 +260,12 @@ private:
   // will list all owners' nicknames available in SERVER_STORAGE_DIR.
   void HandleNLRequest()
   {
-    LOG_INFO_ASYNC << "Handling Nicknames Listing Request (NLR)";
+    log::INFO<Server>(LogMode::Async, "Handling Nicknames Listing Request (NLR)");
 
     AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
     if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
     {
-      LOG_ERROR_ASYNC << "Storage directory not found: " << storage_path;
+      log::ERROR<Server>(LogMode::Async, "Storage directory not found: {}", storage_path);
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -294,7 +302,7 @@ private:
 
     if (!entries_found)
     {
-      LOG_ERROR_ASYNC << "No IPs or Audio-IDs found in storage";
+      log::ERROR<Server>(LogMode::Async, "No IPs or Audio-IDs found in storage!!");
       SendResponse(macros::to_string(macros::SERVER_ERROR_404));
       return;
     }
@@ -320,7 +328,7 @@ private:
         auto toml_data_opt = parseAudioMetadataFromDataString(body);
         if (toml_data_opt.path.empty())
         {
-          LOG_ERROR_ASYNC << "[TOML] Failed to parse TOML data";
+          log::ERROR<Server>(LogMode::Async, "[TOML] Failed to parse TOML data");
           SendResponse(macros::to_string(macros::SERVER_ERROR_400));
           return;
         }
@@ -357,13 +365,13 @@ private:
 
   void HandleSendPong()
   {
-    LOG_INFO_ASYNC << "Sending pong to client...";
+    log::INFO<Server>(LogMode::Async, "Sending pong to client...");
     SendResponse(macros::to_string(macros::SERVER_PONG_MSG));
   }
 
   void HandleUpload()
   {
-    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "Handling GZIP file upload for owner (IP): " << m_ipID;
+    log::INFO<ServerUpload>(LogMode::Async, "Handling GZIP file upload for owner (IP): {}", m_ipID);
 
     StorageAudioID audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
     AbsPath        gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
@@ -373,7 +381,8 @@ private:
     std::ofstream output_file(gzip_path, std::ios::binary);
     if (!output_file)
     {
-      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to open output file for writing: " << gzip_path;
+      log::ERROR<ServerUpload>(LogMode::Async, "Failed to open output file for writing: {}",
+                               gzip_path);
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -382,7 +391,7 @@ private:
 
     if (!output_file.good())
     {
-      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Failed to write data to file: " << gzip_path;
+      log::ERROR<ServerUpload>(LogMode::Async, "Failed to write data to file: {}", gzip_path);
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
@@ -391,12 +400,12 @@ private:
 
     if (!bfs::exists(gzip_path) || bfs::file_size(gzip_path) == 0)
     {
-      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "GZIP upload failed: File is empty or missing!";
+      log::ERROR<ServerUpload>(LogMode::Async, "GZIP upload failed: File is empty or missing!");
       SendResponse("HTTP/1.1 400 Bad Request\r\n\r\nGZIP upload failed");
       return;
     }
 
-    LOG_INFO_ASYNC << SERVER_UPLD_LOG << "File successfully written: " << gzip_path;
+    log::INFO<ServerUpload>(LogMode::Async, "File successfully written: {}", gzip_path);
 
     if (extract_and_validate(gzip_path, audio_id))
     {
@@ -404,7 +413,7 @@ private:
     }
     else
     {
-      LOG_ERROR_ASYNC << SERVER_UPLD_LOG << "Extraction or validation failed!";
+      log::ERROR<ServerUpload>(LogMode::Async, "Extraction or validation failed!");
       SendResponse(macros::to_string(macros::SERVER_ERROR_400));
     }
 
@@ -434,13 +443,13 @@ private:
     NetTarget          target(m_request.target().begin(), m_request.target().end());
     std::istringstream iss(target);
 
-    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << "Processing request: " << target;
+    log::DBG<ServerDownload>(LogMode::Async, "Processing target request: {}", target);
 
     std::vector<std::string> parts = tokenizePath(iss);
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Invalid request path: " << target;
+      log::ERROR<ServerDownload>(LogMode::Async, "Invalid target request path: {}", target);
       SendResponse(macros::to_string(macros::SERVER_ERROR_400));
       return;
     }
@@ -453,7 +462,7 @@ private:
     AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
                         audio_id + "/" + filename;
 
-    LOG_DEBUG_ASYNC << SERVER_DWNLD_LOG << "Checking file: " << file_path;
+    log::DBG<ServerDownload>(LogMode::Async, "Checking out file: {}", file_path);
 
     // Use async file reading (prevent blocking on large files)
     auto file_stream = std::make_shared<boost::beast::http::file_body::value_type>();
@@ -463,15 +472,15 @@ private:
 
     if (ec)
     {
-      LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Failed to open file: " << file_path
-                      << " Error: " << ec.message();
+      log::ERROR<ServerDownload>(LogMode::Async, "Failed to open file: {} Error: {}", file_path,
+                                 ec.message());
       SendResponse(macros::to_string(macros::SERVER_ERROR_500));
       return;
     }
 
     ui8 file_size = file_stream->size();
-    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "File opened asynchronously: " << file_path
-                   << " (Size: " << libwavy::utils::math::bytesFormat(file_size) << ")";
+    log::INFO<ServerDownload>(LogMode::Async, "File opened asynchronously: {} (Size: {})",
+                              file_path, utils::math::bytesFormat(file_size));
 
     std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
     if (filename.ends_with(macros::PLAYLIST_EXT))
@@ -493,22 +502,23 @@ private:
     response->prepare_payload();
 
     auto self = shared_from_this(); // Keep session alive
-    http::async_write(socket_, *response,
+    http::async_write(m_socket, *response,
                       [this, self, response](boost::system::error_code ec, std::size_t)
                       {
                         if (ec)
                         {
-                          LOG_ERROR_ASYNC << SERVER_DWNLD_LOG << "Write error: " << ec.message();
+                          log::ERROR<ServerDownload>(LogMode::Async, "Write error: {}",
+                                                     ec.message());
                         }
                         else
                         {
-                          LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "Response sent successfully.";
+                          log::INFO<ServerDownload>(LogMode::Async, "Response sent successfully.");
                         }
-                        socket_.lowest_layer().close();
+                        m_socket.lowest_layer().close();
                       });
 
-    LOG_INFO_ASYNC << SERVER_DWNLD_LOG << "[OWNER:" << ip_addr << "] Served: " << filename << " ("
-                   << audio_id << ")";
+    log::INFO<ServerDownload>(LogMode::Async, "[OWNER:{}] Served: {} ({})", ip_addr, filename,
+                              audio_id);
   }
 
   void SendResponse(const NetResponse& msg)
@@ -516,35 +526,35 @@ private:
     LOG_DEBUG_ASYNC << SERVER_LOG << "Attempting to send " << msg;
     auto self(shared_from_this());
     boost::asio::async_write(
-      socket_, boost::asio::buffer(msg),
+      m_socket, boost::asio::buffer(msg),
       [this, self, msg_size = msg.size()](boost::system::error_code ec,
                                           std::size_t               bytes_transferred)
       {
         // Always perform shutdown, even on error
         auto do_shutdown = [this, self]()
         {
-          socket_.async_shutdown(
+          m_socket.async_shutdown(
             [this, self](boost::system::error_code shutdown_ec)
             {
               if (shutdown_ec)
               {
-                LOG_ERROR_ASYNC << SERVER_LOG << "Shutdown error: " << shutdown_ec.message();
+                log::ERROR<Server>(LogMode::Async, "Shutdown error: {}", shutdown_ec.message());
               }
-              socket_.lowest_layer().close();
+              m_socket.lowest_layer().close();
             });
         };
 
         if (ec)
         {
-          LOG_ERROR_ASYNC << SERVER_LOG << "Write error: " << ec.message();
+          log::ERROR<Server>(LogMode::Async, "Write error: {}", ec.message());
           do_shutdown();
           return;
         }
 
         if (bytes_transferred != msg_size)
         {
-          LOG_ERROR_ASYNC << SERVER_LOG << "Incomplete write: " << bytes_transferred << " of "
-                          << msg_size << " bytes";
+          log::ERROR<Server>(LogMode::Async, "Incomplete write: {} of {} bytes.", bytes_transferred,
+                             msg_size);
           do_shutdown();
           return;
         }

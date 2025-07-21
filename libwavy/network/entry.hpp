@@ -32,7 +32,7 @@
 
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 
 namespace ssl   = boost::asio::ssl;
 namespace beast = boost::beast;
@@ -43,7 +43,7 @@ using tcp       = asio::ip::tcp;
 namespace libwavy::network
 {
 
-class HttpsClient
+class WAVY_API HttpsClient
 {
 public:
   HttpsClient(asio::io_context& ioc, ssl::context& ssl_ctx, IPAddr server)
@@ -51,69 +51,103 @@ public:
   {
   }
 
-  /**
-   * @brief Perform a GET request to the specified target.
-   * @param target The HTTP target (e.g., "/hls/somefile.m3u8").
-   * @return The response body as a string, or an empty string (NetResponse) on failure.
-   */
-  auto get(NetTarget& target) -> NetResponse
+  void setTimeout(std::chrono::seconds timeout) { m_timeout = timeout; }
+
+  void cancelCurrentRequest()
+  {
+    if (m_socket && beast::get_lowest_layer(*m_socket).is_open())
+    {
+      beast::get_lowest_layer(*m_socket).cancel();
+    }
+  }
+
+  auto get(const NetTarget& target) -> NetResponse
+  {
+    return makeRequest(http::verb::get, target, "");
+  }
+
+  auto post(const NetTarget& target, const std::string& body) -> NetResponse
+  {
+    return makeRequest(http::verb::post, target, body);
+  }
+
+private:
+  asio::io_context&    m_ioCtx;
+  ssl::context&        m_sslCtx;
+  IPAddr               m_server;
+  std::chrono::seconds m_timeout{10}; // default 10s
+
+  std::unique_ptr<beast::ssl_stream<tcp::socket>> m_socket;
+
+  auto makeRequest(http::verb method, const NetTarget& target, const std::string& body)
+    -> NetResponse
   {
     try
     {
-      // Create a new resolver and SSL stream for each request
-      tcp::resolver                  resolver{m_ioCtx};
-      beast::ssl_stream<tcp::socket> stream{m_ioCtx, m_sslCtx};
+      tcp::resolver resolver{m_ioCtx};
+      m_socket = std::make_unique<beast::ssl_stream<tcp::socket>>(m_ioCtx, m_sslCtx);
 
-      // Resolve the host
-      auto const results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
+      auto results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
+      asio::connect(beast::get_lowest_layer(*m_socket), results.begin(), results.end());
 
-      // Connect the socket
-      asio::connect(stream.next_layer(), results.begin(), results.end());
+      m_socket->handshake(ssl::stream_base::client);
 
-      // Perform SSL handshake
-      stream.handshake(ssl::stream_base::client);
+      // Timeout
+      asio::steady_timer timer(m_ioCtx);
+      timer.expires_after(m_timeout);
 
-      // Set up HTTP GET request
-      http::request<http::string_body> req{http::verb::get, target, 11};
+      bool timed_out = false;
+      timer.async_wait(
+        [&](const beast::error_code& ec)
+        {
+          if (!ec && m_socket)
+          {
+            timed_out = true;
+            cancelCurrentRequest();
+          }
+        });
+
+      // Request
+      http::request<http::string_body> req{method, target, 11};
       req.set(http::field::host, m_server);
       req.set(http::field::user_agent, "WavyClient");
 
-      // Send the request
-      http::write(stream, req);
+      if (method == http::verb::post)
+      {
+        req.set(http::field::content_type, macros::CONTENT_TYPE_JSON);
+        req.body() = body;
+        req.prepare_payload();
+      }
 
-      // Buffer and response container
+      http::write(*m_socket, req);
+
       beast::flat_buffer                 buffer;
       http::response<http::dynamic_body> res;
-      http::read(stream, buffer, res);
+      http::read(*m_socket, buffer, res);
 
-      // Convert response body to string
-      std::string response_data = boost::beast::buffers_to_string(res.body().data());
+      timer.cancel(); // Cancel timer after success
 
-      // Gracefully shutdown SSL stream
+      if (timed_out)
+      {
+        log::ERROR<log::NET>("Request timed out");
+        return "";
+      }
+
+      std::string response_data = beast::buffers_to_string(res.body().data());
+
       beast::error_code ec;
-      stream.shutdown(ec);
+      m_socket->shutdown(ec);
       if (ec == asio::error::eof)
-      {
-        ec.clear(); // This is expected
-      }
-      else if (ec)
-      {
-        LOG_WARNING << NET_LOG << "Stream shutdown warning: " << ec.message();
-      }
+        ec.clear();
 
       return response_data;
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << NET_LOG << "HTTPS request failed: " << e.what();
+      log::ERROR<log::NET>("HTTPS request failed: {}", e.what());
       return "";
     }
   }
-
-private:
-  asio::io_context& m_ioCtx;
-  ssl::context&     m_sslCtx;
-  IPAddr            m_server;
 };
 
 } // namespace libwavy::network

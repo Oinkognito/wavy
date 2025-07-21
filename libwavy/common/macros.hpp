@@ -34,8 +34,10 @@ enum
 };
 
 #define WAVY_SERVER_PORT_NO_STR "8080"
-#define CRLF2                   "\r\n\r\n"
-#define CRLF                    "\r\n"
+/// Basic string for Carriage Return Line Feed (CRLF x 2)
+#define CRLF2 "\r\n\r\n"
+/// Basic string for Carriage Return Line Feed (CRLF)
+#define CRLF "\r\n"
 
 #define WAVY_RET_SUC   0
 #define WAVY_RET_FAIL  1
@@ -110,6 +112,8 @@ enum
   /* Content Types */                                         \
   X(CONTENT_TYPE_COMPRESSION, "application/gzip")             \
   X(CONTENT_TYPE_OCTET_STREAM, "application/octet-stream")    \
+  X(CONTENT_TYPE_JSON, "application/json")                    \
+  X(CONTENT_TYPE_GZIP, "application/gzip")                    \
                                                               \
   /* Server Endpoints */                                      \
   X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \

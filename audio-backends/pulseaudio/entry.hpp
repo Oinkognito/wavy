@@ -25,7 +25,7 @@
 
 #include <libwavy/audio/interface.hpp>
 #include <libwavy/common/state.hpp>
-#include <libwavy/utils/io/log/entry.hpp>
+#include <libwavy/utils/io/pluginlog/entry.hpp>
 #include <pulse/error.h>
 #include <pulse/simple.h>
 

@@ -24,7 +24,7 @@
  ********************************************************************************/
 
 #include <libwavy/common/macros.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/network/entry.hpp>
 #include <libwavy/parser/ast/entry.hpp>
 #include <libwavy/parser/entry.hpp>
@@ -43,8 +43,6 @@ namespace ssl   = boost::asio::ssl;
 namespace bfs   = boost::filesystem;
 using tcp       = net::ip::tcp;
 
-using namespace libwavy::hls::parser;
-
 class PlaylistParser
 {
 public:
@@ -55,39 +53,40 @@ public:
 
   auto fetchMasterPlaylist() -> bool
   {
-    std::string host, port, target;
-    parseUrl(master_url_, host, port, target);
+    std::string host, port;
 
-    LOG_INFO << "Fetching master playlist from: " << target;
+    NetTarget target = parseUrl(master_url_, host, port);
+
+    log::INFO<log::M3U8_PARSER>("Fetching master playlist from: {}", target);
 
     try
     {
       libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
-      LOG_INFO << "Resolving host: " << host << " on port " << port;
+      log::INFO<log::M3U8_PARSER>("Resolving host: {} on port {}..", host, port);
       std::string body = client_.get(target);
 
       try
       {
-        LOG_INFO << "Parsing master playlist using template HLS parser";
+        log::DBG<log::M3U8_PARSER>("Parsing master playlist using template HLS parser");
         std::string base_url = getBaseUrl(master_url_);
-        master_playlist_     = M3U8Parser::parseMasterPlaylist(body, base_url);
+        master_playlist_     = hls::parser::M3U8Parser::parseMasterPlaylist(body, base_url);
 
         updateBitratePlaylistsFromAst();
 
         // Print the AST for debugging
-        printAST(master_playlist_);
+        hls::parser::printAST(master_playlist_);
 
         return true;
       }
       catch (const std::exception& e)
       {
-        LOG_ERROR << "Failed to parse master playlist: " << e.what();
+        log::ERROR<log::M3U8_PARSER>("Failed to parse master playlist: {}", e.what());
         return false;
       }
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "Error fetching master playlist: " << e.what();
+      log::ERROR<log::M3U8_PARSER>("Error fetching master playlist: {}", e.what());
       return false;
     }
   }
@@ -97,7 +96,7 @@ public:
     auto it = bitrate_playlists_.find(bitrate);
     if (it == bitrate_playlists_.end())
     {
-      LOG_ERROR << "No playlist found for bitrate: " << bitrate;
+      log::ERROR<log::M3U8_PARSER>("No playlist found for bitrate: {}", bitrate);
       return false;
     }
 
@@ -109,36 +108,37 @@ public:
       url                  = base_url + (url.starts_with("/") ? "" : "/") + url;
     }
 
-    std::string host, port, target;
-    parseUrl(url, host, port, target);
+    std::string host, port;
+    NetTarget   target = parseUrl(url, host, port);
 
-    LOG_INFO << "Fetching media playlist for bitrate " << bitrate << " from: " << target;
+    log::INFO<log::M3U8_PARSER>("Fetching media playlist for bitrate {} from: {}", bitrate, target);
 
     try
     {
       libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
-      LOG_INFO << "Resolving host: " << host << " on port " << port;
+      log::INFO<log::M3U8_PARSER>("Resolving host: {} on port {}...", host, port);
       std::string body = client_.get(target);
 
       try
       {
-        LOG_INFO << "Parsing media playlist using template HLS parser";
-        std::string base_url      = getBaseUrl(url);
-        media_playlists_[bitrate] = M3U8Parser::parseMediaPlaylist(body, bitrate, base_url);
+        log::DBG<log::M3U8_PARSER>("Parsing media playlist using template HLS parser");
+        std::string base_url = getBaseUrl(url);
+        media_playlists_[bitrate] =
+          hls::parser::M3U8Parser::parseMediaPlaylist(body, bitrate, base_url);
 
-        printAST(media_playlists_[bitrate]);
+        hls::parser::printAST(media_playlists_[bitrate]);
 
         return true;
       }
       catch (const std::exception& e)
       {
-        LOG_ERROR << "Failed to parse media playlist: " << e.what();
+        log::ERROR<log::M3U8_PARSER>("Failed to parse media playlist: {}", e.what());
         return false;
       }
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR << "Error fetching media playlist: " << e.what();
+      log::ERROR<log::M3U8_PARSER>("Error fetching media playlist: {}", e.what());
       return false;
     }
   }
@@ -200,12 +200,13 @@ private:
       if (variant.bitrate > 0)
       {
         bitrate_playlists_[variant.bitrate] = variant.uri;
-        LOG_INFO << "Added bitrate playlist from AST: " << variant.bitrate << " -> " << variant.uri;
+        log::INFO<log::M3U8_PARSER>("Added bitrate playlist from AST: {} -> {}", variant.bitrate,
+                                    variant.uri);
       }
     }
   }
 
-  void parseUrl(const std::string& url, std::string& host, std::string& port, std::string& target)
+  auto parseUrl(const std::string& url, std::string& host, std::string& port) -> NetTarget
   {
     size_t pos   = url.find("//");
     size_t start = (pos == std::string::npos) ? 0 : pos + 2;
@@ -225,8 +226,10 @@ private:
       port = WAVY_SERVER_PORT_NO_STR; // Default HTTPS port
     }
 
-    target = (end == std::string::npos) ? "/" : url.substr(end);
-    LOG_DEBUG << "Parsed Host: " << host << ", Port: " << port << ", Target: " << target;
+    NetTarget target = (end == std::string::npos) ? "/" : url.substr(end);
+    log::INFO<log::M3U8_PARSER>("Parsed Host: {}, Port: {}, Target: {}", host, port, target);
+
+    return target;
   }
 };
 

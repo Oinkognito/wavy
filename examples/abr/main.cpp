@@ -37,10 +37,11 @@ void signalHandler(int signal)
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
+  INIT_WAVY_LOGGER();
+
   if (argc != 2)
   {
-    LOG_ERROR << "Usage: " << argv[0] << " <network-stream>";
+    lwlog::ERROR<_>("Usage: {} <network-stream>", argv[0]);
     return EXIT_FAILURE;
   }
   try
@@ -57,7 +58,7 @@ auto main(int argc, char* argv[]) -> int
     {
       libwavy::abr::ABRManager abr_manager(ioc, master_url);
       abr_manager.selectBestBitrate();
-      LOG_INFO << "Waiting for 2 seconds...";
+      lwlog::INFO<_>("Waiting for 2 seconds...");
       std::this_thread::sleep_for(std::chrono::seconds(2)); // Poll every 2 seconds
     }
   }

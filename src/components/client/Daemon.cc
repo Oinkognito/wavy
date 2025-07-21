@@ -29,7 +29,7 @@ namespace libwavy::components::client
 
 auto WavyClient::start(bool flac_found, int index) -> int
 {
-  LOG_INFO << "Starting Client Fetch and Playback Daemon...";
+  log::INFO<log::CLIENT>("Starting Client Fetch and Playback Daemon...");
 
   fetch::SegmentFetcherPtr fetcher;
 
@@ -40,22 +40,22 @@ auto WavyClient::start(bool flac_found, int index) -> int
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << PLUGIN_LOG << "Plugin error: " << e.what();
+    log::ERROR<log::PLUGIN>("Plugin error: {}", e.what());
     return WAVY_RET_FAIL;
   }
 
   // Fetch client list and audio ID
-  const std::vector<std::string> clients = fetcher->fetch_client_list(m_server, m_nickname);
+  const std::vector<std::string> clients = fetcher->fetchOwnersList(m_server, m_nickname);
   if (clients.empty())
   {
-    LOG_ERROR << "Failed to fetch clients. Exiting...";
+    log::ERROR<log::CLIENT>("Failed to fetch clients. Exiting...");
     return WAVY_RET_FAIL;
   }
 
   // Validate the index
   if (index < 0 || index >= static_cast<int>(clients.size()))
   {
-    LOG_ERROR << RECEIVER_LOG << "Invalid index. Available range: 0 to " << clients.size() - 1;
+    log::ERROR<log::CLIENT>("Invalid index. Available range: 0 to {}", clients.size() - 1);
     return WAVY_RET_FAIL;
   }
 
@@ -65,7 +65,7 @@ auto WavyClient::start(bool flac_found, int index) -> int
   if (!fetcher->fetchAndPlay(m_nickname, audio_id, m_globalState, m_bitrate, flac_found,
                              m_audioBackendLibPath))
   {
-    LOG_ERROR << RECEIVER_LOG << "Something went horribly wrong while fetching!!";
+    log::ERROR<log::CLIENT>("Something went horribly wrong while fetching!!");
     return WAVY_RET_FAIL;
   }
 

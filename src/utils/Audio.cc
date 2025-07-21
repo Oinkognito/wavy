@@ -24,6 +24,8 @@
 
 #include <libwavy/utils/audio/entry.hpp>
 
+using Decoder = libwavy::log::DECODER;
+
 namespace libwavy::utils::audio
 {
 
@@ -34,52 +36,52 @@ auto decodeAndPlay(GlobalState& gs, bool& flac_found, const RelPath& customAudio
 
   if (segments.empty())
   {
-    LOG_ERROR << DECODER_LOG << "No transport stream segments provided";
+    log::ERROR<Decoder>("No transport stream segments provided!");
     return false;
   }
 
-  LOG_INFO << "Decoding transport stream segments...";
+  log::INFO<Decoder>("Decoding transport stream segments...");
 
   libwavy::ffmpeg::MediaDecoder decoder;
   TotalDecodedAudioData         decoded_audio;
   if (!decoder.decode(segments, decoded_audio))
   {
-    LOG_ERROR << DECODER_LOG << "Decoding failed";
+    log::ERROR<Decoder>("Decoding failed!!! Check callback logs for more info.");
     return false;
   }
 
   if (gNumAudioBackends == 0)
   {
-    LOG_ERROR << PLUGIN_LOG << "No audio backend plugins found! Exiting cleanly...";
+    log::ERROR<Decoder>("No audio backend plugins found! Exiting cleanly...");
     return false;
   }
 
   const RelPath audioBackendLibPath =
-    std::string(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
+    RelPath(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
     (customAudioBackendLibPath.empty() ? gAudioBackends[0].plugin_path : customAudioBackendLibPath);
 
-  LOG_INFO << RECEIVER_LOG << "Given Audio Backend Plugin: '" << audioBackendLibPath;
+  log::INFO<log::CLIENT>("Given Audio Backend Plugin: '{}'", audioBackendLibPath);
 
   try
   {
     // load audio backend plugin here
-    LOG_INFO << PLUGIN_LOG << "Loading audio backend plugin...";
+    log::INFO<log::PLUGIN>("Loading audio backend plugin...");
     libwavy::audio::AudioBackendPtr backend;
     backend = libwavy::audio::plugin::WavyAudioBackend::load(audioBackendLibPath);
     if (backend->initialize(decoded_audio, flac_found))
     {
-      LOG_TRACE << PLUGIN_LOG << "Loaded: " << backend->name();
+      log::TRACE<log::PLUGIN>("Loaded: '{}'!", backend->name());
       backend->play();
     }
     else
     {
-      LOG_ERROR << PLUGIN_LOG << "Error while loading plugin: " << audioBackendLibPath;
+      log::ERROR<log::PLUGIN>("Error while loading plugin: {}", audioBackendLibPath);
       return false;
     }
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR << AUDIO_LOG << "Audio playback error: " << e.what();
+    log::ERROR<log::AUDIO>("Audio playback error: {}", e.what());
     return false;
   }
 

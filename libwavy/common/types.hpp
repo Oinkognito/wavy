@@ -71,6 +71,8 @@ using PlaylistData = std::string; // The playlist (.m3u8) content stored here
 using StorageOwnerID = std::string;
 using StorageAudioID = std::string;
 
+using Owners = std::vector<StorageOwnerID>;
+
 //[ AUDIO BACKEND PLUGIN DEFS ]//
 using AudioBackendPluginName               = const char*;
 using AudioByte                            = ui8;

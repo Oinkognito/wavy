@@ -84,31 +84,35 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
 
 #define LOG_FMT(str) BOLD str RESET
 
-#define LOG_CATEGORIES                        \
-  X(DECODER, "#DECODER_LOG         ")         \
-  X(TRANSCODER, "#TRANSCODER_LOG      ")      \
-  X(LIBAV, "#LIBAV_LOG           ")           \
-  X(AUDIO, "#AUDIO_LOG           ")           \
-  X(NET, "#NETWORK_LOG         ")             \
-  X(FETCH, "#TSFETCH_LOG         ")           \
-  X(PLUGIN, "#PLUGIN_LOG          ")          \
-  X(HLS, "#HLS_LOG             ")             \
-  X(M3U8_PARSER, "#M3U8_PARSER_LOG     ")     \
-  X(UNIX, "#UNIX_LOG            ")            \
-  X(DISPATCH, "#DISPATCH_LOG        ")        \
-  X(SERVER, "#SERVER_LOG          ")          \
-  X(SERVER_DWNLD, "#SERVER_DWNLD_LOG    ")    \
-  X(SERVER_UPLD, "#SERVER_UPLD_LOG     ")     \
-  X(SERVER_EXTRACT, "#SERVER_EXTRACT_LOG  ")  \
-  X(SERVER_VALIDATE, "#SERVER_VALIDATE_LOG ") \
-  X(OWNER, "#OWNER_LOG           ")           \
-  X(RECEIVER, "#RECEIVER_LOG        ")
+// clang-format off
+#define LOG_CATEGORIES                         \
+  X(DECODER,         "#DECODER_LOG         ")  \
+  X(TRANSCODER,      "#TRANSCODER_LOG      ")  \
+  X(LIBAV,           "#LIBAV_LOG           ")  \
+  X(AUDIO,           "#AUDIO_LOG           ")  \
+  X(NET,             "#NETWORK_LOG         ")  \
+  X(FETCH,           "#TSFETCH_LOG         ")  \
+  X(PLUGIN,          "#PLUGIN_LOG          ")  \
+  X(HLS,             "#HLS_LOG             ")  \
+  X(M3U8_PARSER,     "#M3U8_PARSER_LOG     ")  \
+  X(CMD_LINE_PARSER, "#CMD_LINE_PARSER_LOG ")  \
+  X(UNIX,            "#UNIX_LOG            ")  \
+  X(DISPATCH,        "#DISPATCH_LOG        ")  \
+  X(SERVER,          "#SERVER_LOG          ")  \
+  X(SERVER_DWNLD,    "#SERVER_DWNLD_LOG    ")  \
+  X(SERVER_UPLD,     "#SERVER_UPLD_LOG     ")  \
+  X(SERVER_EXTRACT,  "#SERVER_EXTRACT_LOG  ")  \
+  X(SERVER_VALIDATE, "#SERVER_VALIDATE_LOG ")  \
+  X(OWNER,           "#OWNER_LOG           ")  \
+  X(CLIENT,          "#CLIENT_LOG          ")  \
+  X(FLAC,            "#FLAC_LOG            ")  \
+  X(NONE,            "")
+// clang-format on
 
 // Generate string constants
 #define X(name, str) constexpr const char* name##_LOG = LOG_FMT(str);
 LOG_CATEGORIES
 #undef X
-#undef LOG_FMT
 
 namespace libwavy::log
 {
@@ -116,12 +120,24 @@ namespace libwavy::log
 // In priority order
 enum SeverityLevel
 {
-  ERROR,
-  WARNING,
-  TRACE,
-  INFO,
-  DEBUG
+  __ERROR__,
+  __WARNING__,
+  __TRACE__,
+  __INFO__,
+  __DEBUG__
 };
+
+template <typename T> constexpr auto log_prefix() -> const char*;
+
+#define X(name, str)       \
+  struct name##_Tag        \
+  {                        \
+  };                       \
+  using name = name##_Tag; \
+  template <> constexpr const char* log_prefix<name##_Tag>() { return LOG_FMT(str); }
+LOG_CATEGORIES
+#undef X
+#undef LOG_FMT
 
 inline auto strip_ansi(const std::string& input) -> std::string
 {
@@ -129,7 +145,7 @@ inline auto strip_ansi(const std::string& input) -> std::string
   return boost::regex_replace(input, ansi_regex, "");
 }
 
-inline auto get_current_timestamp() -> std::string
+inline auto get_current_timestamp() -> const std::string
 {
   using namespace std::chrono;
 
@@ -140,7 +156,7 @@ inline auto get_current_timestamp() -> std::string
   return std::format("{:%Y-%m-%d %H:%M:%S}.{:03}", now_time, now_ms.count());
 }
 
-inline void init_logging()
+inline WAVY_API void init_logging()
 {
   namespace bfs     = boost::filesystem;
   namespace logging = boost::log;
@@ -215,15 +231,15 @@ inline void init_logging()
   boost::log::add_common_attributes();
 }
 
-inline void flush_logs() { boost::log::core::get()->flush(); }
+inline WAVY_API void flush_logs() { boost::log::core::get()->flush(); }
 
-inline void set_log_level(SeverityLevel level)
+inline WAVY_API void set_log_level(SeverityLevel level)
 {
   namespace trivial = boost::log::trivial;
 
   static const std::map<SeverityLevel, trivial::severity_level> level_map = {
-    {ERROR, trivial::error}, {WARNING, trivial::warning}, {TRACE, trivial::trace},
-    {INFO, trivial::info},   {DEBUG, trivial::debug},
+    {__ERROR__, trivial::error}, {__WARNING__, trivial::warning}, {__TRACE__, trivial::trace},
+    {__INFO__, trivial::info},   {__DEBUG__, trivial::debug},
   };
 
   auto it = level_map.find(level);
@@ -236,6 +252,17 @@ inline void set_log_level(SeverityLevel level)
     std::cerr << "Unknown log level specified.\n";
   }
 }
+
+/***************************************************
+ *              !!! NOTE !!!
+ * 
+ * It is NOT RECOMMENDED to use these logging macros 
+ * on your own!! Use libwavy/log-macros.hpp which is 
+ * a much better container and is easy to call.
+ *
+ ***************************************************/
+
+#ifdef WAVY__INTERNAL_LOGGING_IMPL
 
 // Macros for logging
 #define THREAD_ID    BOLD << "[Worker " << boost::this_thread::get_id() << "] " << RESET
@@ -253,5 +280,7 @@ inline void set_log_level(SeverityLevel level)
 #define LOG_WARNING_ASYNC BOOST_LOG_TRIVIAL(warning) << THREAD_ID
 #define LOG_ERROR_ASYNC   BOOST_LOG_TRIVIAL(error) << THREAD_ID << _TRACE_BACK_
 #define LOG_DEBUG_ASYNC   BOOST_LOG_TRIVIAL(debug) << THREAD_ID
+
+#endif
 
 } // namespace libwavy::log

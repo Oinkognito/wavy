@@ -28,7 +28,8 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  libwavy::log::init_logging();
+  INIT_WAVY_LOGGER();
+
   try
   {
     if (argc > 2)

@@ -27,7 +27,7 @@
 #include <dlfcn.h>
 #include <functional>
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
 #include <string>
 
@@ -40,9 +40,9 @@ public:
   {
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);
 
-    LOG_INFO << PLUGIN_LOG << "Found plugin path: " << WAVY_FETCHER_PLUGIN_OUTPUT_PATH;
+    log::INFO<log::PLUGIN>("Found fetcher plugin path: '{}'!", WAVY_FETCHER_PLUGIN_OUTPUT_PATH);
 
-    LOG_INFO << PLUGIN_LOG << "Attempting to load plugin from: " << plugin_path;
+    log::INFO<log::PLUGIN>("Attempting to load fetcher plugin from: {}", plugin_path);
 
     // Load the plugin shared object
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
@@ -51,7 +51,7 @@ public:
       throw std::runtime_error(std::string("Failed to load plugin: ") + dlerror());
     }
 
-    LOG_INFO << PLUGIN_LOG << "Plugin loaded successfully. Resolving symbols...";
+    log::INFO<log::PLUGIN>("Fetcher Plugin loaded successfully. Resolving symbols...");
 
     // Load the create function from the plugin
     auto create_fn = reinterpret_cast<FetcherCreateFunc>(dlsym(handle, "create_fetcher_with_arg"));
@@ -61,8 +61,8 @@ public:
       throw std::runtime_error("Failed to load symbol: create_fetcher_with_arg");
     }
 
-    LOG_TRACE << PLUGIN_LOG << "Symbol 'create_fetcher_with_arg' resolved successfully.";
-    LOG_TRACE << PLUGIN_LOG << "Creating fetcher instance with server: " << server;
+    log::INFO<log::PLUGIN>("Symbol 'create_fetcher_with_arg' resolved successfully.");
+    log::INFO<log::PLUGIN>("Creating fetcher instance with server: {}", server);
 
     // Create the fetcher instance
     ISegmentFetcher* fetcher_ptr = create_fn(server.c_str());
@@ -73,12 +73,12 @@ public:
       throw std::runtime_error("Fetcher creation returned null.");
     }
 
-    LOG_INFO << PLUGIN_LOG << "Fetcher instance created successfully.";
+    log::INFO<log::PLUGIN>("Fetcher Plugin Instance created successfully!!");
 
     // Wrap the pointer in a std::unique_ptr with a custom deleter
     return {fetcher_ptr, [handle](ISegmentFetcher* ptr)
             {
-              LOG_TRACE << PLUGIN_LOG << "Destroying fetcher instance and unloading plugin.";
+              log::TRACE<log::PLUGIN>("Destroying fetcher instance and unloading plugin...");
               delete ptr;
               dlclose(handle);
             }};

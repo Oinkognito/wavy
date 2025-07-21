@@ -25,11 +25,9 @@
 #include <libwavy/tsfetcher/interface.hpp>
 #include <libwavy/tsfetcher/methods/aggr/entry.hpp>
 
-using namespace libwavy::fetch;
-
-extern "C" auto create_fetcher_with_arg(const char* server) -> ISegmentFetcher*
+extern "C" auto create_fetcher_with_arg(const char* server) -> libwavy::fetch::ISegmentFetcher*
 {
-  return new TSegFetcher(std::string(server));
+  return new libwavy::fetch::TSegFetcher(std::string(server));
 }
 
-extern "C" void destroy_fetcher(ISegmentFetcher* ptr) { delete ptr; }
+extern "C" void destroy_fetcher(libwavy::fetch::ISegmentFetcher* ptr) { delete ptr; }

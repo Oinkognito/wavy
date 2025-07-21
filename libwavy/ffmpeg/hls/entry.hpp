@@ -27,7 +27,7 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <vector>
 
 extern "C"
@@ -48,7 +48,7 @@ namespace libwavy::ffmpeg::hls
  * @class HLS_Segmenter
  * @brief Handles segmentation of audio files into HLS streams and playlist generation.
  */
-class HLS_Segmenter
+class WAVY_API HLS_Segmenter
 {
 private:
   std::vector<int> found_bitrates;

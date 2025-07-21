@@ -51,9 +51,9 @@ public:
 
   ~RegisterAudio()
   {
-    if (fmt_ctx)
+    if (m_fmtCtx)
     {
-      avformat_close_input(&fmt_ctx);
+      avformat_close_input(&m_fmtCtx);
     }
   }
 
@@ -61,16 +61,16 @@ public:
   {
     int ret;
 
-    if ((ret = avformat_open_input(&fmt_ctx, m_filePath.c_str(), nullptr, nullptr)) < 0)
+    if ((ret = avformat_open_input(&m_fmtCtx, m_filePath.c_str(), nullptr, nullptr)) < 0)
     {
       std::cerr << "Error opening input file: " << m_filePath << std::endl;
       return false;
     }
 
-    if ((ret = avformat_find_stream_info(fmt_ctx, nullptr)) < 0)
+    if ((ret = avformat_find_stream_info(m_fmtCtx, nullptr)) < 0)
     {
       std::cerr << "Cannot find stream information\n";
-      avformat_close_input(&fmt_ctx);
+      avformat_close_input(&m_fmtCtx);
       return false;
     }
 
@@ -122,7 +122,7 @@ public:
 
 private:
   RelPath          m_filePath;
-  AVFormatContext* fmt_ctx{};
+  AVFormatContext* m_fmtCtx{};
   AudioMetadata    m_metadata;
   std::vector<int> m_bitrates;
   StorageOwnerID   m_nickname;
@@ -133,19 +133,19 @@ private:
 
     using namespace TomlKeys;
 
-    if (fmt_ctx->iformat)
+    if (m_fmtCtx->iformat)
     {
-      m_metadata.file_format = fmt_ctx->iformat->name ? std::string(fmt_ctx->iformat->name) : "";
+      m_metadata.file_format = m_fmtCtx->iformat->name ? std::string(m_fmtCtx->iformat->name) : "";
       m_metadata.file_format_long =
-        fmt_ctx->iformat->long_name ? std::string(fmt_ctx->iformat->long_name) : "";
+        m_fmtCtx->iformat->long_name ? std::string(m_fmtCtx->iformat->long_name) : "";
     }
 
     m_metadata.duration =
-      (fmt_ctx->duration != AV_NOPTS_VALUE) ? fmt_ctx->duration / AV_TIME_BASE : -1;
-    m_metadata.bitrate = (fmt_ctx->bit_rate > 0) ? fmt_ctx->bit_rate / 1000 : -1;
+      (m_fmtCtx->duration != AV_NOPTS_VALUE) ? m_fmtCtx->duration / AV_TIME_BASE : -1;
+    m_metadata.bitrate = (m_fmtCtx->bit_rate > 0) ? m_fmtCtx->bit_rate / 1000 : -1;
 
     const AVDictionaryEntry* tag = nullptr;
-    while ((tag = av_dict_iterate(fmt_ctx->metadata, tag)))
+    while ((tag = av_dict_iterate(m_fmtCtx->metadata, tag)))
     {
       std::string key   = tag->key;
       std::string value = tag->value;
@@ -181,9 +181,9 @@ private:
     }
 
     // Extract streams
-    for (AudioStreamIdxIter i = 0; i < fmt_ctx->nb_streams; i++)
+    for (AudioStreamIdxIter i = 0; i < m_fmtCtx->nb_streams; i++)
     {
-      AVStream*          stream       = fmt_ctx->streams[i];
+      AVStream*          stream       = m_fmtCtx->streams[i];
       AVCodecParameters* codec_params = stream->codecpar;
 
       StreamMetadata streamMetadata;

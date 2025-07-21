@@ -28,7 +28,7 @@
 #include <functional>
 #include <libwavy/audio/interface.hpp> // Defines IAudioBackend
 #include <libwavy/common/types.hpp>
-#include <libwavy/logger.hpp>
+#include <libwavy/log-macros.hpp>
 #include <stdexcept>
 #include <string>
 
@@ -42,18 +42,18 @@ public:
     using BackendCreateFunc = IAudioBackend* (*)();
     using MetadataFunc      = const char* (*)();
 
-    LOG_INFO << PLUGIN_LOG << "Found plugin path: " << WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH;
+    log::INFO<log::PLUGIN>("Found plugin path: '{}'!", WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH);
 
-    LOG_INFO << PLUGIN_LOG << "Attempting to load plugin from: " << plugin_path;
+    log::INFO<log::PLUGIN>("Attempting to load plugin from: {}", plugin_path);
 
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
     if (!handle)
     {
-      LOG_ERROR << PLUGIN_LOG << "Failed to load audio plugin: " << dlerror();
+      log::ERROR<log::PLUGIN>("Failed to load audio plugin: {}", dlerror());
       throw std::runtime_error(std::string("Failed to load audio plugin: ") + dlerror());
     }
 
-    LOG_INFO << PLUGIN_LOG << "Audio Backend Plugin loaded. Resolving symbols...";
+    log::INFO<log::PLUGIN>("Audio Backend Plugin loaded. Resolving symbols...");
 
     auto create_fn = reinterpret_cast<BackendCreateFunc>(dlsym(handle, "create_audio_backend"));
     auto meta_fn   = reinterpret_cast<MetadataFunc>(dlsym(handle, "get_plugin_metadata"));
@@ -65,7 +65,7 @@ public:
     }
 
     const char* metadata = meta_fn();
-    LOG_INFO << PLUGIN_LOG << "Loaded audio backend plugin: " << metadata;
+    log::INFO<log::PLUGIN>("Loaded audio backend plugin ===> {}", metadata);
 
     IAudioBackend* backend_ptr = create_fn();
     if (!backend_ptr)
@@ -76,7 +76,7 @@ public:
 
     return {backend_ptr, [handle](IAudioBackend* ptr)
             {
-              LOG_TRACE << AUDIO_LOG << "Destroying audio backend and unloading plugin.";
+              log::TRACE<log::PLUGIN>("Destroying audio backend and unloading plugin.");
               delete ptr;
               dlclose(handle);
             }};

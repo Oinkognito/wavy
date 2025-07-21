@@ -24,7 +24,8 @@
  ********************************************************************************/
 
 #include <cstring>
-#include <libwavy/logger.hpp>
+#include <libwavy/common/api/entry.hpp>
+#include <libwavy/log-macros.hpp>
 #include <map>
 #include <span>
 #include <stdexcept>
@@ -33,7 +34,7 @@
 
 namespace libwavy::utils::cmdline
 {
-class CmdLineParser
+class WAVY_API CmdLineParser
 {
 public:
   CmdLineParser(std::span<char* const> argv, std::string usage) : usage_text_(std::move(usage))
@@ -63,7 +64,7 @@ public:
       else
       {
         // Handle any invalid arguments
-        LOG_ERROR << "Invalid argument format: " << arg;
+        log::ERROR<log::CMD_LINE_PARSER>("Invalid argument format: {}", arg);
         throw std::invalid_argument("Invalid argument format: " + arg);
       }
     }
@@ -73,8 +74,8 @@ public:
   {
     if (actual_argc < min_argc)
     {
-      LOG_ERROR << "Not enough arguments provided. Expected at least " << min_argc << ", but got "
-                << actual_argc << ".";
+      log::ERROR<log::CMD_LINE_PARSER>(
+        "Not enough arguments provided. Expected at least {}, but got {}.", min_argc, actual_argc);
       print_usage_and_exit();
     }
   }
@@ -98,17 +99,19 @@ public:
       catch (const std::invalid_argument& e)
       {
         // Return the default value in case of invalid integer conversion
-        LOG_ERROR << "Invalid integer argument for key '" << key << "': " << it->second;
-        LOG_WARNING << "Default value " << default_value << " being passed to key: '" << key
-                    << "'.";
+        log::ERROR<log::CMD_LINE_PARSER>("Invalid integer argument for key '{}': {}", key,
+                                         it->second);
+        log::WARN<log::CMD_LINE_PARSER>("Default value {} being passed to key: '{}'.",
+                                        default_value, key);
         return default_value;
       }
       catch (const std::out_of_range& e)
       {
         // Return the default value in case of out-of-range error
-        LOG_ERROR << "Integer argument for key '" << key << "' is out of range: " << it->second;
-        LOG_WARNING << "Default value " << default_value << " being passed to key: '" << key
-                    << "'.";
+        log::ERROR<log::CMD_LINE_PARSER>("Integer argument for key '{}' is out of range: {}", key,
+                                         it->second);
+        log::WARN<log::CMD_LINE_PARSER>("Default value {} being passed to key: '{}'.",
+                                        default_value, key);
         return default_value;
       }
     }

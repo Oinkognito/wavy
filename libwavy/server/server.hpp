@@ -23,8 +23,10 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include "libwavy/log-macros.hpp"
 #include <archive.h>
 #include <archive_entry.h>
+#include <libwavy/common/api/entry.hpp>
 #include <unistd.h>
 
 #include <libwavy/server/session.hpp>
@@ -85,7 +87,7 @@
 namespace libwavy::server
 {
 
-class WavyServer
+class WAVY_API WavyServer
 {
 public:
   WavyServer(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context,
@@ -95,13 +97,13 @@ public:
         m_socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), m_wavySocketBind(m_socketPath)
 
   {
-    m_wavySocketBind.ensure_single_instance();
-    LOG_INFO << SERVER_LOG << "Starting Wavy Server on port " << port;
+    m_wavySocketBind.EnsureSingleInstance();
+    log::INFO<Server>("Starting Wavy Server on port {}", port);
 
     m_signals.async_wait(
       [this](boost::system::error_code /*ec*/, int /*signo*/)
       {
-        LOG_INFO << SERVER_LOG << "Termination signal received. Cleaning up...";
+        log::INFO<Server>("Termination signal (Ctrl+C) received. Cleaning up...");
         m_wavySocketBind.cleanup();
         std::exit(0);
       });
@@ -125,12 +127,12 @@ private:
       {
         if (ec)
         {
-          LOG_ERROR_ASYNC << SERVER_LOG << "Accept failed: " << ec.message();
+          log::ERROR<Server>(LogMode::Async, "Accept failed: {}", ec.message());
           return;
         }
 
         IPAddr ip = socket.remote_endpoint().address().to_string();
-        LOG_INFO_ASYNC << SERVER_LOG << "Accepted new connection from " << ip;
+        log::INFO<Server>(LogMode::Async, "Accepted new connection from '{}'", ip);
 
         auto session = std::make_shared<WavySession>(
           boost::asio::ssl::stream<tcp::socket>(std::move(socket), m_sslContext), ip);

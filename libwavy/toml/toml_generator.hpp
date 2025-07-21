@@ -25,12 +25,13 @@
 
 #include <external/toml++/toml.hpp>
 #include <fstream>
+#include <libwavy/common/api/entry.hpp>
 #include <string>
 
 namespace libwavy::Toml
 {
 
-class TomlGenerator
+class WAVY_API TomlGenerator
 {
 public:
   TomlGenerator() = default;

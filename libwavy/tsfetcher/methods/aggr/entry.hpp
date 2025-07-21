@@ -23,7 +23,6 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include "libwavy/logger.hpp"
 #include <cstdlib>
 #include <sstream>
 #include <string>
@@ -33,6 +32,7 @@
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/network/entry.hpp>
 #include <libwavy/tsfetcher/interface.hpp>
 #include <libwavy/utils/audio/entry.hpp>
@@ -57,12 +57,11 @@ public:
                     int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path)
     -> bool override
   {
-    LOG_INFO << FETCH_LOG << "Request Owner: " << nickname;
-    LOG_INFO << FETCH_LOG << "Audio-ID: " << audio_id;
-    LOG_INFO << FETCH_LOG << "Bitrate: " << desired_bandwidth;
+    log::INFO<log::FETCH>("Request Owner: {}", nickname);
+    log::INFO<log::FETCH>("Audio-ID: {}", audio_id);
+    log::INFO<log::FETCH>("Bitrate: {}", desired_bandwidth);
 
     auto master_playlist = fetch_master_playlist(nickname, audio_id);
-    std::cout << master_playlist << std::endl;
     if (master_playlist.empty())
       return false;
 
@@ -83,11 +82,11 @@ public:
 
     if (!libwavy::dbg::FileWriter<AudioData>::write(gs.getAllSegments(), "audio.raw"))
     {
-      LOG_ERROR << FETCH_LOG << "Error writing transport segments to file";
+      log::ERROR<log::FETCH>("Error writing transport segments to file!!");
       return false;
     }
 
-    LOG_INFO << FETCH_LOG << "Stored " << gs.segSizeAll() << " transport segments.";
+    log::INFO<log::FETCH>("Stored {} transport segments.", gs.segSizeAll());
 
     // Decode and play the fetched stream
     if (!utils::audio::decodeAndPlay(gs, flac_found, audio_backend_lib_path))
@@ -98,7 +97,7 @@ public:
     return true;
   }
 
-  auto fetch_client_list(const IPAddr& server, const StorageOwnerID& targetNickname)
+  auto fetchOwnersList(const IPAddr& server, const StorageOwnerID& targetNickname)
     -> std::vector<std::string> override
   {
     asio::io_context ioc;
@@ -106,18 +105,18 @@ public:
     ctx.set_verify_mode(ssl::verify_none);
     libwavy::network::HttpsClient client(ioc, ctx, server);
 
-    LOG_TRACE << FETCH_LOG << "Attempting to fetch client list of owner " << targetNickname
-              << " through Wavy server at: " << server;
+    log::TRACE<log::FETCH>("Attempting to fetch client list of owner {} through Wavy-Server at {}",
+                           targetNickname, server);
 
     NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_CLIENTS));
 
     if (response.empty())
       return {};
 
-    std::istringstream       iss(response);
-    std::string              line;
-    StorageOwnerID           currentNickname;
-    std::vector<std::string> clients;
+    std::istringstream iss(response);
+    std::string        line;
+    StorageOwnerID     currentNickname;
+    Owners             owners;
 
     while (std::getline(iss, line))
     {
@@ -136,12 +135,12 @@ public:
         if (pos != std::string::npos)
         {
           StorageOwnerID client_id = line.substr(pos + 2); // Extract client ID
-          clients.push_back(client_id);
+          owners.push_back(client_id);
         }
       }
     }
 
-    return clients;
+    return owners;
   }
 
 private:
@@ -160,14 +159,14 @@ private:
     const NetTarget masterPlaylistPath =
       "/hls/" + nickname + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
 
-    LOG_DEBUG << FETCH_LOG << "Fetching Master Playlist from: " << masterPlaylistPath;
+    log::DBG<log::FETCH>("Fetching Master Playlist from: '{}'", masterPlaylistPath);
 
     auto         client  = make_client();
     PlaylistData content = client->get(masterPlaylistPath);
     if (content.empty())
     {
-      LOG_ERROR << FETCH_LOG << "Failed to fetch master playlist for owner + audio ID: " << nickname
-                << "/" << audio_id;
+      log::ERROR<log::FETCH>("Failed to fetch master playlist for Owner + audio ID: {}/{}",
+                             nickname, audio_id);
     }
     return content;
   }
@@ -212,11 +211,11 @@ private:
     if (selected.empty())
     {
       selected = max_bandwidth_url;
-      LOG_WARNING << FETCH_LOG << "Exact match not found. Using max bitrate: " << max_bandwidth;
+      log::WARN<log::FETCH>("Exact match not found. Using max bitrate: {} BPS", max_bandwidth);
     }
 
     const NetTarget playlist_path = "/hls/" + nickname + "/" + audio_id + "/" + selected;
-    LOG_INFO << FETCH_LOG << "Selected bitrate playlist: " << playlist_path;
+    log::INFO<log::FETCH>("Selected bitrate playlist: {}", playlist_path);
 
     auto client = make_client();
     return client->get(playlist_path);
@@ -247,10 +246,10 @@ private:
       init_mp4_data              = client->get(initMp4Url);
       if (init_mp4_data.empty())
       {
-        LOG_ERROR << FETCH_LOG << "Failed to fetch init.mp4 for " << nickname << "/" << audio_id;
+        log::ERROR<log::FETCH>("Failed to fetch init.mp4 for {}/{}", nickname, audio_id);
         return false;
       }
-      LOG_INFO << FETCH_LOG << "Fetched init.mp4, size: " << init_mp4_data.size() << " bytes.";
+      log::INFO<log::FETCH>("Fetched init.mp4, size: {} bytes.", init_mp4_data.size());
     }
 
     stream.clear();
@@ -260,7 +259,7 @@ private:
       if (!line.empty() && line[0] != '#')
       {
         const NetTarget url = "/hls/" + nickname + "/" + audio_id + "/" + line;
-        LOG_TRACE << FETCH_LOG << "Fetching URL: " << url;
+        log::TRACE<log::FETCH>("Fetching URL: {}", url);
         AudioData data = client->get(url);
 
         if (!data.empty())
@@ -270,11 +269,11 @@ private:
           else if (line.ends_with(macros::TRANSPORT_STREAM_EXT))
             gs.appendSegment(std::move(data));
 
-          LOG_DEBUG << FETCH_LOG << "Fetched segment: " << line;
+          log::DBG<log::FETCH>("Fetched segment: {}", line);
         }
         else
         {
-          LOG_WARNING << FETCH_LOG << "Failed to fetch segment: " << line;
+          log::WARN<log::FETCH>("Failed to fetch segment: {}", line);
         }
       }
     }
