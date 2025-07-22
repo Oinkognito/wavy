@@ -14,7 +14,6 @@ if(POLICY CMP0167)
 endif()
 
 # Find Boost
-find_package(Boost REQUIRED COMPONENTS log log_setup system thread)
 find_package(OpenSSL REQUIRED)
 
 # Find FFmpeg libraries
@@ -24,11 +23,11 @@ find_package(PkgConfig REQUIRED)
 add_executable(example_get_req ${SOURCES})
 
 # Include directories
-target_include_directories(example_get_req PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_get_req PRIVATE ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(example_get_req PRIVATE 
-    Boost::log Boost::log_setup Boost::system Boost::thread
+target_link_libraries(example_get_req PRIVATE
+    wavy-logger
     OpenSSL::SSL OpenSSL::Crypto
 )
 

@@ -13,9 +13,6 @@ if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
 endif()
 
-# Find Boost
-find_package(Boost REQUIRED COMPONENTS log log_setup system thread)
-
 # find libarchive
 find_library(ARCHIVE_LIB_DISPATCHER archive)
 
@@ -29,11 +26,11 @@ pkg_check_modules(ZSTD REQUIRED libzstd)
 add_executable(example_dispatcher ${DISPATCH_SRC})
 
 # Include directories
-target_include_directories(example_dispatcher PRIVATE ${Boost_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_dispatcher PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(example_dispatcher PRIVATE 
-    Boost::log Boost::log_setup Boost::system Boost::thread 
+target_link_libraries(example_dispatcher PRIVATE
+    wavy-logger
     ${ARCHIVE_LIB_DISPATCHER}
     OpenSSL::SSL
     ${ZSTD_LIBRARIES}

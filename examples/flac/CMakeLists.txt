@@ -16,9 +16,6 @@ if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
 endif()
 
-# Find Boost (log, log_setup, system, filesystem)
-find_package(Boost REQUIRED COMPONENTS log log_setup system filesystem)
-
 # Find FLAC++
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FLAC REQUIRED IMPORTED_TARGET flac++)
@@ -27,12 +24,12 @@ pkg_check_modules(FLAC REQUIRED IMPORTED_TARGET flac++)
 add_executable(example_flac_metadata ${SOURCES})
 
 # Include directories
-target_include_directories(example_flac_metadata PRIVATE ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_flac_metadata PRIVATE ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(example_flac_metadata PRIVATE 
-    Boost::log Boost::log_setup Boost::system Boost::filesystem 
-    PkgConfig::FLAC 
+target_link_libraries(example_flac_metadata PRIVATE
+    wavy-logger
+    PkgConfig::FLAC
     pthread
 )
 
