@@ -4,10 +4,14 @@
 #include <libwavy/logger.hpp>
 #undef WAVY__INTERNAL_LOGGING_IMPL
 
-#define INIT_WAVY_LOGGER()              \
-  namespace lwlog = libwavy::log;       \
-  using _         = libwavy::log::NONE; \
-  lwlog::init_logging();
+#include <format>
+
+#define INIT_WAVY_LOGGER()                                                                      \
+  namespace lwlog = libwavy::log;                                                               \
+  using _         = libwavy::log::NONE;                                                         \
+  lwlog::init_logging();                                                                        \
+  LOG_INFO << "Wavy logger initialized! Check WAVY_LOG_LEVEL (environment variable) for which " \
+              "log level this session is on!!";
 
 /* ------------ LOGGING MACROS --------------- */
 
@@ -29,10 +33,10 @@ struct is_formattable<T, std::void_t<decltype(std::formatter<std::remove_cvref_t
 
 template <typename... Args> constexpr bool all_formattable_v = (is_formattable<Args>::value && ...);
 
-#define LOG_ARGS_TYPE_CHECK()                                                              \
-  static_assert(                                                                           \
-    all_formattable_v<Args...>,                                                            \
-    "One or more arguments passed to INFO are not formattable with std::format. Consider " \
+#define LOG_ARGS_TYPE_CHECK()                                                                    \
+  static_assert(                                                                                 \
+    all_formattable_v<Args...>,                                                                  \
+    "One or more arguments passed to LOG MACROS are not formattable with std::format. Consider " \
     "converting types like std::filesystem::path to string using .string().");
 
 namespace libwavy::log

@@ -28,10 +28,11 @@
 #include <unordered_set>
 
 #include "helpers/Dispatcher.hpp"
-#include <libwavy/log-macros.hpp>
+#include "libwavy/logger.hpp"
 #include <libwavy/ffmpeg/hls/entry.hpp>
 #include <libwavy/ffmpeg/misc/metadata.hpp>
 #include <libwavy/ffmpeg/transcoder/entry.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/registry/entry.hpp>
 #include <libwavy/utils/cmd-line/parser.hpp>
 #include <tbb/concurrent_vector.h>
@@ -46,8 +47,8 @@
  *
  */
 
-namespace lwlog = libwavy::log;
-using Owner = lwlog::OWNER;
+namespace logger = libwavy::log;
+using Owner      = logger::OWNER;
 
 constexpr const char* HELP_STR =
   " --inputFile=<input file> --outputDir=<output directory> "
@@ -59,7 +60,7 @@ auto exportTOMLFile(const FileName& filename, const StorageOwnerID& nickname,
   libwavy::registry::RegisterAudio parser(filename, nickname, found_bitrates);
   if (!parser.parse())
   {
-    lwlog::ERROR<Owner>("Failed to parse audio file.");
+    logger::ERROR<Owner>("Failed to parse audio file.");
     return WAVY_RET_FAIL;
   }
 
@@ -67,7 +68,7 @@ auto exportTOMLFile(const FileName& filename, const StorageOwnerID& nickname,
   RelPath outputTOMLFile = output_dir + "/" + macros::to_string(macros::METADATA_FILE);
 
   parser.exportToTOML(macros::to_string(outputTOMLFile));
-  lwlog::INFO<Owner>("TOML metadata exported to '{}'", outputTOMLFile);
+  logger::INFO<Owner>("TOML metadata exported to '{}'", outputTOMLFile);
 
   return WAVY_RET_SUC;
 }
@@ -76,7 +77,7 @@ void DBG_AVlogCheck(const bool& avdebug_mode)
 {
   if (avdebug_mode)
   {
-    lwlog::INFO<Owner>("-- AV Debug mode enabled: AV_LOG will output verbose logs.");
+    logger::INFO<Owner>("-- AV Debug mode enabled: AV_LOG will output verbose logs.");
     av_log_set_level(AV_LOG_DEBUG);
   }
   else
@@ -87,8 +88,7 @@ void DBG_AVlogCheck(const bool& avdebug_mode)
 
 auto main(int argc, char* argv[]) -> int
 {
-  lwlog::init_logging();
-  lwlog::set_log_level(libwavy::log::__INFO__);
+  logger::init_logging();
 
   libwavy::utils::cmdline::CmdLineParser cmdLineParser(std::span<char* const>(argv, argc),
                                                        HELP_STR);
@@ -105,8 +105,8 @@ auto main(int argc, char* argv[]) -> int
   cmdLineParser.requireMinArgs(5, argc);
 
   libwavy::ffmpeg::Metadata met;
-  int      entryBitrate = met.fetchBitrate(input_file.c_str());
-  lwlog::INFO<Owner>("Entry input file '{}' with bitrate: {}", input_file, entryBitrate);
+  int                       entryBitrate = met.fetchBitrate(input_file.c_str());
+  logger::INFO<Owner>("Entry input file '{}' with bitrate: {}", input_file, entryBitrate);
 
   DBG_AVlogCheck(avdebug_mode);
 
@@ -138,18 +138,18 @@ auto main(int argc, char* argv[]) -> int
 
   if (fs::exists(output_dir))
   {
-    lwlog::WARN<Owner>("Output directory exists, rewriting...");
+    logger::WARN<Owner>("Output directory exists, rewriting...");
     fs::remove_all(output_dir);
     fs::remove_all(macros::DISPATCH_ARCHIVE_REL_PATH);
   }
 
   if (fs::create_directory(output_dir))
   {
-    lwlog::INFO<Owner>("Directory created successfully: '{}'", fs::absolute(output_dir).string());
+    logger::INFO<Owner>("Directory created successfully: '{}'", fs::absolute(output_dir).string());
   }
   else
   {
-    lwlog::ERROR<Owner>("Failed to create directory: '{}'", output_dir);
+    logger::ERROR<Owner>("Failed to create directory: '{}'", output_dir);
     return WAVY_RET_FAIL;
   }
 
@@ -158,7 +158,7 @@ auto main(int argc, char* argv[]) -> int
   /*
    * @NOTE:
    *
-   * When HLS segmenting for FLAC files, the remuxing is great and no 
+   * When HLS segmenting for FLAC files, the remuxing is great and no
    * problems when running this code.
    *
    * However, when checking the HLS segments or master playlists' metadata,
@@ -169,7 +169,7 @@ auto main(int argc, char* argv[]) -> int
    */
   if (use_flac)
   {
-    lwlog::INFO<Owner>("Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...");
+    logger::INFO<Owner>("Encoding HLS segments for FLAC -> FLAC. Skipping transcoding...");
     seg.createSegmentsFLAC(input_file, output_dir, "hls_flac.m3u8",
                            entryBitrate); // This will also create the master playlist
     int ret =
@@ -180,7 +180,7 @@ auto main(int argc, char* argv[]) -> int
       return dispatch(server, nickname, output_dir);
     }
 
-    lwlog::ERROR<Owner>("Failed to export metadata. Quiting dispatch JOB.");
+    logger::ERROR<Owner>("Failed to export metadata. Quiting dispatch JOB.");
     return WAVY_RET_FAIL;
   }
 
@@ -206,24 +206,26 @@ auto main(int argc, char* argv[]) -> int
       RelPath output_file_i =
         output_dir + "/output_" + std::to_string(i) + macros::to_string(macros::MP3_FILE_EXT);
       libwavy::ffmpeg::Transcoder trns;
-      lwlog::INFO<Owner>(LogMode::Async, "[Bitrate: {}] Starting transcoding job...", i);
+      logger::INFO<Owner>(LogMode::Async, "[Bitrate: {}] Starting transcoding job...", i);
       int result = trns.transcode_to_mp3(input_file.c_str(), output_file_i.c_str(), i * 1000);
       if (result == 0)
       {
-        lwlog::INFO<Owner>(LogMode::Async, "[Bitrate: {}] Transcoding job went OK. Creating HLS Segments...", i);
+        logger::INFO<Owner>(LogMode::Async,
+                            "[Bitrate: {}] Transcoding job went OK. Creating HLS Segments...", i);
         std::vector<int> res = seg.createSegments(output_file_i.c_str(), output_dir.c_str());
         for (int b : res)
           concurrent_found_bitrates.push_back(b);
       }
       else
       {
-        lwlog::WARN<Owner>(LogMode::Async, "[Bitrate: {}] Transcoding Job failed.", i);
+        logger::WARN<Owner>(LogMode::Async, "[Bitrate: {}] Transcoding Job failed.", i);
       }
 
       std::remove(output_file_i.c_str());
     });
 
-  lwlog::INFO<Owner>("Total TRANSCODING + HLS segmenting JOB seems to be complete. Going ahead with creating <master playlist> ...");
+  logger::INFO<Owner>("Total TRANSCODING + HLS segmenting JOB seems to be complete. Going ahead "
+                      "with creating <master playlist> ...");
 
   std::unordered_set<int> unique_set(
     concurrent_found_bitrates.begin(),
@@ -234,7 +236,7 @@ auto main(int argc, char* argv[]) -> int
 
   if (exportTOMLFile(input_file, nickname, output_dir, found_bitrates) > 0)
   {
-    lwlog::ERROR<Owner>("Failed to export metadata to `metadata.toml`. Exiting...");
+    logger::ERROR<Owner>("Failed to export metadata to `metadata.toml`. Exiting...");
     return WAVY_RET_FAIL;
   }
 

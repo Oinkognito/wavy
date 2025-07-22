@@ -45,21 +45,21 @@ auto WavyClient::start(bool flac_found, int index) -> int
   }
 
   // Fetch client list and audio ID
-  const std::vector<std::string> clients = fetcher->fetchOwnersList(m_server, m_nickname);
-  if (clients.empty())
+  const Owners owners = fetcher->fetchOwnersList(m_server, m_nickname);
+  if (owners.empty())
   {
     log::ERROR<log::CLIENT>("Failed to fetch clients. Exiting...");
     return WAVY_RET_FAIL;
   }
 
   // Validate the index
-  if (index < 0 || index >= static_cast<int>(clients.size()))
+  if (index < 0 || index >= static_cast<int>(owners.size()))
   {
-    log::ERROR<log::CLIENT>("Invalid index. Available range: 0 to {}", clients.size() - 1);
+    log::ERROR<log::CLIENT>("Invalid index. Available range: 0 to {}", owners.size() - 1);
     return WAVY_RET_FAIL;
   }
 
-  StorageAudioID audio_id = clients[index];
+  StorageAudioID audio_id = owners[index];
 
   // Fetch the transport stream
   if (!fetcher->fetchAndPlay(m_nickname, audio_id, m_globalState, m_bitrate, flac_found,

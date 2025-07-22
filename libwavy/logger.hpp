@@ -37,9 +37,6 @@
 #include <boost/log/utility/setup/file.hpp>
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
-#include <chrono>
-#include <format>
-#include <iostream>
 
 #include <libwavy/common/api/entry.hpp>
 
@@ -71,15 +68,15 @@ constexpr const char* REL_PATH_LOGS = ".cache/wavy/logs";
 #define FILENAME \
   (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
-#define GET_HOME_OR_RETURN(var)                                    \
-  do                                                               \
-  {                                                                \
-    var = std::getenv("HOME");                                     \
-    if (!(var))                                                    \
-    {                                                              \
-      std::cerr << "ERROR: Unable to determine HOME directory.\n"; \
-      return;                                                      \
-    }                                                              \
+#define GET_HOME_OR_RETURN(var)                                               \
+  do                                                                          \
+  {                                                                           \
+    var = std::getenv("HOME");                                                \
+    if (!(var))                                                               \
+    {                                                                         \
+      std::cerr << "ERROR: Unable to determine '" << var << "' directory.\n"; \
+      return;                                                                 \
+    }                                                                         \
   } while (0)
 
 #define LOG_FMT(str) BOLD str RESET
@@ -122,8 +119,8 @@ enum SeverityLevel
 {
   __ERROR__,
   __WARNING__,
-  __TRACE__,
   __INFO__,
+  __TRACE__,
   __DEBUG__
 };
 
@@ -139,125 +136,34 @@ LOG_CATEGORIES
 #undef X
 #undef LOG_FMT
 
-inline auto strip_ansi(const std::string& input) -> std::string
-{
-  static const boost::regex ansi_regex(ANSI_REGEX);
-  return boost::regex_replace(input, ansi_regex, "");
-}
-
-inline auto get_current_timestamp() -> const std::string
-{
-  using namespace std::chrono;
-
-  auto now      = system_clock::now();
-  auto now_time = floor<seconds>(now); // truncate to seconds
-  auto now_ms   = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
-
-  return std::format("{:%Y-%m-%d %H:%M:%S}.{:03}", now_time, now_ms.count());
-}
-
-inline WAVY_API void init_logging()
-{
-  namespace bfs     = boost::filesystem;
-  namespace logging = boost::log;
-  namespace trivial = boost::log::trivial;
-  namespace sinks   = boost::log::sinks;
-  namespace expr    = boost::log::expressions;
-  namespace kw      = boost::log::keywords;
-  using expr::stream;
-
-  using Severity = trivial::severity_level;
-
-  auto console_formatter = []
-  {
-    return stream << BOLD << "[" << get_current_timestamp() << "] "
-                  << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::trace)[stream << PURPLE << "[TRACE]   "]
-                  << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::info)[stream << GREEN << "[INFO]    "]
-                  << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::warning)[stream << YELLOW << "[WARN]    "]
-                  << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::error)[stream << RED << "[ERROR]   "]
-                  << expr::if_(expr::attr<Severity>("Severity") ==
-                               trivial::debug)[stream << BLUE << "[DEBUG]   "]
-                  << RESET << expr::smessage;
-  };
-
-  const char* home;
-  GET_HOME_OR_RETURN(home);
-
-  bfs::path log_dir = bfs::path(home) / REL_PATH_LOGS;
-
-  if (!bfs::exists(log_dir))
-  {
-    if (!bfs::create_directories(log_dir))
-    {
-      std::cerr << "ERROR: Failed to create log directory: " << log_dir.string() << std::endl;
-      return;
-    }
-  }
-
-  // Define log file path
-  std::string log_file = (log_dir / "wavy_%Y-%m-%d_%H-%M-%S.log").string();
-
-  logging::add_console_log(std::cout, kw::format = console_formatter());
-
-  // File logging (without ANSI codes)
-  using text_sink = sinks::synchronous_sink<sinks::text_file_backend>;
-  boost::shared_ptr<text_sink> file_sink =
-    boost::make_shared<text_sink>(kw::file_name     = log_file,
-                                  kw::rotation_size = 10 * 1024 * 1024, // 10 MB
-                                  kw::auto_flush    = true);
-
-  // Custom Filtering: Strip ANSI codes before writing logs to a file
-  file_sink->set_formatter(
-    [](boost::log::record_view const& rec, boost::log::formatting_ostream& strm)
-    {
-      auto        severity    = rec[trivial::severity];
-      auto        message_ref = rec[expr::smessage];
-      std::string message     = message_ref ? message_ref.get() : "";
-
-      // Strip ANSI escape codes
-      static const boost::regex ansi_regex(ANSI_REGEX);
-      message = boost::regex_replace(message, ansi_regex, "");
-
-      strm << "[" << get_current_timestamp() << "] " << (severity ? severity.get() : trivial::info)
-           << " " << message;
-    });
-
-  boost::log::core::get()->add_sink(file_sink);
-
-  boost::log::add_common_attributes();
-}
+/* --------------------------------------------------
+ *                  WAVY LOGGER API
+ * --------------------------------------------------*/
+WAVY_API void set_log_level(SeverityLevel level);
+WAVY_API void init_logging();
+WAVY_API auto strip_ansi(const std::string& input) -> std::string;
+WAVY_API auto get_current_timestamp() -> std::string;
 
 inline WAVY_API void flush_logs() { boost::log::core::get()->flush(); }
 
-inline WAVY_API void set_log_level(SeverityLevel level)
-{
-  namespace trivial = boost::log::trivial;
+inline static const std::map<SeverityLevel, boost::log::trivial::severity_level>
+  LOG_LEVEL_ENUM_MAP = {
+    {__ERROR__, boost::log::trivial::error}, {__WARNING__, boost::log::trivial::warning},
+    {__INFO__, boost::log::trivial::info},   {__TRACE__, boost::log::trivial::trace},
+    {__DEBUG__, boost::log::trivial::debug},
+};
 
-  static const std::map<SeverityLevel, trivial::severity_level> level_map = {
-    {__ERROR__, trivial::error}, {__WARNING__, trivial::warning}, {__TRACE__, trivial::trace},
-    {__INFO__, trivial::info},   {__DEBUG__, trivial::debug},
-  };
-
-  auto it = level_map.find(level);
-  if (it != level_map.end())
-  {
-    boost::log::core::get()->set_filter(trivial::severity >= it->second);
-  }
-  else
-  {
-    std::cerr << "Unknown log level specified.\n";
-  }
-}
+inline static const std::map<std::string, SeverityLevel> LOG_LEVEL_STR_MAP = {{"ERROR", __ERROR__},
+                                                                              {"WARN", __WARNING__},
+                                                                              {"INFO", __INFO__},
+                                                                              {"TRACE", __TRACE__},
+                                                                              {"DEBUG", __DEBUG__}};
 
 /***************************************************
  *              !!! NOTE !!!
- * 
- * It is NOT RECOMMENDED to use these logging macros 
- * on your own!! Use libwavy/log-macros.hpp which is 
+ *
+ * It is NOT RECOMMENDED to use these logging macros
+ * on your own!! Use libwavy/log-macros.hpp which is
  * a much better container and is easy to call.
  *
  ***************************************************/

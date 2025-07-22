@@ -84,6 +84,7 @@ set(OWNER_SRC wavy/Owner.cc)
 set(SERVER_SRC wavy/Server.cc)
 set(CLIENT_SRC wavy/Client.cc)
 
+set(LIBWAVY_LOGGER_SRC src/logger.cc)
 set(LIBWAVY_SERVER_SRC src/server/Server.cc)
 
 find_package(PkgConfig REQUIRED)
@@ -93,6 +94,19 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_library(ARCHIVE_LIB archive)
 
+########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
+add_library(wavy-logger SHARED ${LIBWAVY_LOGGER_SRC})
+target_include_directories(wavy-logger PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(wavy-logger PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex)
+########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
+
+########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
+add_library(wavy-server SHARED ${LIBWAVY_SERVER_SRC})
+target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+# Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
+target_link_libraries(wavy-server PUBLIC wavy-logger OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
+
 if (DEFINED NO_FFMPEG AND NO_FFMPEG)
   message(STATUS "${YELLOW}${BOLD}Skipping FFmpeg check...${RESET}")
 else ()
@@ -101,7 +115,7 @@ else ()
 
   add_library(wavy-ffmpeg SHARED ${FFMPEG_SOURCES})
   target_include_directories(wavy-ffmpeg PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-  target_link_libraries(wavy-ffmpeg PUBLIC ${FFMPEG_LIBRARIES} Boost::log Boost::log_setup)
+  target_link_libraries(wavy-ffmpeg PUBLIC ${FFMPEG_LIBRARIES} wavy-logger)
 endif()
 
 if(ARCHIVE_LIB)
@@ -134,7 +148,7 @@ if (TBB_FOUND)
 
     add_executable(${OWNER_BIN} ${OWNER_SRC})
     target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-    target_link_libraries(${OWNER_BIN} PRIVATE wavy-ffmpeg ${ZSTD_LIBRARIES} Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
+    target_link_libraries(${OWNER_BIN} PRIVATE wavy-ffmpeg wavy-logger ${ZSTD_LIBRARIES} Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 
 if (DEFINED BUILD_FETCHER_PLUGINS AND BUILD_FETCHER_PLUGINS)
@@ -166,24 +180,16 @@ endif()
 file(GLOB WAVY_UTILS_SOURCES "src/utils/*.cc")
 add_library(wavy-utils SHARED ${WAVY_UTILS_SOURCES})
 target_include_directories(wavy-utils PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-target_link_libraries(wavy-utils PUBLIC ${FFMPEG_LIBRARIES} Boost::log Boost::log_setup)
-########################### -- MISC CPP FILES -- #########################################
+target_link_libraries(wavy-utils PUBLIC ${FFMPEG_LIBRARIES} wavy-logger)
+########################### -- MISC CPP FILES (WAVY-UTILS) -- #########################################
 
 ########################### -- WAVY CLIENT -- #########################################
 file(GLOB WAVY_COMPONENT_CLIENT_SOURCES "src/components/client/*.cc")
 add_executable(${CLIENT_BIN} ${CLIENT_SRC} ${WAVY_COMPONENT_CLIENT_SOURCES})
 target_include_directories(${CLIENT_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 target_compile_features(${CLIENT_BIN} PRIVATE cxx_std_20)
-target_link_libraries(${CLIENT_BIN} PRIVATE wavy-ffmpeg Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+target_link_libraries(${CLIENT_BIN} PRIVATE wavy-ffmpeg wavy-logger Threads::Threads OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 ########################### -- WAVY CLIENT -- #########################################
-
-########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
-add_library(wavy-server SHARED ${LIBWAVY_SERVER_SRC})
-target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-# Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
-target_link_libraries(wavy-server PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
-########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
-
 
 ########################### -- WAVY SERVER -- #########################################
 add_executable(${SERVER_BIN} ${SERVER_SRC})

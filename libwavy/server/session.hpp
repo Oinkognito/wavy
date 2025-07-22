@@ -429,9 +429,9 @@ private:
    * WavyServer stores verified files (.ts, .m3u8, .m4s, .toml, etc)
    * in `/tmp/wavy_storage`.
    *
-   * In Linux, the /tmp is NOT a persistant directory and after every 
-   * reboot of the system, the /tmp directory is re-created for that 
-   * session only. 
+   * In Linux, the /tmp is NOT a persistant directory and after every
+   * reboot of the system, the /tmp directory is re-created for that
+   * session only.
    *
    * The revamp will hope to bring a persistant option as well to fully
    * utilize the server's potential as a audio media server.
@@ -454,12 +454,12 @@ private:
       return;
     }
 
-    IPAddr         ip_addr  = parts[1];
+    StorageOwnerID owner_id = parts[1];
     StorageAudioID audio_id = parts[2];
     FileName       filename = parts[3];
 
     // Construct the file path
-    AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ip_addr + "/" +
+    AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + owner_id + "/" +
                         audio_id + "/" + filename;
 
     log::DBG<ServerDownload>(LogMode::Async, "Checking out file: {}", file_path);
@@ -517,7 +517,7 @@ private:
                         m_socket.lowest_layer().close();
                       });
 
-    log::INFO<ServerDownload>(LogMode::Async, "[OWNER:{}] Served: {} ({})", ip_addr, filename,
+    log::INFO<ServerDownload>(LogMode::Async, "[OWNER:{}] Served: {} ({})", owner_id, filename,
                               audio_id);
   }
 

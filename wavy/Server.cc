@@ -36,7 +36,10 @@ auto main() -> int
   try
   {
     INIT_WAVY_LOGGER();
+
+    // always have fallback to trace for more detailed logs
     lwlog::set_log_level(libwavy::log::__TRACE__);
+
     asio::io_context io_context;
     ssl::context     ssl_context(ssl::context::sslv23);
 

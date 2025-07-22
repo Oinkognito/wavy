@@ -32,9 +32,6 @@
 #include <libwavy/log-macros.hpp>
 #include <libwavy/utils/cmd-line/parser.hpp>
 
-using Client = libwavy::log::CLIENT;
-namespace lwlog = libwavy::log;
-
 void print_client_list(const std::vector<std::string>& clients)
 {
   if (clients.empty())
@@ -52,8 +49,9 @@ void print_client_list(const std::vector<std::string>& clients)
 
 auto main(int argc, char* argv[]) -> int
 {
-  lwlog::init_logging();
-  lwlog::set_log_level(lwlog::__DEBUG__); // anything with INFO and above priority will be printed
+  INIT_WAVY_LOGGER();
+  namespace logger = lwlog;
+  using Client     = libwavy::log::CLIENT;
 
   std::string usage = std::string(argv[0]) +
                       ": --nickname=<owner-nickname> --index=<index> --serverIP=<server-ip> "
@@ -77,13 +75,13 @@ auto main(int argc, char* argv[]) -> int
   // Check if index or bitrate is valid
   if (index == -1)
   {
-    lwlog::ERROR<Client>("Invalid or missing index argument.");
+    logger::ERROR<Client>("Invalid or missing index argument.");
     return WAVY_RET_FAIL;
   }
 
   if (bitrate == 0)
   {
-    lwlog::ERROR<Client>("Invalid or missing bitrate-stream argument.");
+    logger::ERROR<Client>("Invalid or missing bitrate-stream argument.");
     return WAVY_RET_FAIL;
   }
 
@@ -94,7 +92,8 @@ auto main(int argc, char* argv[]) -> int
   {
     if (fetch_lib.empty())
     {
-      lwlog::ERROR<Client>("You must specify --fetchLib=<so file name> when using --fetchMode=custom");
+      logger::ERROR<Client>(
+        "You must specify --fetchLib=<so file name> when using --fetchMode=custom");
       return WAVY_RET_FAIL;
     }
 
@@ -114,15 +113,15 @@ auto main(int argc, char* argv[]) -> int
 
   if (!foundFetcher)
   {
-    lwlog::ERROR<Client>("No matching fetcher plugin found for mode: {}!", fetch_mode);
-    lwlog::INFO<Client>("Available fetchers: ");
+    logger::ERROR<Client>("No matching fetcher plugin found for mode: {}!", fetch_mode);
+    logger::INFO<Client>("Available fetchers: ");
     for (const auto& gFetcher : gFetchers)
-      lwlog::INFO<Client>("Fetcher: {} ({})", gFetcher.name, gFetcher.plugin_path);
+      logger::INFO<Client>("Fetcher: {} ({})", gFetcher.name, gFetcher.plugin_path);
     return WAVY_RET_FAIL;
   }
   else
   {
-    lwlog::INFO<Client>("Proceeding with Fetcher Plugin: {}", plugin_path);
+    logger::INFO<Client>("Proceeding with Fetcher Plugin: {}", plugin_path);
   }
 
   bool flac_found = parser.get("--playFlac") == "true" ? true : false;

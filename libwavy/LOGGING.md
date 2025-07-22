@@ -3,17 +3,39 @@
 The `logger.hpp` file provides a structured logging system for Wavy, leveraging **Boost.Log** for both console and file-based logging. It includes features such as **color-coded severity levels**, **timestamped logs**, **per-component log tags**, and **support for multi-threaded logging** with thread-aware macros.
 
 > [!CAUTION]
-> 
+>
 > Never include `libwavy/logger.hpp` this will
 > cause **INTENTIONAL** breaking compilation errors!
-> 
+>
 > Always include:
 > ```cpp
 > #include <libwavy/log-macros.hpp>
 > ```
-> 
+>
 
 ## **1. Initialization**
+
+> [!IMPORTANT]
+>
+> You can change log level at runtime!!
+>
+> Run the following before running any Wavy binary:
+>
+> ```bash
+> export WAVY_LOG_LEVEL=TRACE
+> ```
+>
+> In the above example, every log priority that is **ABOVE** `TRACE`
+> will be printed logged to file!
+>
+> The **log priority** order:
+>
+> 1. `ERROR`
+> 2. `WARN`
+> 3. `INFO`
+> 4. `TRACE`
+> 5. `DEBUG`
+>
 
 Before using the logger, call:
 
@@ -180,7 +202,7 @@ Same applies for:
 libwavy::log::INFO<DISPATCH_LOG>("Parsed Audio-ID: {}", std::string(audio_id));
 libwavy::log::ERROR<PLUGIN_LOG>(LogMode::Async, "Plugin failed: {}", plugin_name);
 
-// Using NONE log category 
+// Using NONE log category
 INIT_WAVY_LOGGER();
 lwlog::TRACE<_>("Hello there!");
 ```
@@ -196,23 +218,23 @@ static_assert(all_formattable_v<Args...>);
 This ensures that all arguments are safely usable with `std::format`.
 
 > [!NOTE]
-> 
+>
 > Convert non-formattable types like `std::filesystem::path`, `boost::string_view`, or `enum class` manually:
-> 
+>
 > ```cpp
 > std::string(path)
 > std::string_view(beast_sv)
 > std::to_underlying(my_enum)
 > ```
 > Or wrap them:
-> 
+>
 > ```cpp
 > template<typename SV>
 > std::string to_std_string(SV s) {
 >   return {s.data(), s.size()};
 > }
 > ```
-> 
+>
 
 ### Enum `LogMode`
 
@@ -253,9 +275,9 @@ If any argument doesn't satisfy `std::formatter<T>`, a static assert will trigge
 
 You might still require the **older** logging methods like `LOG_INFO`, etc. for special cases like **flushing** (which is NOT formattable):
 
-```cpp 
+```cpp
 // !! This will NOT compile !!
-lwlog::INFO<_>("\rI want flush {}", std::flush); 
+lwlog::INFO<_>("\rI want flush {}", std::flush);
 
 // == This WILL compile ==
 LOG_INFO << "\rI want flush " << std::flush;
