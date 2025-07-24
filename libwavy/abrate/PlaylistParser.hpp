@@ -47,7 +47,7 @@ class PlaylistParser
 {
 public:
   PlaylistParser(net::io_context& ioc, ssl::context& ssl_ctx, std::string url)
-      : ioc_(ioc), ssl_ctx_(ssl_ctx), master_url_(std::move(url))
+      : m_ioCtx(ioc), m_sslCtx(ssl_ctx), m_masterURL(std::move(url))
   {
   }
 
@@ -55,26 +55,26 @@ public:
   {
     std::string host, port;
 
-    NetTarget target = parseUrl(master_url_, host, port);
+    NetTarget target = parseUrl(m_masterURL, host, port);
 
     log::INFO<log::M3U8_PARSER>("Fetching master playlist from: {}", target);
 
     try
     {
-      libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
+      libwavy::network::HttpsClient client_(m_ioCtx, m_sslCtx, host);
       log::INFO<log::M3U8_PARSER>("Resolving host: {} on port {}..", host, port);
       std::string body = client_.get(target);
 
       try
       {
         log::DBG<log::M3U8_PARSER>("Parsing master playlist using template HLS parser");
-        std::string base_url = getBaseUrl(master_url_);
-        master_playlist_     = hls::parser::M3U8Parser::parseMasterPlaylist(body, base_url);
+        std::string base_url = getBaseUrl(m_masterURL);
+        m_masterPlaylist     = hls::parser::M3U8Parser::parseMasterPlaylist(body, base_url);
 
         updateBitratePlaylistsFromAst();
 
         // Print the AST for debugging
-        hls::parser::printAST(master_playlist_);
+        hls::parser::printAST(m_masterPlaylist);
 
         return true;
       }
@@ -93,8 +93,8 @@ public:
 
   auto fetchMediaPlaylist(int bitrate) -> bool
   {
-    auto it = bitrate_playlists_.find(bitrate);
-    if (it == bitrate_playlists_.end())
+    auto it = m_bitratePlaylist.find(bitrate);
+    if (it == m_bitratePlaylist.end())
     {
       log::ERROR<log::M3U8_PARSER>("No playlist found for bitrate: {}", bitrate);
       return false;
@@ -104,7 +104,7 @@ public:
     // Handle relative URLs
     if (!url.starts_with("http"))
     {
-      std::string base_url = getBaseUrl(master_url_);
+      std::string base_url = getBaseUrl(m_masterURL);
       url                  = base_url + (url.starts_with("/") ? "" : "/") + url;
     }
 
@@ -115,7 +115,7 @@ public:
 
     try
     {
-      libwavy::network::HttpsClient client_(ioc_, ssl_ctx_, host);
+      libwavy::network::HttpsClient client_(m_ioCtx, m_sslCtx, host);
       log::INFO<log::M3U8_PARSER>("Resolving host: {} on port {}...", host, port);
       std::string body = client_.get(target);
 
@@ -123,10 +123,10 @@ public:
       {
         log::DBG<log::M3U8_PARSER>("Parsing media playlist using template HLS parser");
         std::string base_url = getBaseUrl(url);
-        media_playlists_[bitrate] =
+        m_mediaPlaylists[bitrate] =
           hls::parser::M3U8Parser::parseMediaPlaylist(body, bitrate, base_url);
 
-        hls::parser::printAST(media_playlists_[bitrate]);
+        hls::parser::printAST(m_mediaPlaylists[bitrate]);
 
         return true;
       }
@@ -145,19 +145,19 @@ public:
 
   [[nodiscard]] auto getBitratePlaylists() const -> std::map<int, std::string>
   {
-    return bitrate_playlists_;
+    return m_bitratePlaylist;
   }
 
   [[nodiscard]] auto getMasterPlaylist() const -> const libwavy::hls::parser::ast::MasterPlaylist&
   {
-    return master_playlist_;
+    return m_masterPlaylist;
   }
 
   [[nodiscard]] auto getMediaPlaylist(int bitrate) const
     -> std::optional<libwavy::hls::parser::ast::MediaPlaylist>
   {
-    auto it = media_playlists_.find(bitrate);
-    if (it != media_playlists_.end())
+    auto it = m_mediaPlaylists.find(bitrate);
+    if (it != m_mediaPlaylists.end())
     {
       return it->second;
     }
@@ -165,12 +165,12 @@ public:
   }
 
 private:
-  net::io_context&                                        ioc_;
-  ssl::context&                                           ssl_ctx_;
-  std::string                                             master_url_;
-  std::map<int, std::string>                              bitrate_playlists_;
-  libwavy::hls::parser::ast::MasterPlaylist               master_playlist_;
-  std::map<int, libwavy::hls::parser::ast::MediaPlaylist> media_playlists_;
+  net::io_context&                                        m_ioCtx;
+  ssl::context&                                           m_sslCtx;
+  std::string                                             m_masterURL;
+  std::map<int, std::string>                              m_bitratePlaylist;
+  libwavy::hls::parser::ast::MasterPlaylist               m_masterPlaylist;
+  std::map<int, libwavy::hls::parser::ast::MediaPlaylist> m_mediaPlaylists;
 
   auto getBaseUrl(const std::string& url) -> std::string
   {
@@ -195,11 +195,11 @@ private:
 
   void updateBitratePlaylistsFromAst()
   {
-    for (const auto& variant : master_playlist_.variants)
+    for (const auto& variant : m_masterPlaylist.variants)
     {
       if (variant.bitrate > 0)
       {
-        bitrate_playlists_[variant.bitrate] = variant.uri;
+        m_bitratePlaylist[variant.bitrate] = variant.uri;
         log::INFO<log::M3U8_PARSER>("Added bitrate playlist from AST: {} -> {}", variant.bitrate,
                                     variant.uri);
       }
@@ -209,13 +209,13 @@ private:
   auto parseUrl(const std::string& url, std::string& host, std::string& port) -> NetTarget
   {
     size_t pos   = url.find("//");
-    size_t start = (pos == std::string::npos) ? 0 : pos + 2;
+    size_t start = (pos == NetTarget::npos) ? 0 : pos + 2;
     size_t end   = url.find('/', start);
 
     std::string full_host = url.substr(start, end - start);
     size_t      port_pos  = full_host.find(':');
 
-    if (port_pos != std::string::npos)
+    if (port_pos != NetTarget::npos)
     {
       host = full_host.substr(0, port_pos);
       port = full_host.substr(port_pos + 1);
@@ -226,7 +226,7 @@ private:
       port = WAVY_SERVER_PORT_NO_STR; // Default HTTPS port
     }
 
-    NetTarget target = (end == std::string::npos) ? "/" : url.substr(end);
+    NetTarget target = (end == NetTarget::npos) ? "/" : url.substr(end);
     log::INFO<log::M3U8_PARSER>("Parsed Host: {}, Port: {}, Target: {}", host, port, target);
 
     return target;

@@ -203,6 +203,9 @@ add_custom_target(build_owner COMMAND ${CMAKE_COMMAND} --build . --target ${OWNE
 add_custom_target(build_server COMMAND ${CMAKE_COMMAND} --build . --target ${SERVER_BIN})
 add_custom_target(build_client COMMAND ${CMAKE_COMMAND} --build . --target ${CLIENT_BIN})
 
+# Generate pkg-config files for shared obj libs
+include(cmake/PkgConfigDetect.cmake)
+
 # Examples
 if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
   message(STATUS "${PURPLE}${BOLD}${UNDERLINE}Compiling examples for Wavy...${RESET}")

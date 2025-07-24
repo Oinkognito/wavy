@@ -37,7 +37,7 @@ namespace libwavy::utils::cmdline
 class WAVY_API CmdLineParser
 {
 public:
-  CmdLineParser(std::span<char* const> argv, std::string usage) : usage_text_(std::move(usage))
+  CmdLineParser(std::span<char* const> argv, std::string usage) : m_usageText(std::move(usage))
   {
     for (size_t i = 1; i < argv.size(); ++i)
     {
@@ -53,12 +53,12 @@ public:
         {
           std::string key   = arg.substr(2, eq_pos - 2);
           std::string value = arg.substr(eq_pos + 1);
-          arguments_[key]   = value;
+          m_args[key]       = value;
         }
         else
         {
           std::string key = arg.substr(2);
-          arguments_[key] = "";
+          m_args[key]     = "";
         }
       }
       else
@@ -83,14 +83,14 @@ public:
   [[nodiscard]] auto get(const std::string& key, const std::string& default_value = "") const
     -> std::string
   {
-    auto it = arguments_.find(key);
-    return (it != arguments_.end()) ? it->second : default_value;
+    auto it = m_args.find(key);
+    return (it != m_args.end()) ? it->second : default_value;
   }
 
   [[nodiscard]] auto get_int(const std::string& key, int default_value = -1) const -> int
   {
-    auto it = arguments_.find(key);
-    if (it != arguments_.end())
+    auto it = m_args.find(key);
+    if (it != m_args.end())
     {
       try
       {
@@ -120,17 +120,17 @@ public:
 
   [[nodiscard]] auto has(const std::string& key) const -> bool
   {
-    return arguments_.find(key) != arguments_.end();
+    return m_args.find(key) != m_args.end();
   }
 
   void print_usage_and_exit() const
   {
-    std::cerr << "Usage:\n" << usage_text_ << "\n";
+    std::cerr << "Usage:\n" << m_usageText << "\n";
     std::exit(0);
   }
 
 private:
-  std::map<std::string, std::string> arguments_;
-  std::string                        usage_text_;
+  std::map<std::string, std::string> m_args;
+  std::string                        m_usageText;
 };
 } // namespace libwavy::utils::cmdline

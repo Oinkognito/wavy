@@ -91,11 +91,11 @@ private:
                                  return;
                                }
                                log::INFO<Server>(LogMode::Async, "SSL handshake successful!");
-                               do_read();
+                               doRead();
                              });
   }
 
-  void resolve_ip()
+  void resolveIP()
   {
     try
     {
@@ -109,10 +109,10 @@ private:
       return;
     }
 
-    do_read();
+    doRead();
   }
 
-  void do_read()
+  void doRead()
   {
     auto self(shared_from_this());
 

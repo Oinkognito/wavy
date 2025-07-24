@@ -50,14 +50,14 @@ class NetworkDiagnoser
 {
 public:
   NetworkDiagnoser(net::io_context& ioc, std::string server_url)
-      : resolver_(ioc), socket_(ioc), timer_(ioc), server_url_(std::move(server_url))
+      : m_tcpResolver(ioc), m_socket(ioc), m_timer(ioc), m_serverURL(std::move(server_url))
   {
   }
 
   auto diagnoseNetworkSpeed() -> NetworkStats
   {
     std::string  host, port;
-    NetTarget    target = parseUrl(server_url_, host, port);
+    NetTarget    target = parseUrl(m_serverURL, host, port);
     NetworkStats stats  = {.latency = -1, .jitter = 0.0, .packet_loss = 0.0};
 
     try
@@ -97,11 +97,11 @@ public:
   }
 
 private:
-  tcp::resolver                     resolver_;
-  tcp::socket                       socket_;
-  net::steady_timer                 timer_;
-  std::string                       server_url_;
-  time_point<high_resolution_clock> start_time_;
+  tcp::resolver                     m_tcpResolver;
+  tcp::socket                       m_socket;
+  net::steady_timer                 m_timer;
+  std::string                       m_serverURL;
+  time_point<high_resolution_clock> m_startTime;
 
   auto parseUrl(NetTarget& url, IPAddr& host, std::string& port) -> NetTarget
   {

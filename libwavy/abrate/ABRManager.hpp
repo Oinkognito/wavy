@@ -35,27 +35,27 @@ class ABRManager
 {
 public:
   ABRManager(boost::asio::io_context& ioc, const std::string& master_url)
-      : ioc_(ioc), ssl_ctx_(boost::asio::ssl::context::sslv23), parser_(ioc, ssl_ctx_, master_url),
-        network_(ioc, master_url)
+      : m_ioCtx(ioc), m_sslCtx(boost::asio::ssl::context::sslv23),
+        m_playlistParser(ioc, m_sslCtx, master_url), m_netDiag(ioc, master_url)
   {
   }
 
   void selectBestBitrate()
   {
-    if (!parser_.fetchMasterPlaylist())
+    if (!m_playlistParser.fetchMasterPlaylist())
     {
       std::cerr << "[ERROR] Failed to fetch master playlist.\n";
       return;
     }
 
-    NetworkStats stats = network_.diagnoseNetworkSpeed();
+    NetworkStats stats = m_netDiag.diagnoseNetworkSpeed();
     if (stats.latency < 0)
     {
       std::cerr << "[ERROR] Network diagnosis failed.\n";
       return;
     }
 
-    std::map<int, std::string> playlists = parser_.getBitratePlaylists();
+    std::map<int, std::string> playlists = m_playlistParser.getBitratePlaylists();
     if (playlists.empty())
     {
       std::cerr << "[ERROR] No available bitrates in playlist.\n";
@@ -75,10 +75,10 @@ public:
   }
 
 private:
-  boost::asio::io_context&  ioc_;
-  boost::asio::ssl::context ssl_ctx_;
-  PlaylistParser            parser_;
-  NetworkDiagnoser          network_;
+  boost::asio::io_context&  m_ioCtx;
+  boost::asio::ssl::context m_sslCtx;
+  PlaylistParser            m_playlistParser;
+  NetworkDiagnoser          m_netDiag;
 
   /**
      * Determines the best bitrate based on network statistics.

@@ -38,30 +38,30 @@ public:
 
   void addValueStr(const std::string& key, const std::string& value)
   {
-    data.insert_or_assign(key, toml::value<std::string>{value});
+    m_data.insert_or_assign(key, toml::value<std::string>{value});
   }
 
   void addValueInt(const std::string& key, int value)
   {
-    data.insert_or_assign(key, toml::value<int64_t>{value});
+    m_data.insert_or_assign(key, toml::value<int64_t>{value});
   }
 
   void addValueDbl(const std::string& key, double value)
   {
-    data.insert_or_assign(key, toml::value<double>{value});
+    m_data.insert_or_assign(key, toml::value<double>{value});
   }
 
   void addValueBool(const std::string& key, bool value)
   {
-    data.insert_or_assign(key, toml::value<bool>{value});
+    m_data.insert_or_assign(key, toml::value<bool>{value});
   }
 
   // Create a table (not nested)
   void createTable(const std::string& tableName)
   {
-    if (!data.contains(tableName))
+    if (!m_data.contains(tableName))
     {
-      data.insert_or_assign(tableName, toml::table{});
+      m_data.insert_or_assign(tableName, toml::table{});
     }
   }
 
@@ -69,17 +69,17 @@ public:
   template <typename T>
   void addTableValue(const std::string& table, const std::string& key, T value)
   {
-    if (!data.contains(table))
+    if (!m_data.contains(table))
     {
       createTable(table);
     }
-    data[table].as_table()->insert_or_assign(key, value);
+    m_data[table].as_table()->insert_or_assign(key, value);
   }
 
   template <typename T>
   void addTableArray(const std::string& table, const std::string& key, const std::vector<T>& values)
   {
-    if (!data.contains(table))
+    if (!m_data.contains(table))
     {
       createTable(table);
     }
@@ -88,7 +88,7 @@ public:
     {
       arr.push_back(value);
     }
-    data[table].as_table()->insert_or_assign(key, arr);
+    m_data[table].as_table()->insert_or_assign(key, arr);
   }
 
   // Save to file
@@ -97,13 +97,13 @@ public:
     std::ofstream file(filename);
     if (file.is_open())
     {
-      file << data;
+      file << m_data;
       file.close();
     }
   }
 
 private:
-  toml::table data;
+  toml::table m_data;
 };
 
 } // namespace libwavy::Toml

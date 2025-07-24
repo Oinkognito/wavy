@@ -1,0 +1,17 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: wavy-server
+Description: Wavy server library
+Version: @PROJECT_VERSION@
+
+# Link flags for the consumer
+Libs: -L${libdir} -lwavy-server
+# Include flags for the consumer
+Cflags: -I${includedir}
+
+# Dependencies
+Requires: openssl libzstd libarchive
+Requires.private: boost

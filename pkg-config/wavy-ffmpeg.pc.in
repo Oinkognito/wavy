@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: wavy-ffmpeg
+Description: Wavy FFmpeg utility library
+Version: @PROJECT_VERSION@
+
+Libs: -L${libdir} -lwavy-ffmpeg
+Cflags: -I${includedir}
+
+Requires: libavutil libavcodec libavformat libswresample
