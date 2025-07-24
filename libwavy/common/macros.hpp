@@ -116,7 +116,7 @@ enum
   X(CONTENT_TYPE_GZIP, "application/gzip")                    \
                                                               \
   /* Server Endpoints */                                      \
-  X(SERVER_PATH_HLS_CLIENTS, "/hls/clients")                  \
+  X(SERVER_PATH_HLS_OWNERS, "/hls/owners")                    \
   X(SERVER_PATH_TOML_UPLOAD, "/toml/upload")                  \
   X(SERVER_PATH_AUDIO_INFO, "/hls/audio-info/")               \
   X(SERVER_PATH_PING, "/hls/ping")                            \

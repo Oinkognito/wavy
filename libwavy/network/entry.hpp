@@ -133,7 +133,7 @@ private:
         return "";
       }
 
-      std::string response_data = beast::buffers_to_string(res.body().data());
+      NetResponse response_data = beast::buffers_to_string(res.body().data());
 
       beast::error_code ec;
       m_socket->shutdown(ec);

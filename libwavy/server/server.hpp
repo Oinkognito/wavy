@@ -51,16 +51,16 @@
  *  │   ├── 1435f431-a69a-4027-8661-44c31cd11ef6/        # Randomly generated audio id
  *  │   │   ├── index.m3u8
  *  │   │   ├── hls_mp3_64.m3u8                          # HLS MP3 encoded playlist (64-bit)
- *  │   │   ├── hls_mp3_64_0.ts                          # First transport stream of hls_mp3_64 playlist                
+ *  │   │   ├── hls_mp3_64_0.ts                          # First transport stream of hls_mp3_64 playlist
  *  │   │   ├── ...                                      # Similarly for 128 and 256 bitrates
  *  │   │   ├── metadata.toml                            # Metadata and other song information
  *  │   ├── e5fdeca5-57c8-47b4-b9c6-60492ddf11ae/
  *  │   │   ├── index.m3u8
  *  │   │   ├── hls_flac_64.m3u8                         # HLS FLAC encoded playlist (64-bit)
- *  │   │   ├── hls_flac_64_0.ts                         # First transport stream of hls_mp3_64 playlist 
+ *  │   │   ├── hls_flac_64_0.ts                         # First transport stream of hls_mp3_64 playlist
  *  │   │   ├── ...                                      # Similarly for 128 and 256 bitrates
  *  │   │   ├── metadata.toml                            # Metadata and other song information
- *  │    
+ *  │
  *
  * Boost libs ensures that every operation (if not then most) in the server occurs asynchronously
  * without any concurrency issues
@@ -133,8 +133,7 @@ private:
         IPAddr ip = socket.remote_endpoint().address().to_string();
         log::INFO<Server>(LogMode::Async, "Accepted new connection from '{}'", ip);
 
-        auto session = std::make_shared<WavySession>(
-          boost::asio::ssl::stream<tcp::socket>(std::move(socket), m_sslContext), ip);
+        auto session = std::make_shared<WavySession>(Socket(std::move(socket), m_sslContext), ip);
         session->start();
         start_accept();
       });

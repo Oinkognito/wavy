@@ -69,7 +69,7 @@ void init_logging()
   }
 
   // Define log file path
-  std::string log_file = (log_dir / "wavy_%Y-%m-%d_%H-%M-%S.log").string();
+  const std::string log_file = (log_dir / "wavy_%Y-%m-%d_%H-%M-%S.log").string();
 
   logging::add_console_log(std::cout, kw::format = L_ConsoleFormatter());
 
@@ -136,6 +136,7 @@ void set_log_level(SeverityLevel level)
   if (it != LOG_LEVEL_ENUM_MAP.end())
   {
     boost::log::core::get()->set_filter(trivial::severity >= it->second);
+    std::cout << "==> Log Level context changed to: " << it->second << "!!" << std::endl;
   }
   else
   {

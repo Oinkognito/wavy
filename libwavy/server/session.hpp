@@ -23,10 +23,6 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
@@ -37,23 +33,17 @@
 #include <fstream>
 #include <sstream>
 
-#include <libwavy/common/macros.hpp>
-#include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
-#include <libwavy/server/prototypes.hpp>
+#include <libwavy/server/methods/download.hpp>
 #include <libwavy/toml/toml_parser.hpp>
 #include <libwavy/unix/domainBind.hpp>
 #include <libwavy/utils/math/entry.hpp>
 #include <libwavy/zstd/decompression.h>
 
-namespace bfs   = boost::filesystem; // Refers to boost filesystem (async file I/O ops)
-namespace beast = boost::beast;
-namespace http  = beast::http;
-using boost::asio::ip::tcp;
+namespace bfs = boost::filesystem; // Refers to boost filesystem (async file I/O ops)
 
-using Server         = libwavy::log::SERVER;
-using ServerUpload   = libwavy::log::SERVER_UPLD;
-using ServerDownload = libwavy::log::SERVER_DWNLD;
+using Server       = libwavy::log::SERVER;
+using ServerUpload = libwavy::log::SERVER_UPLD;
 
 namespace libwavy::server
 {
@@ -61,7 +51,7 @@ namespace libwavy::server
 class WavySession : public std::enable_shared_from_this<WavySession>
 {
 public:
-  explicit WavySession(boost::asio::ssl::stream<tcp::socket> socket, const IPAddr ip)
+  explicit WavySession(Socket socket, const IPAddr ip)
       : m_socket(std::move(socket)), m_ipID(std::move(ip))
   {
   }
@@ -73,10 +63,10 @@ public:
   }
 
 private:
-  boost::asio::ssl::stream<tcp::socket> m_socket;
-  beast::flat_buffer                    m_buffer;
-  http::request<http::string_body>      m_request;
-  IPAddr                                m_ipID;
+  Socket                           m_socket;
+  beast::flat_buffer               m_buffer;
+  http::request<http::string_body> m_request;
+  IPAddr                           m_ipID;
 
   void do_handshake()
   {
@@ -136,8 +126,8 @@ private:
           return;
         }
         /* ZSTD_bytes_to_mib is a C FFI from common.h */
-        log::INFO<Server>("Received {} MiB ({} bytes)", ZSTD_bytes_to_mib(bytes_transferred),
-                          bytes_transferred);
+        log::INFO<Server>(LogMode::Async, "Received {} MiB ({} bytes)",
+                          ZSTD_bytes_to_mib(bytes_transferred), bytes_transferred);
         m_request = parser->release();
         ProcessRequest();
       });
@@ -205,8 +195,8 @@ private:
     {
       if (bfs::is_directory(nickname_entry.status()))
       {
-        StorageOwnerID nickname = nickname_entry.path().filename().string();
-        log::DBG<Server>(LogMode::Async, "Processing nickname: {}", nickname);
+        const StorageOwnerID nickname = nickname_entry.path().filename().string();
+        log::DBG<Server>(LogMode::Async, "Processing Owner Nickname: {}", nickname);
         response_stream << nickname << ":\n";
 
         bool audio_found = false;
@@ -340,7 +330,7 @@ private:
     }
     else if (m_request.method() == http::verb::get)
     {
-      if (m_request.target() == macros::SERVER_PATH_HLS_CLIENTS) // Request for all client IDs
+      if (m_request.target() == macros::SERVER_PATH_HLS_OWNERS) // Request for all client IDs
       {
         HandleNLRequest();
       }
@@ -371,11 +361,25 @@ private:
 
   void HandleUpload()
   {
-    log::INFO<ServerUpload>(LogMode::Async, "Handling GZIP file upload for owner (IP): {}", m_ipID);
+    // At this point we do not know the owner nor have the intention to know so we identify by
+    // a remote IP address
+    //
+    // [NOTE]
+    // When using VPN like tailscale to funnel to connect with other devices over VPN in general,
+    // tailscale or any VPN service will not expose your true IP Address; rather it will identify
+    // you as the default gateway ip addr for routers (ex: 10.0.0.1)
+    //
+    // I have tried this with my tailscale and all connections are identified as this IP only!
+    //
+    // This is majorly the reason why I have moved over owner identification to a "nickname" set
+    // by the owner themselves before dispatching it over to the server. The onus now lies on the
+    // owner to make it unique and suitable to their needs (they can always check /hls/owners path
+    // for currently recognized owners in the server)
+    log::INFO<ServerUpload>(LogMode::Async, "Handling GZIP file upload from remote IP: {}", m_ipID);
 
-    StorageAudioID audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
-    AbsPath        gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
-                        macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
+    const StorageAudioID audio_id = boost::uuids::to_string(boost::uuids::random_generator()());
+    const AbsPath gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id +
+                              macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
 
     bfs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
     std::ofstream output_file(gzip_path, std::ios::binary);
@@ -439,91 +443,15 @@ private:
    */
   void HandleDownload()
   {
-    // Parse request target (expected: /hls/<audio_id>/<filename>)
-    NetTarget          target(m_request.target().begin(), m_request.target().end());
-    std::istringstream iss(target);
-
-    log::DBG<ServerDownload>(LogMode::Async, "Processing target request: {}", target);
-
-    std::vector<std::string> parts = helpers::tokenizePath(iss);
-
-    if (parts.size() < 4 || parts[0] != "hls")
-    {
-      log::ERROR<ServerDownload>(LogMode::Async, "Invalid target request path: {}", target);
-      SendResponse(macros::to_string(macros::SERVER_ERROR_400));
-      return;
-    }
-
-    StorageOwnerID owner_id = parts[1];
-    StorageAudioID audio_id = parts[2];
-    FileName       filename = parts[3];
-
-    // Construct the file path
-    AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + owner_id + "/" +
-                        audio_id + "/" + filename;
-
-    log::DBG<ServerDownload>(LogMode::Async, "Checking out file: {}", file_path);
-
-    // Use async file reading (prevent blocking on large files)
-    auto file_stream = std::make_shared<boost::beast::http::file_body::value_type>();
-
-    boost::system::error_code ec;
-    file_stream->open(file_path.c_str(), boost::beast::file_mode::read, ec);
-
-    if (ec)
-    {
-      log::ERROR<ServerDownload>(LogMode::Async, "Failed to open file: {} Error: {}", file_path,
-                                 ec.message());
-      SendResponse(macros::to_string(macros::SERVER_ERROR_500));
-      return;
-    }
-
-    ui8 file_size = file_stream->size();
-    log::INFO<ServerDownload>(LogMode::Async, "File opened asynchronously: {} (Size: {})",
-                              file_path, utils::math::bytesFormat(file_size));
-
-    std::string content_type = macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
-    if (filename.ends_with(macros::PLAYLIST_EXT))
-    {
-      content_type = "application/vnd.apple.mpegurl";
-    }
-    else if (filename.ends_with(macros::TRANSPORT_STREAM_EXT))
-    {
-      content_type = "video/mp2t";
-    }
-
-    auto response = std::make_shared<http::response<http::file_body>>();
-    response->version(m_request.version());
-    response->result(http::status::ok);
-    response->set(http::field::server, "Wavy Server");
-    response->set(http::field::content_type, content_type);
-    response->content_length(file_size);
-    response->body() = std::move(*file_stream);
-    response->prepare_payload();
-
-    auto self = shared_from_this(); // Keep session alive
-    http::async_write(m_socket, *response,
-                      [this, self, response](boost::system::error_code ec, std::size_t)
-                      {
-                        if (ec)
-                        {
-                          log::ERROR<ServerDownload>(LogMode::Async, "Write error: {}",
-                                                     ec.message());
-                        }
-                        else
-                        {
-                          log::INFO<ServerDownload>(LogMode::Async, "Response sent successfully.");
-                        }
-                        m_socket.lowest_layer().close();
-                      });
-
-    log::INFO<ServerDownload>(LogMode::Async, "[OWNER:{}] Served: {} ({})", owner_id, filename,
-                              audio_id);
+    auto responder =
+      std::make_shared<methods::DownloadManager>(std::move(m_socket), std::move(m_request), m_ipID);
+    responder->Run();
   }
 
   void SendResponse(const NetResponse& msg)
   {
     log::DBG<Server>(LogMode::Async, "Attempting to send {}", msg);
+
     auto self(shared_from_this());
     boost::asio::async_write(
       m_socket, boost::asio::buffer(msg),
@@ -531,7 +459,7 @@ private:
                                           std::size_t               bytes_transferred)
       {
         // Always perform shutdown, even on error
-        auto do_shutdown = [this, self]()
+        auto SocketShutdown = [this, self]()
         {
           m_socket.async_shutdown(
             [this, self](boost::system::error_code shutdown_ec)
@@ -547,7 +475,7 @@ private:
         if (ec)
         {
           log::ERROR<Server>(LogMode::Async, "Write error: {}", ec.message());
-          do_shutdown();
+          SocketShutdown();
           return;
         }
 
@@ -555,11 +483,11 @@ private:
         {
           log::ERROR<Server>(LogMode::Async, "Incomplete write: {} of {} bytes.", bytes_transferred,
                              msg_size);
-          do_shutdown();
+          SocketShutdown();
           return;
         }
 
-        do_shutdown();
+        SocketShutdown();
       });
   }
 };
