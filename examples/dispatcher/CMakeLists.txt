@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Source files
 set(DISPATCH_SRC main.cpp)
 
+set(INDICATORS_HEADERS ../../external/indicators/include)
+
 # Enable Boost C++ 1.70+ policy
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
@@ -26,7 +28,7 @@ pkg_check_modules(ZSTD REQUIRED libzstd)
 add_executable(example_dispatcher ${DISPATCH_SRC})
 
 # Include directories
-target_include_directories(example_dispatcher PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(example_dispatcher PRIVATE ${ZSTD_INCLUDE_DIRS} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
 
 # Link Libraries
 target_link_libraries(example_dispatcher PRIVATE

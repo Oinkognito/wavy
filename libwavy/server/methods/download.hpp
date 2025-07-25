@@ -64,7 +64,9 @@ public:
 
     if (parts.size() < 4 || parts[0] != "hls")
     {
-      return SendError(http::status::bad_request, "Invalid download path");
+      log::ERROR<ServerDownload>(LogMode::Async,
+                                 "Invalid download path '{}' found! Sending error...", target);
+      return SendError(http::status::bad_request, "Invalid download path provided. Try again!");
     }
 
     const StorageOwnerID owner_id = parts[1];

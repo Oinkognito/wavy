@@ -42,6 +42,9 @@
 #include <libwavy/log-macros.hpp>
 #include <libwavy/zstd/compression.h>
 
+#include <indicators/cursor_control.hpp>
+#include <indicators/progress_bar.hpp>
+
 /*
  * DISPATCHER
  *
@@ -128,6 +131,7 @@ namespace fs    = std::filesystem;
 using tcp       = asio::ip::tcp;
 
 using Dispatch = libwavy::log::DISPATCH;
+using Socket   = beast::ssl_stream<tcp::socket>;
 
 namespace libwavy::dispatch
 {
@@ -139,33 +143,33 @@ enum class PlaylistFormat
   FMP4
 };
 
-class Dispatcher
+class WAVY_API Dispatcher
 {
 public:
   Dispatcher(IPAddr server, StorageOwnerID nickname, Directory directory, FileName playlist_name)
-      : ssl_ctx_(ssl::context::sslv23), resolver_(context_), stream_(context_, ssl_ctx_),
-        server_(std::move(server)), nickname_(std::move(nickname)),
-        directory_(std::move(directory)), playlist_name_(std::move(playlist_name))
+      : m_sslCtx(ssl::context::sslv23), m_resolver(m_ioCtx), m_socket(m_ioCtx, m_sslCtx),
+        m_server(std::move(server)), m_nickname(std::move(nickname)),
+        m_directory(std::move(directory)), m_playlistName(std::move(playlist_name))
   {
-    if (!fs::exists(directory_))
+    if (!fs::exists(m_directory))
     {
-      log::ERROR<Dispatch>("Directory does not exist: {}", directory_);
-      throw std::runtime_error("Directory does not exist: " + directory_);
+      log::ERROR<Dispatch>("Directory does not exist: {}", m_directory);
+      throw std::runtime_error("Directory does not exist: " + m_directory);
     }
 
-    fs::path nickname_file_path =
-      fs::path(directory_) / (nickname_ + macros::to_string(macros::OWNER_FILE_EXT));
-    std::ofstream file(nickname_file_path);
+    const fs::path m_nicknamefile_path =
+      fs::path(m_directory) / (m_nickname + macros::to_string(macros::OWNER_FILE_EXT));
+    std::ofstream file(m_nicknamefile_path);
     if (!file)
     {
-      log::ERROR<Dispatch>("Failed to create file: '{}'", nickname_file_path.string());
-      throw std::runtime_error("Failed to create file: " + nickname_file_path.string());
+      log::ERROR<Dispatch>("Failed to create file: '{}'", m_nicknamefile_path.string());
+      throw std::runtime_error("Failed to create file: " + m_nicknamefile_path.string());
     }
-    file << "Created for user: " << nickname_ << "\n";
+    file << "Created for user: " << m_nickname << "\n";
     file.close();
 
-    ssl_ctx_.set_default_verify_paths();
-    stream_.set_verify_mode(ssl::verify_none); // [TODO]: Improve SSL verification
+    m_sslCtx.set_default_verify_paths();
+    m_socket.set_verify_mode(ssl::verify_none); // [TODO]: Improve SSL verification
   }
 
   auto process_and_upload() -> bool
@@ -174,12 +178,12 @@ public:
     {
       log::DBG<Dispatch>("Payload already exists, checking for {}...",
                          macros::DISPATCH_ARCHIVE_NAME);
-      AbsPath archive_path = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
+      AbsPath archive_path = fs::path(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
       if (fs::exists(archive_path))
         return upload_to_server(archive_path);
     }
 
-    AbsPath master_playlist_path = fs::path(directory_) / playlist_name_;
+    const AbsPath master_playlist_path = fs::path(m_directory) / m_playlistName;
 
     if (!verify_master_playlist(master_playlist_path))
     {
@@ -193,10 +197,10 @@ public:
       return false;
     }
 
-    AbsPath metadata_path = fs::path(directory_) / macros::to_string(macros::METADATA_FILE);
+    const AbsPath metadata_path = fs::path(m_directory) / macros::to_string(macros::METADATA_FILE);
     if (!fs::exists(metadata_path))
     {
-      log::ERROR<Dispatch>("Missing metadata.toml in: {}", directory_);
+      log::ERROR<Dispatch>("Missing metadata.toml in: {}", m_directory);
       return false;
     }
     log::INFO<Dispatch>("Found metadata.toml: {}", metadata_path);
@@ -205,9 +209,9 @@ public:
     print_hierarchy();
 #endif
 
-    AbsPath archive_path  = fs::path(directory_) / macros::DISPATCH_ARCHIVE_NAME;
-    bool    applyZSTDComp = true;
-    if (playlist_format == PlaylistFormat::FMP4)
+    const AbsPath archive_path  = fs::path(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
+    bool          applyZSTDComp = true;
+    if (m_playlistFmt == PlaylistFormat::FMP4)
     {
       log::DBG<Dispatch>(
         "Found FMP4 files, no point in compressing them. Skipping ZSTD compression job..");
@@ -224,17 +228,18 @@ public:
   }
 
 private:
-  asio::io_context               context_;
-  PlaylistFormat                 playlist_format = PlaylistFormat::UNKNOWN;
-  ssl::context                   ssl_ctx_;
-  tcp::resolver                  resolver_;
-  beast::ssl_stream<tcp::socket> stream_;
-  DirPathHolder                  server_, directory_, playlist_name_;
-  StorageOwnerID                 nickname_;
+  asio::io_context m_ioCtx;
+  PlaylistFormat   m_playlistFmt = PlaylistFormat::UNKNOWN;
+  ssl::context     m_sslCtx;
+  tcp::resolver    m_resolver;
+  Socket           m_socket;
+  IPAddr           m_server;
+  DirPathHolder    m_directory, m_playlistName;
+  StorageOwnerID   m_nickname;
 
-  std::unordered_map<AbsPath, TotalAudioData> reference_playlists_;
-  TotalAudioData                              transport_streams_;
-  PlaylistData                                master_playlist_content_;
+  std::unordered_map<AbsPath, TotalAudioData> m_refPlaylists;
+  TotalAudioData                              m_transportStreams;
+  PlaylistData                                m_masterPlaylistContent;
 
   auto verify_master_playlist(const AbsPath& path) -> bool
   {
@@ -248,40 +253,40 @@ private:
     log::INFO<Dispatch>("Found master playlist: '{}'!", path);
 
     std::string line;
-    bool        has_stream_inf = false;
+    bool        has_m_socketinf = false;
     while (std::getline(file, line))
     {
       if (line.find(macros::PLAYLIST_VARIANT_TAG) != std::string::npos)
       {
-        has_stream_inf = true;
+        has_m_socketinf = true;
         if (!std::getline(file, line) || line.empty() ||
             line.find(macros::PLAYLIST_EXT) == std::string::npos)
         {
           log::ERROR<Dispatch>("Invalid reference playlist in master!");
           return false;
         }
-        AbsPath playlist_path               = fs::path(directory_) / line;
-        reference_playlists_[playlist_path] = {}; // Store referenced playlists
+        const AbsPath playlist_path   = fs::path(m_directory) / line;
+        m_refPlaylists[playlist_path] = {}; // Store referenced playlists
         log::INFO<Dispatch>("Found reference playlist: {}", playlist_path);
       }
     }
 
-    if (!has_stream_inf)
+    if (!has_m_socketinf)
     {
       log::WARN<Dispatch>("No valid streams found in master playlist!");
       return false;
     }
 
-    master_playlist_content_ = std::string(std::istreambuf_iterator<char>(file), {});
+    m_masterPlaylistContent = PlaylistData(std::istreambuf_iterator<char>(file), {});
     log::INFO<Dispatch>("Master playlist verified successfully.");
     return true;
   }
 
   auto verify_references() -> bool
   {
-    TotalAudioData mp4_segments_, transport_streams_;
+    TotalAudioData mp4_segments_, m_transportStreams;
 
-    for (auto& [playlist_path, segments] : reference_playlists_)
+    for (auto& [playlist_path, segments] : m_refPlaylists)
     {
       std::ifstream file(playlist_path);
       if (!file.is_open())
@@ -294,18 +299,18 @@ private:
 
       while (std::getline(file, line))
       {
-        AbsPath segment_path = fs::path(directory_) / line;
+        const AbsPath segment_path = fs::path(m_directory) / line;
 
         if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
-          if (playlist_format == PlaylistFormat::FMP4)
+          if (m_playlistFmt == PlaylistFormat::FMP4)
           {
             log::ERROR<Dispatch>(
               "Inconsistent playlist format in: {} (Cannot mix .ts and .m4s segments!!)",
               playlist_path);
             return false;
           }
-          playlist_format = PlaylistFormat::TRANSPORT_STREAM;
+          m_playlistFmt = PlaylistFormat::TRANSPORT_STREAM;
 
           std::ifstream ts_file(segment_path, std::ios::binary);
           if (!ts_file.is_open())
@@ -324,19 +329,19 @@ private:
           }
 
           segments.push_back(segment_path);
-          transport_streams_.push_back(segment_path);
+          m_transportStreams.push_back(segment_path);
           log::INFO<Dispatch>("Found valid transport stream: {}", segment_path);
         }
         else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
         {
-          if (playlist_format == PlaylistFormat::TRANSPORT_STREAM)
+          if (m_playlistFmt == PlaylistFormat::TRANSPORT_STREAM)
           {
             log::ERROR<Dispatch>(
               "Inconsistent playlist format in: {} (Cannot mix .ts and .m4s segments!!)",
               playlist_path);
             return false;
           }
-          playlist_format = PlaylistFormat::FMP4;
+          m_playlistFmt = PlaylistFormat::FMP4;
 
           std::ifstream m4s_file(segment_path, std::ios::binary);
           if (!m4s_file.is_open())
@@ -358,7 +363,7 @@ private:
     }
 
     // Ensure all verified segments exist in the filesystem
-    for (const auto& ts : transport_streams_)
+    for (const auto& ts : m_transportStreams)
     {
       if (!fs::exists(ts))
       {
@@ -378,8 +383,8 @@ private:
 
     log::INFO<Dispatch>("All referenced playlists and their respective segment types verified.");
     log::INFO<Dispatch>("Found {} transport streams.",
-                        (playlist_format == PlaylistFormat::TRANSPORT_STREAM
-                           ? transport_streams_.size()
+                        (m_playlistFmt == PlaylistFormat::TRANSPORT_STREAM
+                           ? m_transportStreams.size()
                            : mp4_segments_.size()));
     return true;
   }
@@ -408,12 +413,12 @@ private:
   auto compress_files(const AbsPath& output_archive_path, const bool applyZSTDComp) -> bool
   {
     log::DBG<Dispatch>("Beginning Compression Job in: {} from {}", output_archive_path,
-                       fs::absolute(directory_).string());
+                       fs::absolute(m_directory).string());
     /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
     if (applyZSTDComp)
     {
       if (!ZSTD_compressFilesInDirectory(
-            fs::path(directory_).c_str(),
+            fs::path(m_directory).c_str(),
             macros::to_string(macros::DISPATCH_ARCHIVE_REL_PATH).c_str()))
       {
         log::ERROR<Dispatch>("Something went wrong with ZSTD compression!");
@@ -431,7 +436,7 @@ private:
       return false;
     }
 
-    auto AddFileToArchive = [&](const std::string& file_path) -> bool
+    auto AddFileToArchive = [&](const RelPath& file_path) -> bool
     {
       std::ifstream file(file_path, std::ios::binary);
       if (!file)
@@ -456,10 +461,10 @@ private:
      * ZSTD files.
      *
      * Since MP4 and M4S files have minimal viability for compression, we just ignore
-     * that operation, meaning the payload target is now just directory_ variable.
+     * that operation, meaning the payload target is now just m_directory variable.
      */
-    fs::path payloadTarget =
-      applyZSTDComp ? fs::path(macros::DISPATCH_ARCHIVE_REL_PATH) : fs::path(directory_);
+    const fs::path payloadTarget =
+      applyZSTDComp ? fs::path(macros::DISPATCH_ARCHIVE_REL_PATH) : fs::path(m_directory);
 
     log::DBG<Dispatch>("Making payload target: {}", payloadTarget.string());
 
@@ -486,40 +491,100 @@ private:
     }
 
     archive_write_free(archive);
-    log::INFO<Dispatch>("ZSTD compression of {} to {} with final GNU TAR job done.", directory_,
+    log::INFO<Dispatch>("ZSTD compression of {} to {} with final GNU TAR job done.", m_directory,
                         output_archive_path);
     return true;
   }
 
-  auto upload_to_server(const std::string& archive_path) -> bool
+  auto upload_to_server(const AbsPath& archive_path) -> bool
   {
     try
     {
-      auto const results = resolver_.resolve(server_, WAVY_SERVER_PORT_NO_STR);
-      asio::connect(stream_.next_layer(), results.begin(), results.end());
-      stream_.handshake(ssl::stream_base::client);
+      auto const results = m_resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
+      asio::connect(m_socket.next_layer(), results.begin(), results.end());
+      m_socket.handshake(ssl::stream_base::client);
 
-      send_http_request("POST", archive_path);
-
-      // **Proper SSL stream shutdown**
-      boost::system::error_code ec;
-      stream_.shutdown(ec);
-      if (ec == asio::error::eof)
+      std::ifstream file(archive_path, std::ios::binary | std::ios::ate);
+      if (!file.is_open())
       {
-        // Expected, means server closed the connection cleanly
-        ec.clear();
-      }
-      else if (ec)
-      {
-        log::ERROR<Dispatch>("SSL shutdown failed: {}", ec.message());
+        log::ERROR<Dispatch>("Could not open file for upload: {}", archive_path);
+        return false;
       }
 
-      log::INFO<Dispatch>("Upload process completed successfully.");
+      const auto file_size = file.tellg();
+      file.seekg(0);
+
+      indicators::ProgressBar bar{indicators::option::BarWidth{50},
+                                  indicators::option::Start{"["},
+                                  indicators::option::Fill{"■"},
+                                  indicators::option::Lead{">"},
+                                  indicators::option::Remainder{"-"},
+                                  indicators::option::End{"]"},
+                                  indicators::option::PostfixText{"Uploading"},
+                                  indicators::option::ForegroundColor{indicators::Color::cyan},
+                                  indicators::option::ShowElapsedTime{true},
+                                  indicators::option::ShowPercentage{true}};
+
+      beast::flat_buffer buffer;
+
+      http::request<http::empty_body> req{http::verb::post, "/upload", 11};
+      req.set(http::field::host, m_server);
+      req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+      req.set(http::field::transfer_encoding, "chunked");
+      req.set(http::field::content_type, macros::CONTENT_TYPE_GZIP);
+
+      http::serializer<true, http::empty_body> sr{req};
+      http::write_header(m_socket, sr);
+
+      constexpr std::size_t CHUNK_SIZE = 64 * 1024; // 64 KB
+      std::vector<char>     buffer_chunk(CHUNK_SIZE);
+      std::size_t           total_sent = 0;
+
+      while (file)
+      {
+        file.read(buffer_chunk.data(), CHUNK_SIZE);
+        std::streamsize bytes_read = file.gcount();
+
+        if (bytes_read <= 0)
+          break;
+
+        std::ostringstream chunk_stream;
+        chunk_stream << std::hex << bytes_read << "\r\n";
+        chunk_stream.write(buffer_chunk.data(), bytes_read);
+        chunk_stream << "\r\n";
+
+        std::string chunk_data = chunk_stream.str();
+        asio::write(m_socket, asio::buffer(chunk_data));
+
+        total_sent += bytes_read;
+        bar.set_progress(static_cast<float>(total_sent) * 100 / file_size);
+      }
+
+      // Final zero-length chunk to indicate end
+      asio::write(m_socket, asio::buffer("0\r\n\r\n"));
+
+      http::response<http::string_body> res;
+      http::read(m_socket, buffer, res);
+
+      if (res.result() != http::status::ok)
+      {
+        log::ERROR<Dispatch>("Upload failed: {}", res.result_int());
+        return false;
+      }
+
+      if (auto audio_id_it = res.find("Audio-ID"); audio_id_it != res.end())
+      {
+        log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(audio_id_it->value()));
+      }
+
+      log::INFO<Dispatch>("Upload completed successfully ({} bytes sent)", total_sent);
+      m_socket.shutdown();
+
       return true;
     }
     catch (const std::exception& e)
     {
-      log::ERROR<Dispatch>("Upload failed: {}", e.what());
+      log::ERROR<Dispatch>("Upload exception: {}", e.what());
       return false;
     }
   }
@@ -536,13 +601,13 @@ private:
     }
 
     http::request<http::file_body> req{http::string_to_verb(method), "/", 11};
-    req.set(http::field::host, server_);
+    req.set(http::field::host, m_server);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
     req.set(http::field::content_type, macros::CONTENT_TYPE_GZIP);
     req.body() = std::move(body);
     req.prepare_payload();
 
-    http::write(stream_, req, ec);
+    http::write(m_socket, req, ec);
     if (ec)
     {
       log::ERROR<Dispatch>("Failed to send request: {}", ec.message());
@@ -552,7 +617,7 @@ private:
     // Read response from server
     beast::flat_buffer                buffer;
     http::response<http::string_body> res;
-    http::read(stream_, buffer, res, ec);
+    http::read(m_socket, buffer, res, ec);
 
     if (ec)
     {
@@ -561,10 +626,10 @@ private:
     }
 
     // Extract and log Audio-ID separately
-    auto audio_id_it = res.find("Audio-ID");
+    const auto audio_id_it = res.find("Audio-ID");
     if (audio_id_it != res.end())
     {
-      auto AUDIO_ID = audio_id_it->value();
+      const auto AUDIO_ID = audio_id_it->value();
       log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(AUDIO_ID));
     }
     else
@@ -576,9 +641,9 @@ private:
   void print_hierarchy()
   {
     log::INFO<log::NONE>("\n HLS Playlist Hierarchy:\n");
-    std::cout << ">> " << playlist_name_ << "\n";
+    std::cout << ">> " << m_playlistName << "\n";
 
-    for (const auto& [playlist, segments] : reference_playlists_)
+    for (const auto& [playlist, segments] : m_refPlaylists)
     {
       std::cout << "   ├── > " << fs::path(playlist).filename().string() << "\n";
       for (const auto& ts : segments)

@@ -87,6 +87,8 @@ set(CLIENT_SRC wavy/Client.cc)
 set(LIBWAVY_LOGGER_SRC src/logger.cc)
 set(LIBWAVY_SERVER_SRC src/server/Server.cc)
 
+set(INDICATORS_HEADERS external/indicators/include/)
+
 find_package(PkgConfig REQUIRED)
 
 find_package(Boost REQUIRED COMPONENTS log log_setup system thread filesystem date_time regex)
@@ -147,7 +149,7 @@ if (TBB_FOUND)
     link_directories(${TBB_LIBRARY_DIRS})
 
     add_executable(${OWNER_BIN} ${OWNER_SRC})
-    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
     target_link_libraries(${OWNER_BIN} PRIVATE wavy-ffmpeg wavy-logger ${ZSTD_LIBRARIES} Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 

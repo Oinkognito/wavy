@@ -450,7 +450,7 @@ private:
 
   void SendResponse(const NetResponse& msg)
   {
-    log::DBG<Server>(LogMode::Async, "Attempting to send {}", msg);
+    log::DBG<Server>(LogMode::Async, "Attempting to send \n{}", msg);
 
     auto self(shared_from_this());
     boost::asio::async_write(
