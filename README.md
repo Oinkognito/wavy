@@ -207,7 +207,7 @@ A basic walkthrough on how to use Wavy to the fullest! (as of latest commit atle
 > [!CAUTION]
 >
 > To understand what is truly happening here,
-> read **Wavy Architecture[https://github.com/Oinkognito/wavy/blob/main/ARCHITECTURE.md]**
+> read **[Wavy Architecture](https://github.com/Oinkognito/wavy/blob/main/ARCHITECTURE.md)**
 >
 
 ### Native server (not docker)
@@ -357,7 +357,7 @@ Now you can see the streams being fetched from the server and the client decodes
 Wavy currently is under heavy development as mentioned above, so for people to understand the project better,
 the project maintains an `examples/` directory. Latest `libwavy` APIs are made sure to have atleast one in-depth example
 
-> [!NOTE]
+> [!IMPORTANT]
 >
 > To compile all examples:
 >
