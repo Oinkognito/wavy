@@ -28,8 +28,8 @@
 /*
  * This is a universal transcoder that works in the following formats:
  *
- * flac (16,32 bit) ==> mp3 transcoding 
- * mp3 ==> mp3 transcoding 
+ * flac (16,32 bit) ==> mp3 transcoding
+ * mp3 ==> mp3 transcoding
  *
  * wav to mp3 is also possible I believe if we use FLAC++ API to decode WAV to FLAC first
  *
@@ -37,7 +37,7 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  INIT_WAVY_LOGGER();
+  INIT_WAVY_LOGGER_ALL();
   // Register all codecs and formats (not needed in newer FFmpeg versions but included for compatibility)
   libwavy::ffmpeg::Transcoder trns;
 

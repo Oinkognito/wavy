@@ -34,103 +34,226 @@
 
 namespace libwavy::utils::cmdline
 {
+
+struct CmdArg
+{
+  std::vector<std::string> keys;
+  std::string              description;
+
+  // For flag args
+  CmdArg(std::initializer_list<std::string> k, std::string desc)
+      : keys(k), description(std::move(desc))
+  {
+  }
+};
+
 class WAVY_API CmdLineParser
 {
 public:
-  CmdLineParser(std::span<char* const> argv, std::string usage) : m_usageText(std::move(usage))
+  CmdLineParser(std::span<char* const> argv)
   {
     for (size_t i = 1; i < argv.size(); ++i)
     {
       std::string arg = argv[i];
       if (arg == "--help" || arg == "-h")
       {
-        print_usage_and_exit();
+        m_args["help"] = "true";
+        continue;
       }
+
       if (arg.starts_with("--"))
       {
         size_t eq_pos = arg.find('=');
         if (eq_pos != std::string::npos)
         {
-          std::string key   = arg.substr(2, eq_pos - 2);
-          std::string value = arg.substr(eq_pos + 1);
-          m_args[key]       = value;
+          auto key               = arg.substr(2, eq_pos - 2);
+          auto val               = arg.substr(eq_pos + 1);
+          m_args[std::move(key)] = std::move(val);
         }
         else
         {
-          std::string key = arg.substr(2);
-          m_args[key]     = "";
+          m_args[arg.substr(2)] = "true"; // boolean flag
         }
       }
       else
       {
-        // Handle any invalid arguments
-        log::ERROR<log::CMD_LINE_PARSER>("Invalid argument format: {}", arg);
+        std::cerr << "Invalid argument: " << arg << '\n';
         throw std::invalid_argument("Invalid argument format: " + arg);
       }
     }
+  }
+
+  void register_arg(const CmdArg& arg) { m_registeredArgs.push_back(arg); }
+
+  void register_args(std::initializer_list<CmdArg> args)
+  {
+    for (const auto& a : args)
+      register_arg(a);
+  }
+
+  template <typename T> auto get(const std::string& key) const -> std::optional<T>
+  {
+    m_accessedKeys.insert(key);
+    auto it = m_args.find(key);
+    if (it == m_args.end())
+      return std::nullopt;
+    return parse_value<T>(it->second);
+  }
+
+  template <typename T> auto get_or(const std::string& key, T fallback) const -> T
+  {
+    m_accessedKeys.insert(key);
+    auto val = get<T>(key);
+    return val.value_or(fallback);
+  }
+
+  [[nodiscard]] auto has(const std::string& key) const -> bool
+  {
+    m_accessedKeys.insert(key);
+    return m_args.find(key) != m_args.end();
+  }
+
+  [[nodiscard]] auto get_bool(const std::string& key, bool default_value = false) const -> bool
+  {
+    m_accessedKeys.insert(key);
+    auto it = m_args.find(key);
+    if (it != m_args.end())
+    {
+      std::string val = it->second;
+      std::ranges::transform(val.begin(), val.end(), val.begin(), ::tolower);
+      return val == "true" || val == "1" || val == "yes";
+    }
+    return default_value;
+  }
+
+  // Get with alias list
+  template <typename T> auto get(std::initializer_list<std::string> keys) const -> std::optional<T>
+  {
+    for (const auto& key : keys)
+    {
+      m_accessedKeys.insert(key);
+      auto it = m_args.find(key);
+      if (it != m_args.end())
+        return parse_value<T>(it->second);
+    }
+    return std::nullopt;
+  }
+
+  // Get with fallback and alias list
+  template <typename T> auto get_or(std::initializer_list<std::string> keys, T fallback) const -> T
+  {
+    auto val = get<T>(keys);
+    return val.value_or(fallback);
+  }
+
+  // Has with alias list
+  [[nodiscard]] auto has(std::initializer_list<std::string> keys) const -> bool
+  {
+    for (const auto& key : keys)
+    {
+      m_accessedKeys.insert(key);
+      if (m_args.contains(key))
+        return true;
+    }
+    return false;
+  }
+
+  // get_bool with alias list
+  [[nodiscard]] auto get_bool(std::initializer_list<std::string> keys,
+                              bool default_value = false) const -> bool
+  {
+    for (const auto& key : keys)
+    {
+      m_accessedKeys.insert(key);
+      auto it = m_args.find(key);
+      if (it != m_args.end())
+      {
+        std::string val = it->second;
+        std::ranges::transform(val.begin(), val.end(), val.begin(), ::tolower);
+        return val == "true" || val == "1" || val == "yes";
+      }
+    }
+    return default_value;
   }
 
   void requireMinArgs(size_t min_argc, size_t actual_argc) const
   {
     if (actual_argc < min_argc)
     {
-      log::ERROR<log::CMD_LINE_PARSER>(
-        "Not enough arguments provided. Expected at least {}, but got {}.", min_argc, actual_argc);
-      print_usage_and_exit();
+      std::cerr << "Not enough arguments. Expected at least " << min_argc << ", but got "
+                << actual_argc << ".\n";
+      print_usage();
+      throw std::invalid_argument("Too few arguments.");
     }
   }
 
-  [[nodiscard]] auto get(const std::string& key, const std::string& default_value = "") const
-    -> std::string
+  void warn_unknown_args(bool exit_on_error = false) const
   {
-    auto it = m_args.find(key);
-    return (it != m_args.end()) ? it->second : default_value;
-  }
-
-  [[nodiscard]] auto get_int(const std::string& key, int default_value = -1) const -> int
-  {
-    auto it = m_args.find(key);
-    if (it != m_args.end())
+    bool found_errors = false;
+    for (const auto& [key, val] : m_args)
     {
-      try
+      if (!m_accessedKeys.contains(key))
       {
-        return std::stoi(it->second);
-      }
-      catch (const std::invalid_argument& e)
-      {
-        // Return the default value in case of invalid integer conversion
-        log::ERROR<log::CMD_LINE_PARSER>("Invalid integer argument for key '{}': {}", key,
-                                         it->second);
-        log::WARN<log::CMD_LINE_PARSER>("Default value {} being passed to key: '{}'.",
-                                        default_value, key);
-        return default_value;
-      }
-      catch (const std::out_of_range& e)
-      {
-        // Return the default value in case of out-of-range error
-        log::ERROR<log::CMD_LINE_PARSER>("Integer argument for key '{}' is out of range: {}", key,
-                                         it->second);
-        log::WARN<log::CMD_LINE_PARSER>("Default value {} being passed to key: '{}'.",
-                                        default_value, key);
-        return default_value;
+        std::cerr << "[CLI] Unrecognized or unused CLI argument: --" << key
+                  << (val != "true" ? ("=" + val) : "") << "\n";
+        found_errors = true;
       }
     }
-    return default_value;
+
+    if (found_errors && exit_on_error)
+      exit(255);
   }
 
-  [[nodiscard]] auto has(const std::string& key) const -> bool
+  void print_usage() const
   {
-    return m_args.find(key) != m_args.end();
-  }
+    std::cerr << "Usage:\n";
+    for (const auto& arg : m_registeredArgs)
+    {
+      std::string aliases;
+      for (const auto& k : arg.keys)
+      {
+        aliases += "--" + k + ", ";
+      }
+      if (!aliases.empty())
+        aliases.erase(aliases.size() - 2); // Remove trailing comma+space
 
-  void print_usage_and_exit() const
-  {
-    std::cerr << "Usage:\n" << m_usageText << "\n";
-    std::exit(0);
+      std::cerr << "  " << aliases;
+      std::cerr << "\n      " << arg.description << "\n";
+    }
   }
 
 private:
   std::map<std::string, std::string> m_args;
-  std::string                        m_usageText;
+  mutable std::set<std::string>      m_accessedKeys;
+  std::vector<CmdArg>                m_registeredArgs;
+
+  template <typename T> static auto parse_value(const std::string& s) -> std::optional<T>
+  {
+    if constexpr (std::is_same_v<T, std::string>)
+    {
+      return s;
+    }
+    else if constexpr (std::is_same_v<T, bool>)
+    {
+      return s == "true" || s == "1";
+    }
+    else if constexpr (std::is_integral_v<T>)
+    {
+      T out;
+      auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), out);
+      if (ec == std::errc())
+        return out;
+      return std::nullopt;
+    }
+    else
+    {
+      std::istringstream iss(s);
+      T                  out;
+      iss >> out;
+      if (!iss.fail())
+        return out;
+      return std::nullopt;
+    }
+  }
 };
 } // namespace libwavy::utils::cmdline

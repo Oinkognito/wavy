@@ -16,6 +16,7 @@ A **local networking solution** for **audio streaming and sharing**, supporting 
 - [**Architecture**](#architecture)
 - [**Security**](#security)
 - [**API References**](#api-references)
+- [**Dry Run**](#dry-run)
 - [**Examples**](#examples)
 - [**Server**](#server)
 - [**Usage**](#usage)
@@ -25,7 +26,7 @@ A **local networking solution** for **audio streaming and sharing**, supporting 
 ## **Introduction**
 Wavy is a **lightweight** and **efficient** solution for audio streaming within a local network. It is designed to **encode, decode, and dispatch** audio streams seamlessly while ensuring **secure** data transfer via **SSL/TLS encryption**.
 
-> [!IMPORTANT]
+> [!WARNING]
 >
 > The Wavy Project currently is only supported for *NIX Operating Systems (on x86-64 architecture).
 >
@@ -199,9 +200,157 @@ Wavy relies on **FFmpeg's core libraries** for processing audio:
 For detailed API documentation, see:
 [APIREF.md](https://github.com/nots1dd/wavy/blob/main/APIREF.md)
 
-## **Trial Run**
+## **Dry Run**
+
+A basic walkthrough on how to use Wavy to the fullest! (as of latest commit atleast)
+
+> [!CAUTION]
+>
+> To understand what is truly happening here,
+> read **Wavy Architecture[https://github.com/Oinkognito/wavy/blob/main/ARCHITECTURE.md]**
+>
 
 ### Native server (not docker)
+
+Let's say you have an audio file called `testing.mp3` and `cool.flac`. Let us see how you can use Wavy to store them and use for playback.
+
+Firstly, you need to ensure that Wavy is compiled like so:
+
+```bash
+make all EXTRA_CMAKE_FLAGS="-D BUILD_EXAMPLES=OFF -D BUILD_FETCHER_PLUGINS=ON -D BUILD_AUDIO_BACKEND_PLUGINS=ON"
+```
+
+If that is done, you are good to go!
+
+#### Owner (that's you!)
+
+```bash
+./build/wavy_owner -h
+```
+
+This should give you the help on all the params you can give to `Wavy Owner`.
+
+For now let's take the most complicated example: You want to store `testing.mp3` (which is of **320 kbps**) as a stream of **128 kbps**.
+
+```bash
+# --i  :- Input file
+# --o  :- Output directory (of all the HLS segmenting + Transcoding)
+# --ip :- Server IP
+# --n  :- Your desired nickname that is expected to be unique (exposed to server)
+./build/wavy_owner --inputFile=testing.mp3 --outputDir=output --serverIP=127.0.0.1 --nickname=sid123
+```
+
+Just run this. It will transcode by default to: **64**, **112**, **128** kbps
+
+> [!NOTE]
+>
+> You can change what bitrates to transcode to by modifying the
+> `bitrates` vector in `wavy/Owner.cc` (line 194). I will come up with a better way
+> to do the same in the future.
+>
+
+Note that this **WILL** fail if the server is not running on `127.0.0.1` (localhost)
+
+So lets run the **Server** in another terminal.
+
+#### Server
+
+> [!NOTE]
+>
+> Make sure that you have run either:
+>
+> ```bash
+> # manually give details to generate self signed SSL certificate
+> make server-cert
+> # or better, just auto-gen it (NO USER INPUT!!)
+> make server-cert-gen
+> ```
+
+```bash
+make run-server
+```
+
+That's it! Nothing else to do from your side. (You can view logs if you'd like)
+
+#### Client (can be anyone - even you!)
+
+You can query certain information about what owners are there and all the audio info in the server like so:
+
+1. `/hls/owners`:
+
+Will give details of all the owners registered by the server along with every owner's audio-ids.
+
+```bash
+curl -k -X GET https://127.0.0.1:8080/hls/owners
+```
+
+Output would look like:
+
+```text
+sid123.owner:
+  - 5d9f9497-0888-4102-868a-dc4b67f75756
+```
+
+2. `/hls/audio-info/`:
+
+Will provide details on each audio-id regardless of owner (will change this for better filtering)
+
+```bash
+curl -k -X GET https://127.0.0.1:8080/hls/audio-info/
+```
+
+Output will look like:
+
+```text
+sid123.owner:
+  - 5d9f9497-0888-4102-868a-dc4b67f75756
+      1. Title: Passion
+      2. Artist: Gabriel Albuquerqüe
+      3. Duration: 217 secs
+      4. Album: Passion
+      5. Bitrate: 322 kbps
+      6. Sample Rate: 48000 Hz
+      7. Sample Format: fltp
+      8. Audio Bitrate: 320 kbps
+      9. Codec: mp3
+      10. Available Bitrates: [128015,112013,64008,]
+```
+
+After querying simple text, let us actually query audio through `WavyClient`.
+
+Again like with `Owner`, run `-h` or `--help` on `wavy_client` binary for more info:
+
+```bash
+./build/wavy_client -h
+```
+
+Alright lets query the `0th` index of owner `sid123` (which is `5d9f9497-0888-4102-868a-dc4b67f75756`), and I want bitrate stream of **128 kbps** (closest is `128015`).
+
+The default mode to **fetch** the transport streams currently is **`Aggressive`** (more on this later), but just go with it for now. The audio is **NOT** flac, so disable `--playFlac` and finally give the path of the `audioBackendLib` which is always in the format of:
+
+```text
+libwavy_audio_backend_<plugin-name>_plugin.so
+```
+
+> [!NOTE]
+>
+> You can give the full path of the `audioBackendLibPath` if needed.
+> By default, all plugins will be placed in `<build-dir>/plugins/audio/`.
+>
+
+The final command would look like this:
+
+```bash
+./build/wavy_client --nickname=sid123.owner --serverIP=127.0.0.1  --bitrate-stream=128015 --fetchMode=Aggressive --index=1 --playFlac=false --audioBackendLibPath=libwavy_audio_backend_PulseAudio_plugin.so
+```
+
+> [!NOTE]
+>
+> If you give a `bitrate-stream` that is not found to be present in the server,
+> the **HIGHEST** possible stream will be allotted to the client by default.
+>
+
+Now you can see the streams being fetched from the server and the client decodes it followed by playback through `PulseAudio` API. (this will work iff you have PulseAudio in the first place)
 
 ## **Examples**
 

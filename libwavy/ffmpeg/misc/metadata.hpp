@@ -74,6 +74,45 @@ public:
     avformat_close_input(&fmt_ctx);
     return 0;
   }
+
+  auto getAudioFormat(const char* input_file) -> std::string
+  {
+    AVFormatContext* fmt_ctx = nullptr;
+    int              ret;
+
+    if ((ret = avformat_open_input(&fmt_ctx, input_file, nullptr, nullptr)) < 0)
+      return "error: open failed";
+
+    if ((ret = avformat_find_stream_info(fmt_ctx, nullptr)) < 0)
+    {
+      avformat_close_input(&fmt_ctx);
+      return "error: no stream info";
+    }
+
+    // Find the first audio stream
+    for (unsigned int i = 0; i < fmt_ctx->nb_streams; ++i)
+    {
+      AVStream* stream = fmt_ctx->streams[i];
+      if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      {
+        const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
+        if (codec)
+        {
+          std::string codec_name = codec->name;
+          avformat_close_input(&fmt_ctx);
+          return codec_name;
+        }
+        else
+        {
+          avformat_close_input(&fmt_ctx);
+          return "unknown_codec";
+        }
+      }
+    }
+
+    avformat_close_input(&fmt_ctx);
+    return "no_audio_stream";
+  }
 };
 
 } // namespace libwavy::ffmpeg

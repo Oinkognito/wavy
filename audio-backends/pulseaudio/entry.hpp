@@ -23,11 +23,13 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <condition_variable>
 #include <libwavy/audio/interface.hpp>
 #include <libwavy/common/state.hpp>
 #include <libwavy/utils/io/pluginlog/entry.hpp>
 #include <pulse/error.h>
 #include <pulse/simple.h>
+#include <termios.h>
 
 using namespace libwavy::utils::pluginlog;
 
@@ -40,33 +42,33 @@ using PulseError                                      = int;
 class PulseAudioBackend : public IAudioBackend
 {
 private:
-  pa_simple*            stream{nullptr};
-  TotalDecodedAudioData audioData;
-  bool                  isPlaying{false};
+  pa_simple*            m_stream{nullptr};
+  TotalDecodedAudioData m_data;
+  std::atomic<bool>     m_isPlaying{false};
+  pa_sample_spec        m_sampleSpec{};
 
 public:
   auto initialize(const TotalDecodedAudioData& audioInput, bool isFlac, int preferredSampleRate,
                   int preferredChannels, int /*bitDepth*/ = 16) -> bool override
   {
-    audioData = audioInput;
+    m_data = audioInput;
 
     ::libwavy::utils::pluginlog::set_default_tag(_AUDIO_BACKEND_NAME_);
 
     if (isFlac)
       preferredSampleRate = 44100;
 
-    pa_sample_spec sampleSpec;
-    sampleSpec.format =
+    m_sampleSpec.format =
       isFlac ? PA_SAMPLE_S32LE
              : PA_SAMPLE_FLOAT32LE; // Supports float PCM (common for decoded FLAC and MP3)
-    sampleSpec.rate     = (preferredSampleRate > 0) ? preferredSampleRate : 48000;
-    sampleSpec.channels = (preferredChannels > 0) ? preferredChannels : 2;
+    m_sampleSpec.rate     = (preferredSampleRate > 0) ? preferredSampleRate : 48000;
+    m_sampleSpec.channels = (preferredChannels > 0) ? preferredChannels : 2;
 
     int error;
-    stream = pa_simple_new(nullptr, "Wavy", PA_STREAM_PLAYBACK, nullptr, "playback", &sampleSpec,
-                           nullptr, nullptr, &error);
+    m_stream = pa_simple_new(nullptr, "WavyClient-Pulseaudio", PA_STREAM_PLAYBACK, nullptr,
+                             "playback", &m_sampleSpec, nullptr, nullptr, &error);
 
-    if (!stream)
+    if (!m_stream)
     {
       PLUGIN_LOG_ERROR() << "Failed to initialize PulseAudio: " << pa_strerror(error);
       return false;
@@ -78,28 +80,115 @@ public:
 
   void play() override
   {
-    isPlaying = true;
-
-    AudioOffset      offset    = 0;
-    const AudioChunk chunkSize = 4096;
-
-    while (isPlaying && offset < audioData.size())
+    if (!m_stream || m_data.empty())
     {
-      AudioChunk remaining = audioData.size() - offset;
-      AudioChunk toWrite   = std::min(remaining, chunkSize);
+      PLUGIN_LOG_ERROR() << "No m_stream or audio data to play.";
+      return;
+    }
 
-      PulseError error;
-      if (pa_simple_write(stream, audioData.data() + offset, toWrite, &error) < 0)
+    std::atomic<AudioOffset> offset{0};
+    std::atomic<bool>        stopFlag{false};
+    std::atomic<bool>        pauseFlag{false};
+    std::mutex               pauseMutex;
+    std::condition_variable  pauseCond;
+
+    m_isPlaying = true;
+
+    // Playback thread
+    std::thread playbackThread(
+      [&]()
       {
-        PLUGIN_LOG_ERROR() << "PulseAudio write failed: " << pa_strerror(error);
+        const AudioChunk chunkSize = 4096;
+
+        while (!stopFlag && offset < m_data.size())
+        {
+          {
+            std::unique_lock lock(pauseMutex);
+            pauseCond.wait(lock, [&]() { return !pauseFlag || stopFlag; });
+          }
+
+          if (stopFlag)
+            break;
+
+          AudioChunk remaining = m_data.size() - offset;
+          AudioChunk toWrite   = std::min(remaining, chunkSize);
+          PulseError error;
+
+          if (pa_simple_write(m_stream, m_data.data() + offset, toWrite, &error) < 0)
+          {
+            PLUGIN_LOG_ERROR() << "PulseAudio write failed: " << pa_strerror(error);
+            break;
+          }
+
+          offset += toWrite;
+        }
+
+        pa_simple_drain(m_stream, nullptr);
+        m_isPlaying = false;
+      });
+
+    // Utility: getch (non-blocking input)
+    auto getch = []() -> char
+    {
+      char           buf = 0;
+      struct termios old = {};
+      tcgetattr(STDIN_FILENO, &old);
+      old.c_lflag &= ~(ICANON | ECHO);
+      tcsetattr(STDIN_FILENO, TCSANOW, &old);
+      read(STDIN_FILENO, &buf, 1);
+      old.c_lflag |= (ICANON | ECHO);
+      tcsetattr(STDIN_FILENO, TCSANOW, &old);
+      return buf;
+    };
+
+    std::cout << "----- Wavy Audio CLI -----\n";
+    std::cout << "[p] Play/Pause | [s] Seek | [q] Quit\n";
+
+    while (!stopFlag)
+    {
+      char c = getch();
+      if (c == 'p')
+      {
+        pauseFlag = !pauseFlag;
+        if (!pauseFlag)
+          pauseCond.notify_one();
+      }
+      else if (c == 's')
+      {
+        std::cout << "\nSeek to (sec): ";
+        float sec;
+        std::cin >> sec;
+
+        auto newOffset = static_cast<AudioOffset>(sec * m_sampleSpec.rate);
+        if (newOffset < m_data.size())
+        {
+          std::unique_lock lock(pauseMutex);
+          offset = newOffset;
+          pa_simple_flush(m_stream, nullptr);
+        }
+      }
+      else if (c == 'q')
+      {
+        stopFlag = true;
+        pauseCond.notify_one();
         break;
       }
 
-      offset += toWrite;
+      if (m_sampleSpec.rate > 0)
+      {
+        std::cout << "\rProgress: " << offset / m_sampleSpec.rate << "s / "
+                  << m_data.size() / m_sampleSpec.rate << "s" << std::flush;
+      }
+      else
+      {
+        std::cout << "\rProgress: (rate undefined)" << std::flush;
+      }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    pa_simple_drain(stream, nullptr);
-    isPlaying = false;
+    if (playbackThread.joinable())
+      playbackThread.join();
   }
 
   [[nodiscard]] auto name() const -> AudioBackendPluginName override
@@ -110,12 +199,12 @@ public:
   ~PulseAudioBackend() override
   {
     PLUGIN_LOG_INFO() << "Cleaning up PulseAudioBackend.";
-    isPlaying = false;
+    m_isPlaying = false;
 
-    if (stream)
+    if (m_stream)
     {
-      pa_simple_free(stream);
-      stream = nullptr;
+      pa_simple_free(m_stream);
+      m_stream = nullptr;
     }
   }
 };

@@ -49,6 +49,15 @@ Or use the convenience macro:
 INIT_WAVY_LOGGER();
 ```
 
+> [!IMPORTANT]
+>
+> To just use convenient namespaces like `_`, call `INIT_WAVY_LOGGER_MACROS` like so:
+>
+> ```cpp
+> // can be at the top of the source file after includes
+> INIT_WAVY_LOGGER_MACROS();
+> ```
+
 This initializes:
 
 * Console and file sinks

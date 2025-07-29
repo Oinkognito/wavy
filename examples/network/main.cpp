@@ -27,13 +27,13 @@
 #include <libwavy/network/entry.hpp>
 
 /*
- * @GET request to Wavy 
- * 
+ * @GET request to Wavy
+ *
  * This file demonstrates how to use libwavy::network::HttpsClient
- * class to perform a simple GET request to the Wavy Server using 
+ * class to perform a simple GET request to the Wavy Server using
  * Boost C++
  *
- * The only params you will need are the server IP and path (route) you want 
+ * The only params you will need are the server IP and path (route) you want
  * to get.
  *
  * Note: Wavy has a FIXED port number so giving this is not necessary.
@@ -42,7 +42,7 @@
 
 auto main(int argc, char* argv[]) -> int
 {
-  INIT_WAVY_LOGGER();
+  INIT_WAVY_LOGGER_ALL();
 
   if (argc < 3)
   {

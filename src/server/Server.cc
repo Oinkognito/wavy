@@ -22,14 +22,14 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <libwavy/log-macros.hpp>
 #include <libwavy/common/api/entry.hpp>
+#include <libwavy/log-macros.hpp>
 #include <libwavy/server/server.hpp>
 
 using SExtract = libwavy::log::SERVER_EXTRACT;
-using SDwnld = libwavy::log::SERVER_DWNLD;
-using SUpload = libwavy::log::SERVER_UPLD;
-using SValid = libwavy::log::SERVER_VALIDATE;
+using SDwnld   = libwavy::log::SERVER_DWNLD;
+using SUpload  = libwavy::log::SERVER_UPLD;
+using SValid   = libwavy::log::SERVER_VALIDATE;
 
 namespace libwavy::server::helpers
 {
@@ -54,7 +54,7 @@ auto validate_ts_file(const AudioBuffer& data) -> bool
 
 // This validation is NOT correct, will change this in future.
 WAVY_DEPRECATED("Validating m4s files feature is deprecated and a new one is coming soon!")
-auto  validate_m4s(const RelPath& m4s_path) -> bool
+auto validate_m4s(const RelPath& m4s_path) -> bool
 {
   // std::ifstream file(m4s_path, std::ios::binary);
   // if (!file.is_open())
@@ -126,7 +126,8 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
     RelPath filename    = archive_entry_pathname(entry);
     AbsPath output_file = extract_path + "/" + filename;
 
-    log::TRACE<SExtract>("Extracting file: {}", bfs::relative(output_file, macros::SERVER_STORAGE_DIR).string());
+    log::TRACE<SExtract>("Extracting file: {}",
+                         bfs::relative(output_file, macros::SERVER_STORAGE_DIR).string());
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -152,7 +153,8 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
       // If the extracted file is a .zst file, decompress it
       if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
-        log::INFO<log::NONE>("[ZSTD] Decompressing .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+        log::TRACE<log::NONE>("[ZSTD] Decompressing .zst file: {}",
+                              bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         if (!ZSTD_decompress_file(output_file.c_str()))
         {
           log::ERROR<log::NONE>("[ZSTD] Failed to decompress .zst file: {}", output_file);
@@ -161,15 +163,21 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
 
         RelPath decompressed_filename =
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
-        log::INFO<SExtract>("Decompressed file: {}", bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR).string());
+        log::INFO<SExtract>(
+          "Decompressed file: {}",
+          bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR).string());
 
         if (std::remove(output_file.c_str()) == 0)
         {
-          log::INFO<log::NONE>("[ZSTD] Deleted the original .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+          log::TRACE<log::NONE>(
+            "[ZSTD] Deleted the original .zst file: {}",
+            bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
         else
         {
-          log::ERROR<log::NONE>("[ZSTD] Failed to delete .zst file: {}", bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+          log::ERROR<log::NONE>(
+            "[ZSTD] Failed to delete .zst file: {}",
+            bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
       }
     }
@@ -308,7 +316,8 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
 
   if (valid_file_count == 0)
   {
-    log::ERROR<SExtract>(LogMode::Async, " No valid files remain after validation. Extraction failed.");
+    log::ERROR<SExtract>(LogMode::Async,
+                         " No valid files remain after validation. Extraction failed.");
     return false;
   }
 

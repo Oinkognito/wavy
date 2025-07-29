@@ -49,26 +49,36 @@ void print_client_list(const std::vector<std::string>& clients)
 
 auto main(int argc, char* argv[]) -> int
 {
-  INIT_WAVY_LOGGER();
+  INIT_WAVY_LOGGER_ALL();
   namespace logger = lwlog;
   using Client     = libwavy::log::CLIENT;
 
-  std::string usage = std::string(argv[0]) +
-                      ": --nickname=<owner-nickname> --index=<index> --serverIP=<server-ip> "
-                      "--bitrate-stream=<bitrate-stream> --tsfetchMode=<mode> "
-                      "[--tsfetchLib=<so_file>] --audioBackendLibPath=<so_file>";
+  libwavy::utils::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc));
 
-  libwavy::utils::cmdline::CmdLineParser parser(std::span<char* const>(argv, argc), usage);
+  parser.register_args(
+    {{{"nickname", "n"}, "Fetch the desired nickname's songs"},
+     {{"index", "idx"}, "The particular index required to be accessed."},
+     {{"serverIP", "ip"}, "Wavy server IP"},
+     {{"bitrate-stream"},
+      "Specify the bitrate stream for playback (will default to max as fallback.)"},
+     {{"audioBackendLibPath", "abl"}, "Specify the Audio Backend Shared Library Path."},
+     {{"fetchMode"}, "Specify the fetch mode (currently only Aggressive is implemented!)"},
+     {{"fetchLib"}, "Specify the fetch mode' shared library"},
+     {{"playFlac"}, "Whether to playback as FLAC stream or not. (Boolean flag)"}
 
-  const StorageOwnerID nickname = parser.get("nickname");
-  const int            index    = parser.get_int("index", -1); // Safe parsing of integer
-  const IPAddr         server   = parser.get("serverIP");
-  const int            bitrate  = parser.get_int("bitrate-stream", 0);
-  const RelPath        audioBackendLibPath =
-    parser.get("audioBackendLibPath"); // relative to WAVY_FETCHER_PLUGIN_OUTPUT_PATH
-  const std::string fetch_mode =
-    parser.get("fetchMode", "default");                 // Default to "default" if not specified
-  const RelPath fetch_lib = parser.get("fetchLib", ""); // Default to empty if not specified
+    });
+
+  const StorageOwnerID nickname = *parser.get<StorageOwnerID>({"nickname", "n"});
+  const int            index  = parser.get_or<int>({"index", "idx"}, -1); // Safe parsing of integer
+  const IPAddr         server = *parser.get<IPAddr>({"serverIP", "ip"});
+  const int            bitrate             = parser.get_or("bitrate-stream", 0);
+  const RelPath        audioBackendLibPath = *parser.get<RelPath>(
+    {"audioBackendLibPath", "abl"}); // relative to WAVY_FETCHER_PLUGIN_OUTPUT_PATH
+  const auto fetch_mode =
+    parser.get_or<std::string>("fetchMode", "Aggressive"); // Default to "default" if not specified
+  const RelPath fetch_lib = *parser.get<RelPath>("fetchLib"); // Default to empty if not specified
+
+  const bool flac_found = parser.get_bool("playFlac");
 
   parser.requireMinArgs(5, argc);
 
@@ -123,8 +133,6 @@ auto main(int argc, char* argv[]) -> int
   {
     logger::INFO<Client>("Proceeding with Fetcher Plugin: {}", plugin_path);
   }
-
-  bool flac_found = parser.get("--playFlac") == "true" ? true : false;
 
   libwavy::components::client::WavyClient wavyClient(nickname, server, plugin_path, bitrate,
                                                      audioBackendLibPath);

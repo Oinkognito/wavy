@@ -37,7 +37,7 @@ void signalHandler(int signal)
 
 auto main(int argc, char* argv[]) -> int
 {
-  INIT_WAVY_LOGGER();
+  INIT_WAVY_LOGGER_ALL();
 
   if (argc != 2)
   {

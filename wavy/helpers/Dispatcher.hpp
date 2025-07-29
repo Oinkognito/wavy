@@ -4,12 +4,13 @@
 
 // A neat wrapper for dispatcher that works right out of the box
 
-auto dispatch(const IPAddr& server, const StorageOwnerID& nickname, const Directory& dir) -> int
+auto dispatch(const IPAddr& server, const StorageOwnerID& nickname, const Directory& outputDir)
+  -> int
 {
 
   try
   {
-    libwavy::dispatch::Dispatcher dispatcher(server, nickname, dir,
+    libwavy::dispatch::Dispatcher dispatcher(server, nickname, outputDir,
                                              macros::to_string(macros::MASTER_PLAYLIST));
     if (!dispatcher.process_and_upload())
     {
@@ -18,6 +19,7 @@ auto dispatch(const IPAddr& server, const StorageOwnerID& nickname, const Direct
     }
 
     libwavy::log::INFO<libwavy::log::DISPATCH>("Upload successful.");
+    fs::remove_all(outputDir);
     return WAVY_RET_SUC;
   }
   catch (const std::exception& e)

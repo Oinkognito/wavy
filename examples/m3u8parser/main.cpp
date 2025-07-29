@@ -48,7 +48,7 @@ auto readContentIfRequired(const RelPath& path, bool use_string_parser) -> Playl
 
 auto main(int argc, char* argv[]) -> int
 {
-  INIT_WAVY_LOGGER();
+  INIT_WAVY_LOGGER_ALL();
   libwavy::log::set_log_level(libwavy::log::__INFO__);
 
   if (argc < 4)

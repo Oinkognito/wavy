@@ -35,7 +35,7 @@ auto main() -> int
 {
   try
   {
-    INIT_WAVY_LOGGER();
+    INIT_WAVY_LOGGER_ALL();
 
     // always have fallback to trace for more detailed logs
     lwlog::set_log_level(libwavy::log::__TRACE__);

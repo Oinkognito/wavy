@@ -6,12 +6,18 @@
 
 #include <format>
 
+#define INIT_WAVY_LOGGER_MACROS() \
+  namespace lwlog = libwavy::log; \
+  using _         = lwlog::NONE;
+
 #define INIT_WAVY_LOGGER()                                                                      \
-  namespace lwlog = libwavy::log;                                                               \
-  using _         = libwavy::log::NONE;                                                         \
-  lwlog::init_logging();                                                                        \
+  libwavy::log::init_logging();                                                                 \
   LOG_INFO << "Wavy logger initialized! Check WAVY_LOG_LEVEL (environment variable) for which " \
               "log level this session is on!!";
+
+#define INIT_WAVY_LOGGER_ALL() \
+  INIT_WAVY_LOGGER_MACROS();   \
+  INIT_WAVY_LOGGER();
 
 /* ------------ LOGGING MACROS --------------- */
 

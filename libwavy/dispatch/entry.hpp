@@ -40,10 +40,12 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
+#include <libwavy/utils/math/entry.hpp>
 #include <libwavy/zstd/compression.h>
 
 #include <indicators/cursor_control.hpp>
 #include <indicators/progress_bar.hpp>
+#include <indicators/setting.hpp>
 
 /*
  * DISPATCHER
@@ -330,7 +332,7 @@ private:
 
           segments.push_back(segment_path);
           m_transportStreams.push_back(segment_path);
-          log::INFO<Dispatch>("Found valid transport stream: {}", segment_path);
+          log::TRACE<Dispatch>("Found valid transport stream: {}", segment_path);
         }
         else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
         {
@@ -357,7 +359,7 @@ private:
           }
 
           mp4_segments_.push_back(segment_path);
-          log::INFO<Dispatch>("Found valid .m4s segment: {}", segment_path);
+          log::TRACE<Dispatch>("Found valid .m4s segment: {}", segment_path);
         }
       }
     }
@@ -382,7 +384,7 @@ private:
     }
 
     log::INFO<Dispatch>("All referenced playlists and their respective segment types verified.");
-    log::INFO<Dispatch>("Found {} transport streams.",
+    log::INFO<Dispatch>("Found {} verified transport streams.",
                         (m_playlistFmt == PlaylistFormat::TRANSPORT_STREAM
                            ? m_transportStreams.size()
                            : mp4_segments_.size()));
@@ -514,16 +516,13 @@ private:
       const auto file_size = file.tellg();
       file.seekg(0);
 
-      indicators::ProgressBar bar{indicators::option::BarWidth{50},
-                                  indicators::option::Start{"["},
-                                  indicators::option::Fill{"■"},
-                                  indicators::option::Lead{">"},
-                                  indicators::option::Remainder{"-"},
-                                  indicators::option::End{"]"},
-                                  indicators::option::PostfixText{"Uploading"},
-                                  indicators::option::ForegroundColor{indicators::Color::cyan},
-                                  indicators::option::ShowElapsedTime{true},
-                                  indicators::option::ShowPercentage{true}};
+      log::INFO<Dispatch>("Dispatching to Wavy Server....");
+
+      indicators::ProgressBar bar{
+        indicators::option::BarWidth{50}, indicators::option::MaxProgress{100},
+        indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
+        indicators::option::FontStyles{
+          std::vector<indicators::FontStyle>{indicators::FontStyle::bold}}};
 
       beast::flat_buffer buffer;
 
@@ -557,7 +556,7 @@ private:
         asio::write(m_socket, asio::buffer(chunk_data));
 
         total_sent += bytes_read;
-        bar.set_progress(static_cast<float>(total_sent) * 100 / file_size);
+        bar.set_progress(static_cast<ui32>((total_sent * 100) / file_size));
       }
 
       // Final zero-length chunk to indicate end
@@ -577,7 +576,8 @@ private:
         log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(audio_id_it->value()));
       }
 
-      log::INFO<Dispatch>("Upload completed successfully ({} bytes sent)", total_sent);
+      log::INFO<Dispatch>("Upload completed successfully ({} sent)",
+                          utils::math::bytesFormat(total_sent));
       m_socket.shutdown();
 
       return true;
