@@ -88,6 +88,7 @@ set(LIBWAVY_LOGGER_SRC src/logger.cc)
 set(LIBWAVY_SERVER_SRC src/server/Server.cc)
 
 set(INDICATORS_HEADERS external/indicators/include/)
+set(TOML_PLUS_PLUS_HEADER external/toml++/)
 
 find_package(PkgConfig REQUIRED)
 
@@ -149,7 +150,7 @@ if (TBB_FOUND)
     link_directories(${TBB_LIBRARY_DIRS})
 
     add_executable(${OWNER_BIN} ${OWNER_SRC})
-    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
+    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${TOML_PLUS_PLUS_HEADER} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
     target_link_libraries(${OWNER_BIN} PRIVATE wavy-ffmpeg wavy-logger ${ZSTD_LIBRARIES} Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 
@@ -158,6 +159,7 @@ if (DEFINED BUILD_FETCHER_PLUGINS AND BUILD_FETCHER_PLUGINS)
 message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY FETCH PLUGIN BUILD ]==================${RESET}")
 add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
+add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/preemptive)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}===============================================================${RESET}\n")
 ########################### END FETCHER PLUGINS HERE #########################################

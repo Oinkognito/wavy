@@ -31,8 +31,8 @@
 namespace libwavy::utils::audio
 {
 
-auto decodeAndPlay(GlobalState& gs, bool& flac_found, const RelPath& customAudioBackendLibPath = "")
-  -> bool;
+auto decodeAndPlay(TotalAudioData& segments, bool& flac_found,
+                   const RelPath& customAudioBackendLibPath = "") -> bool;
 
 }
 // namespace libwavy::utils::audio

@@ -124,7 +124,15 @@ auto main(int argc, char* argv[]) -> int
     fs::remove_all(macros::DISPATCH_ARCHIVE_REL_PATH);
   }
 
-  fs::create_directory(output_dir);
+  if (fs::create_directory(output_dir))
+  {
+    lwlog::INFO<Owner>("Directory created successfully: '{}'", fs::absolute(output_dir).string());
+  }
+  else
+  {
+    lwlog::ERROR<Owner>("Failed to create directory: '{}'", output_dir);
+    return WAVY_RET_FAIL;
+  }
 
   if (send_raw_file)
   {
@@ -193,16 +201,6 @@ auto main(int argc, char* argv[]) -> int
   std::vector<int> bitrates = {64, 112, 128};        // Example bitrates in kbps
   /* This is a godawful way of doing it will fix. */ //[TODO]: Fix this command line argument
                                                      // structure
-
-  if (fs::create_directory(output_dir))
-  {
-    lwlog::INFO<Owner>("Directory created successfully: '{}'", fs::absolute(output_dir).string());
-  }
-  else
-  {
-    lwlog::ERROR<Owner>("Failed to create directory: '{}'", output_dir);
-    return WAVY_RET_FAIL;
-  }
 
   // Use oneTBB parallelizing for faster transcoding times
   //

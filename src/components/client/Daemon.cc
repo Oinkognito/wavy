@@ -29,7 +29,7 @@ namespace libwavy::components::client
 
 auto WavyClient::start(bool flac_found, int index) -> int
 {
-  log::INFO<log::CLIENT>("Starting Client Fetch and Playback Daemon...");
+  log::INFO<log::CLIENT>("Powering up WavyClient...");
 
   fetch::SegmentFetcherPtr fetcher;
 
@@ -59,11 +59,10 @@ auto WavyClient::start(bool flac_found, int index) -> int
     return WAVY_RET_FAIL;
   }
 
-  StorageAudioID audio_id = owners[index];
+  const StorageAudioID audio_id = owners[index];
 
   // Fetch the transport stream
-  if (!fetcher->fetchAndPlay(m_nickname, audio_id, m_globalState, m_bitrate, flac_found,
-                             m_audioBackendLibPath))
+  if (!fetcher->fetchAndPlay(m_nickname, audio_id, m_bitrate, flac_found, m_audioBackendLibPath))
   {
     log::ERROR<log::CLIENT>("Something went horribly wrong while fetching!!");
     return WAVY_RET_FAIL;

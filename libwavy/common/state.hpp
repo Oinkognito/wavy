@@ -26,6 +26,7 @@
 #include <iterator>
 #include <libwavy/common/types.hpp>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <vector>
@@ -82,59 +83,74 @@ struct AudioMetadata
 struct GlobalState
 {
 private:
-  TotalAudioData            m_transportSegments;
-  mutable std::shared_mutex m_mutex; // allows multiple readers, exclusive writer
+  TotalAudioData            m_segments;
+  std::optional<AudioData>  m_initSegmentFLAC; // stores init segment if needed
+  mutable std::shared_mutex m_mutex;
 
 public:
+  // Mode 1: Normal constructor (no init segment)
+  GlobalState() = default;
+
+  // Mode 2: FLAC init segment passed at construction
+  explicit GlobalState(AudioData initSegment) : m_initSegmentFLAC(std::move(initSegment))
+  {
+    m_segments.push_back(*m_initSegmentFLAC); // auto-store it
+  }
+
+  /// Append a segment (used for streaming mode)
   void appendSegment(AudioData&& segment)
   {
     std::unique_lock lock(m_mutex);
-    m_transportSegments.emplace_back(std::move(segment));
+    m_segments.emplace_back(std::move(segment));
   }
 
-  // Append initial segment + multiple segments safely
-  void appendSegmentsFLAC(AudioData&& initSegment, TotalAudioData&& m4sSegments)
+  /// Append multiple segments (used for prefetching)
+  void appendSegments(TotalAudioData&& segments)
   {
-    std::unique_lock lock(m_mutex); // exclusive lock for write
-    m_transportSegments.push_back(std::move(initSegment));
-    m_transportSegments.insert(m_transportSegments.end(),
-                               std::make_move_iterator(m4sSegments.begin()),
-                               std::make_move_iterator(m4sSegments.end()));
+    std::unique_lock lock(m_mutex);
+    m_segments.insert(m_segments.end(), std::make_move_iterator(segments.begin()),
+                      std::make_move_iterator(segments.end()));
   }
 
-  // Get a snapshot copy of all segments safely
+  /// Get a snapshot of all segments
   auto getAllSegments() const -> TotalAudioData
   {
     std::shared_lock lock(m_mutex);
-    return m_transportSegments;
+    return m_segments;
   }
 
+  /// Get a single segment by index
   auto getSegment(size_t index) const -> AudioData
   {
     std::shared_lock lock(m_mutex);
-    if (index >= m_transportSegments.size())
-      return {}; // or throw or handle error
-    return m_transportSegments[index];
+    if (index >= m_segments.size())
+      return {}; // when calling this, do a sanity .empty check
+    return m_segments[index];
   }
 
-  // check whether m_transportSegments is empty safely
+  /// Whether the store is empty
   auto segsEmpty() const -> bool
   {
     std::shared_lock lock(m_mutex);
-    return m_transportSegments.empty();
+    return m_segments.empty();
   }
 
-  // Clear all segments safely
+  /// Clear all segments (used in teardown/reset)
   void clearSegments()
   {
     std::unique_lock lock(m_mutex);
-    m_transportSegments.clear();
+    m_segments.clear();
+    if (m_initSegmentFLAC)
+      m_segments.push_back(*m_initSegmentFLAC); // re-inject init if needed
   }
 
-  // Get count safely
+  /// Get number of stored segments
   auto segSizeAll() const -> size_t
   {
     std::shared_lock lock(m_mutex);
-    return m_transportSegments.size();
+    return m_segments.size();
   }
+
+  /// Access to init segment for diagnostic/logging (if needed)
+  auto hasInitSegmentFLAC() const -> bool { return m_initSegmentFLAC.has_value(); }
 };

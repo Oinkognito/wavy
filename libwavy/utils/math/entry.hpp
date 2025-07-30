@@ -28,9 +28,12 @@
 #include <sstream>
 #include <string>
 
-#define ONE_KIB 1024
-#define ONE_MIB ONE_KIB * 1024
-#define ONE_GIB ONE_MIB * 1024
+enum ByteTable : std::size_t
+{
+  ONE_KIB = 1024,
+  ONE_MIB = ONE_KIB * ONE_KIB,
+  ONE_GIB = ONE_MIB * ONE_KIB
+};
 
 namespace libwavy::utils::math
 {
@@ -42,10 +45,10 @@ inline auto formatSize(double size, const std::string& unit) -> std::string
   return oss.str();
 }
 
-inline auto bytesFormat(size_t bytes) -> std::string
+inline auto bytesFormat(std::size_t bytes) -> std::string
 {
   static constexpr std::array<const char*, 4> units    = {"B", "KiB", "MiB", "GiB"};
-  static constexpr std::array<size_t, 4>      divisors = {1, ONE_KIB, ONE_MIB, ONE_GIB};
+  static constexpr std::array<std::size_t, 4> divisors = {1, ONE_KIB, ONE_MIB, ONE_GIB};
 
   for (size_t i = 0; i < units.size(); ++i)
   {

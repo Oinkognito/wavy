@@ -37,7 +37,6 @@ private:
   StorageOwnerID m_nickname;
   IPAddr         m_server;
   RelPath        m_pluginPath;
-  GlobalState    m_globalState;
   int            m_bitrate;
   RelPath        m_audioBackendLibPath;
 

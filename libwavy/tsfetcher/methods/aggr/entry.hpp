@@ -46,59 +46,75 @@ class TSegFetcher : public ISegmentFetcher
 {
 public:
   TSegFetcher(IPAddr server)
-      : ioc_(std::make_shared<asio::io_context>()),
-        ctx_(std::make_shared<ssl::context>(ssl::context::tlsv12_client)),
-        server_(std::move(server))
+      : m_ioCtx(std::make_shared<asio::io_context>()),
+        m_sslCtx(std::make_shared<ssl::context>(ssl::context::tlsv12_client)),
+        m_serverIP(std::move(server))
   {
-    ctx_->set_verify_mode(ssl::verify_none);
+    m_sslCtx->set_verify_mode(ssl::verify_none);
   }
 
-  auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id, GlobalState& gs,
+  auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id,
                     int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path)
     -> bool override
   {
-    log::INFO<log::FETCH>("Request Owner: {}", nickname);
-    log::INFO<log::FETCH>("Audio-ID: {}", audio_id);
-    log::INFO<log::FETCH>("Bitrate: {}", desired_bandwidth);
-
-    auto master_playlist = fetch_master_playlist(nickname, audio_id);
-    if (master_playlist.empty())
-      return false;
-
-    auto content = select_playlist(nickname, audio_id, master_playlist, desired_bandwidth);
-    if (content.empty())
-      return false;
-
-    AudioData      init_mp4_data;
-    TotalAudioData m4s_segments;
-    if (!process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments, gs))
-      return false;
-
-    if (!m4s_segments.empty())
+    try
     {
-      flac_found = true;
-      gs.appendSegmentsFLAC(std::move(init_mp4_data), std::move(m4s_segments));
+      log::INFO<log::FETCH>("Request Owner: {}", nickname);
+      log::INFO<log::FETCH>("Audio-ID: {}", audio_id);
+      log::INFO<log::FETCH>("Bitrate: {}", desired_bandwidth);
+
+      auto master_playlist = fetch_master_playlist(nickname, audio_id);
+      if (master_playlist.empty())
+        return false;
+
+      auto content = select_playlist(nickname, audio_id, master_playlist, desired_bandwidth);
+      if (content.empty())
+        return false;
+
+      AudioData      init_mp4_data;
+      TotalAudioData m4s_segments;
+      auto gs = process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments);
+      if (!gs)
+      {
+        log::ERROR<log::FETCH>(
+          "GlobalState found to be empty after processing segments! Exiting...");
+        return false;
+      }
+
+      if (!m4s_segments.empty())
+      {
+        flac_found = true;
+        gs->appendSegments(std::move(m4s_segments));
+      }
+
+      if (!libwavy::dbg::FileWriter<AudioData>::write(gs->getAllSegments(), "audio.raw"))
+      {
+        log::ERROR<log::FETCH>("Error writing transport segments to file!!");
+        return false;
+      }
+
+      log::INFO<log::FETCH>("Stored {} transport segments in memory.", gs->segSizeAll());
+
+      auto allSegments = gs->getAllSegments();
+
+      // Decode and play the fetched stream
+      if (!utils::audio::decodeAndPlay(allSegments, flac_found, audio_backend_lib_path))
+      {
+        return WAVY_RET_FAIL;
+      }
+
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      log::ERROR<log::FETCH>("fetchAndPlay threw error: {}", e.what());
     }
 
-    if (!libwavy::dbg::FileWriter<AudioData>::write(gs.getAllSegments(), "audio.raw"))
-    {
-      log::ERROR<log::FETCH>("Error writing transport segments to file!!");
-      return false;
-    }
-
-    log::INFO<log::FETCH>("Stored {} transport segments.", gs.segSizeAll());
-
-    // Decode and play the fetched stream
-    if (!utils::audio::decodeAndPlay(gs, flac_found, audio_backend_lib_path))
-    {
-      return WAVY_RET_FAIL;
-    }
-
-    return true;
+    return false;
   }
 
   auto fetchOwnersList(const IPAddr& server, const StorageOwnerID& targetNickname)
-    -> std::vector<std::string> override
+    -> Owners override
   {
     asio::io_context ioc;
     ssl::context     ctx(ssl::context::tlsv12_client);
@@ -108,7 +124,7 @@ public:
     log::TRACE<log::FETCH>("Attempting to fetch client list of owner {} through Wavy-Server at {}",
                            targetNickname, server);
 
-    NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_OWNERS));
+    NetResponse response = client.get(macros::to_string(macros::m_serverIPPATH_HLS_OWNERS));
 
     if (response.empty())
       return {};
@@ -144,13 +160,13 @@ public:
   }
 
 private:
-  std::shared_ptr<asio::io_context> ioc_;
-  std::shared_ptr<ssl::context>     ctx_;
-  IPAddr                            server_;
+  std::shared_ptr<asio::io_context> m_ioCtx;
+  std::shared_ptr<ssl::context>     m_sslCtx;
+  IPAddr                            m_serverIP;
 
   auto make_client() -> std::unique_ptr<libwavy::network::HttpsClient>
   {
-    return std::make_unique<libwavy::network::HttpsClient>(*ioc_, *ctx_, server_);
+    return std::make_unique<libwavy::network::HttpsClient>(*m_ioCtx, *m_sslCtx, m_serverIP);
   }
 
   auto fetch_master_playlist(const StorageOwnerID& nickname, const StorageAudioID& audio_id)
@@ -223,7 +239,7 @@ private:
 
   auto process_segments(const PlaylistData& playlist, const StorageOwnerID& nickname,
                         const StorageAudioID& audio_id, AudioData& init_mp4_data,
-                        TotalAudioData& m4s_segments, GlobalState& gs) -> bool
+                        TotalAudioData& m4s_segments) -> std::unique_ptr<GlobalState>
   {
     std::istringstream stream(playlist);
     std::string        line;
@@ -240,6 +256,8 @@ private:
 
     auto client = make_client();
 
+    std::unique_ptr<GlobalState> gs = nullptr;
+
     if (has_m4s)
     {
       const NetTarget initMp4Url = "/hls/" + nickname + "/" + audio_id + "/init.mp4";
@@ -247,13 +265,19 @@ private:
       if (init_mp4_data.empty())
       {
         log::ERROR<log::FETCH>("Failed to fetch init.mp4 for {}/{}", nickname, audio_id);
-        return false;
+        return nullptr;
       }
       log::INFO<log::FETCH>("Fetched init.mp4, size: {} bytes.", init_mp4_data.size());
+      gs = std::make_unique<GlobalState>(std::move(init_mp4_data)); // construct with init
+    }
+    else
+    {
+      gs = std::make_unique<GlobalState>(); // default constructor for MP3 case
     }
 
     stream.clear();
     stream.seekg(0);
+
     while (std::getline(stream, line))
     {
       if (!line.empty() && line[0] != '#')
@@ -265,9 +289,13 @@ private:
         if (!data.empty())
         {
           if (line.ends_with(macros::M4S_FILE_EXT))
+          {
             m4s_segments.push_back(std::move(data));
+          }
           else if (line.ends_with(macros::TRANSPORT_STREAM_EXT))
-            gs.appendSegment(std::move(data));
+          {
+            gs->appendSegment(std::move(data));
+          }
 
           log::DBG<log::FETCH>("Fetched segment: {}", line);
         }
@@ -278,7 +306,7 @@ private:
       }
     }
 
-    return true;
+    return gs;
   }
 };
 

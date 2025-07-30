@@ -107,9 +107,10 @@ private:
     auto self(shared_from_this());
 
     auto parser = std::make_shared<http::request_parser<http::string_body>>();
-    parser->body_limit(WAVY_SERVER_AUDIO_SIZE_LIMIT *
-                       ONE_MIB); // for now 200MiB is alright, when lossless codecs come
-                                 // in the picture we will have to think about it.
+    parser->body_limit(
+      WAVY_SERVER_AUDIO_SIZE_LIMIT *
+      static_cast<std::size_t>(ONE_MIB)); // for now 200MiB is alright, when lossless codecs come
+                                          // in the picture we will have to think about it.
 
     http::async_read(
       m_socket, m_buffer, *parser,

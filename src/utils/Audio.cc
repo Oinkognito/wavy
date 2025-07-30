@@ -29,63 +29,71 @@ using Decoder = libwavy::log::DECODER;
 namespace libwavy::utils::audio
 {
 
-auto decodeAndPlay(GlobalState& gs, bool& flac_found, const RelPath& customAudioBackendLibPath)
-  -> bool
+auto decodeAndPlay(TotalAudioData& segments, bool& flac_found,
+                   const RelPath& customAudioBackendLibPath) -> bool
 {
-  auto segments = gs.getAllSegments();
-
-  if (segments.empty())
-  {
-    log::ERROR<Decoder>("No transport stream segments provided!");
-    return false;
-  }
-
-  log::INFO<Decoder>("Decoding transport stream segments...");
-
-  libwavy::ffmpeg::MediaDecoder decoder;
-  TotalDecodedAudioData         decoded_audio;
-  if (!decoder.decode(segments, decoded_audio))
-  {
-    log::ERROR<Decoder>("Decoding failed!!! Check callback logs for more info.");
-    return false;
-  }
-
-  if (gNumAudioBackends == 0)
-  {
-    log::ERROR<Decoder>("No audio backend plugins found! Exiting cleanly...");
-    return false;
-  }
-
-  const RelPath audioBackendLibPath =
-    RelPath(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
-    (customAudioBackendLibPath.empty() ? gAudioBackends[0].plugin_path : customAudioBackendLibPath);
-
-  log::INFO<log::CLIENT>("Given Audio Backend Plugin: '{}'", audioBackendLibPath);
-
   try
   {
-    // load audio backend plugin here
-    log::INFO<log::PLUGIN>("Loading audio backend plugin...");
-    libwavy::audio::AudioBackendPtr backend;
-    backend = libwavy::audio::plugin::WavyAudioBackend::load(audioBackendLibPath);
-    if (backend->initialize(decoded_audio, flac_found))
+    if (segments.empty())
     {
-      log::TRACE<log::PLUGIN>("Loaded: '{}'!", backend->name());
-      backend->play();
-    }
-    else
-    {
-      log::ERROR<log::PLUGIN>("Error while loading plugin: {}", audioBackendLibPath);
+      log::ERROR<Decoder>("No transport stream segments provided!");
       return false;
     }
+
+    log::INFO<Decoder>("Decoding transport stream segments...");
+
+    libwavy::ffmpeg::MediaDecoder decoder;
+    TotalDecodedAudioData         decoded_audio;
+    if (!decoder.decode(segments, decoded_audio))
+    {
+      log::ERROR<Decoder>("Decoding failed!!! Check callback logs for more info.");
+      return false;
+    }
+
+    if (gNumAudioBackends == 0)
+    {
+      log::ERROR<Decoder>("No audio backend plugins found! Exiting cleanly...");
+      return false;
+    }
+
+    const RelPath audioBackendLibPath =
+      RelPath(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH) + "/" +
+      (customAudioBackendLibPath.empty() ? gAudioBackends[0].plugin_path
+                                         : customAudioBackendLibPath);
+
+    log::INFO<log::CLIENT>("Given Audio Backend Plugin: '{}'", audioBackendLibPath);
+
+    try
+    {
+      // load audio backend plugin here
+      log::INFO<log::PLUGIN>("Loading audio backend plugin...");
+      libwavy::audio::AudioBackendPtr backend;
+      backend = libwavy::audio::plugin::WavyAudioBackend::load(audioBackendLibPath);
+      if (backend->initialize(decoded_audio, flac_found))
+      {
+        log::TRACE<log::PLUGIN>("Loaded: '{}'!", backend->name());
+        backend->play();
+      }
+      else
+      {
+        log::ERROR<log::PLUGIN>("Error while loading plugin: {}", audioBackendLibPath);
+        return false;
+      }
+    }
+    catch (const std::exception& e)
+    {
+      log::ERROR<log::AUDIO>("Audio playback error: {}", e.what());
+      return false;
+    }
+
+    return true;
   }
-  catch (const std::exception& e)
+  catch (std::exception& e)
   {
-    log::ERROR<log::AUDIO>("Audio playback error: {}", e.what());
-    return false;
+    log::ERROR<log::AUDIO>("decodeAndPlay util threw error: {}", e.what());
   }
 
-  return true;
+  return false;
 }
 
 } // namespace libwavy::utils::audio

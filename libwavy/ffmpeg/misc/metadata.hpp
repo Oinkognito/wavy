@@ -30,6 +30,8 @@ extern "C"
 }
 
 #include <libwavy/common/api/entry.hpp>
+#include <libwavy/common/types.hpp>
+#include <string>
 
 namespace libwavy::ffmpeg
 {
@@ -53,7 +55,7 @@ public:
    * @note If an error occurs while opening the file or extracting stream info,
    *       a negative error code will be returned.
    */
-  auto fetchBitrate(const char* input_file) -> int
+  auto fetchBitrate(CStrAbsPath input_file) -> int
   {
     AVFormatContext*         fmt_ctx = nullptr;
     const AVDictionaryEntry* tag     = nullptr;
@@ -75,7 +77,7 @@ public:
     return 0;
   }
 
-  auto getAudioFormat(const char* input_file) -> std::string
+  auto getAudioFormat(CStrAbsPath input_file) -> std::string
   {
     AVFormatContext* fmt_ctx = nullptr;
     int              ret;

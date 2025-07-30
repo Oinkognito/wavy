@@ -26,7 +26,7 @@
 #include <string>
 #include <string_view>
 
-enum
+enum Macros
 {
   TRANSPORT_STREAM_START_BYTE  = 0x47, // 0x47 (MPEG-TS sync byte)
   WAVY_SERVER_PORT_NO          = 8080,
@@ -105,7 +105,7 @@ enum
   X(CODEC_HLS_FLAGS_FIELD, "hls_flags")                       \
                                                               \
   /* Server File & Metadata */                                \
-  X(DISPATCH_ARCHIVE_REL_PATH, "payload")                     \
+  X(DISPATCH_ARCHIVE_REL_PATH, "wavy-owner-payload")          \
   X(DISPATCH_ARCHIVE_NAME, "hls_data.tar.gz")                 \
   X(METADATA_FILE, "metadata.toml")                           \
                                                               \

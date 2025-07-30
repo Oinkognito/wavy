@@ -23,10 +23,10 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <external/toml++/toml.hpp>
 #include <fstream>
 #include <libwavy/common/api/entry.hpp>
 #include <string>
+#include <toml++/toml.hpp>
 
 namespace libwavy::Toml
 {
