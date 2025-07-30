@@ -88,7 +88,6 @@ set(LIBWAVY_LOGGER_SRC src/logger.cc)
 set(LIBWAVY_SERVER_SRC src/server/Server.cc)
 
 set(INDICATORS_HEADERS external/indicators/include/)
-set(TOML_PLUS_PLUS_HEADER external/toml++/)
 
 find_package(PkgConfig REQUIRED)
 
@@ -150,7 +149,7 @@ if (TBB_FOUND)
     link_directories(${TBB_LIBRARY_DIRS})
 
     add_executable(${OWNER_BIN} ${OWNER_SRC})
-    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${TOML_PLUS_PLUS_HEADER} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
+    target_include_directories(${OWNER_BIN} PRIVATE ${FFMPEG_INCLUDE_DIRS} ${INDICATORS_HEADERS} ${CMAKE_SOURCE_DIR})
     target_link_libraries(${OWNER_BIN} PRIVATE wavy-ffmpeg wavy-logger ${ZSTD_LIBRARIES} Threads::Threads TBB::tbb ${ARCHIVE_LIB} OpenSSL::SSL)
 endif()
 
@@ -197,7 +196,7 @@ target_link_libraries(${CLIENT_BIN} PRIVATE wavy-ffmpeg wavy-logger Threads::Thr
 
 ########################### -- WAVY SERVER -- #########################################
 add_executable(${SERVER_BIN} ${SERVER_SRC})
-target_include_directories(${SERVER_BIN} PRIVATE ${TOML_PLUS_PLUS_HEADER} ${CMAKE_SOURCE_DIR})
+target_include_directories(${SERVER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE  ${ARCHIVE_LIB} ${ZSTD_LIBRARIES} wavy-server)
 ########################### -- WAVY SERVER -- #########################################
