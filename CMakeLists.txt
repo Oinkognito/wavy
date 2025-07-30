@@ -158,7 +158,6 @@ if (DEFINED BUILD_FETCHER_PLUGINS AND BUILD_FETCHER_PLUGINS)
 message(NOTICE "\n${BLUE}${BOLD}${UNDERLINE} *** COMPILING FETCHER PLUGINS HERE *** ...${RESET}")
 message(NOTICE "\n${GREEN}${BOLD}==================[ WAVY FETCH PLUGIN BUILD ]==================${RESET}")
 add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/aggr)
-add_subdirectory(${WAVY_FETCHER_PLUGIN_PATH}/preemptive)
 # Add more here ...
 message(NOTICE "${GREEN}${BOLD}===============================================================${RESET}\n")
 ########################### END FETCHER PLUGINS HERE #########################################
