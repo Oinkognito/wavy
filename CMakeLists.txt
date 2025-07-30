@@ -197,7 +197,7 @@ target_link_libraries(${CLIENT_BIN} PRIVATE wavy-ffmpeg wavy-logger Threads::Thr
 
 ########################### -- WAVY SERVER -- #########################################
 add_executable(${SERVER_BIN} ${SERVER_SRC})
-target_include_directories(${SERVER_BIN} PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(${SERVER_BIN} PRIVATE ${TOML_PLUS_PLUS_HEADER} ${CMAKE_SOURCE_DIR})
 target_compile_features(${SERVER_BIN} PRIVATE cxx_std_20)
 target_link_libraries(${SERVER_BIN} PRIVATE  ${ARCHIVE_LIB} ${ZSTD_LIBRARIES} wavy-server)
 ########################### -- WAVY SERVER -- #########################################
