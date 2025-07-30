@@ -124,7 +124,7 @@ public:
     log::TRACE<log::FETCH>("Attempting to fetch client list of owner {} through Wavy-Server at {}",
                            targetNickname, server);
 
-    NetResponse response = client.get(macros::to_string(macros::m_serverIPPATH_HLS_OWNERS));
+    NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_OWNERS));
 
     if (response.empty())
       return {};

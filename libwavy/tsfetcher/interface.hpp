@@ -27,7 +27,6 @@
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
 #include <memory>
-#include <string>
 
 namespace libwavy::fetch
 {
@@ -38,11 +37,11 @@ public:
   virtual ~ISegmentFetcher() = default;
 
   virtual auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id,
-                            GlobalState& gs, int desired_bandwidth, bool& flac_found,
+                            int desired_bandwidth, bool& flac_found,
                             const RelPath& audio_backend_lib_path) -> bool = 0;
 
   virtual auto fetchOwnersList(const IPAddr& server, const StorageOwnerID& targetNickname)
-    -> std::vector<std::string> = 0;
+    -> Owners = 0;
 };
 
 extern "C"

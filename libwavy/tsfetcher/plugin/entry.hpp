@@ -41,7 +41,6 @@ public:
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);
 
     log::INFO<log::PLUGIN>("Found fetcher plugin path: '{}'!", WAVY_FETCHER_PLUGIN_OUTPUT_PATH);
-
     log::INFO<log::PLUGIN>("Attempting to load fetcher plugin from: {}", plugin_path);
 
     // Load the plugin shared object
