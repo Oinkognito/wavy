@@ -37,6 +37,7 @@
 #include <unordered_map>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/network/routes.h>
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
@@ -526,7 +527,7 @@ private:
 
       beast::flat_buffer buffer;
 
-      http::request<http::empty_body> req{http::verb::post, "/upload", 11};
+      http::request<http::empty_body> req{http::verb::post, routes::SERVER_PATH_TOML_UPLOAD, 11};
       req.set(http::field::host, m_server);
       req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
       req.set(http::field::transfer_encoding, "chunked");

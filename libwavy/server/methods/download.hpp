@@ -23,155 +23,80 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast.hpp>
+#include <crow.h>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
 #include <libwavy/server/prototypes.hpp>
+
+#include <filesystem>
+#include <fstream>
 #include <utility>
 
-namespace beast = boost::beast;
-namespace http  = beast::http;
-using boost::asio::ip::tcp;
+namespace fs = std::filesystem;
 
 using ServerDownload = libwavy::log::SERVER_DWNLD;
-using Socket         = boost::asio::ssl::stream<tcp::socket>;
 
 namespace libwavy::server::methods
 {
 
-class DownloadManager : public std::enable_shared_from_this<DownloadManager>
+class DownloadManager
 {
 public:
-  DownloadManager(Socket&& socket, http::request<http::string_body> req, const IPAddr ipAddr)
-      : m_socket(std::move(socket)), m_request(std::move(req)), m_ip(std::move(ipAddr))
+  // New constructor for direct use
+  DownloadManager(std::string audio_id, const crow::request& req)
+      : audioId(std::move(audio_id)), request(req)
   {
   }
 
-  void Run()
+  auto runDirect(const StorageOwnerID& owner_id, const StorageAudioID& filename) -> crow::response
   {
-    log::INFO<ServerDownload>(LogMode::Async, "Download request from [{}] target: {}", m_ip,
-                              NetTarget(m_request.target()));
+    const fs::path file_path =
+      fs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / owner_id / audioId / filename;
 
-    const NetTarget target(m_request.target().begin(), m_request.target().end());
+    log::INFO<ServerDownload>(LogMode::Async, "Attempting to serve file: {}", file_path.string());
 
-    std::istringstream iss(target);
-
-    const auto parts = helpers::tokenizePath(iss);
-
-    if (parts.size() < 4 || parts[0] != "hls")
+    if (!fs::exists(file_path))
     {
-      log::ERROR<ServerDownload>(LogMode::Async,
-                                 "Invalid download path '{}' found! Sending error...", target);
-      return SendError(http::status::bad_request, "Invalid download path provided. Try again!");
+      log::ERROR<ServerDownload>(LogMode::Async, "File not found: {}", file_path.string());
+      return {404, "File not found."};
     }
 
-    const StorageOwnerID owner_id = parts[1];
-    const StorageAudioID audio_id = parts[2];
-    const FileName       filename = parts[3];
+    std::string content_type = detectMimeType(filename);
 
-    const AbsPath file_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + owner_id + "/" +
-                              audio_id + "/" + filename;
+    crow::response res;
+    res.code = 200;
+    res.set_header("Server", "Wavy Server");
+    res.set_header("Content-Type", content_type);
+    res.body = readFile(file_path.string());
+    res.set_header("Content-Length", std::to_string(res.body.size()));
 
-    log::INFO<ServerDownload>(LogMode::Async, "[{}] attempting to serve file: {}", m_ip, file_path);
+    log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename,
+                              res.body.size(), content_type);
 
-    m_targetFile = std::make_shared<http::file_body::value_type>();
-    boost::system::error_code ec;
-    m_targetFile->open(file_path.c_str(), beast::file_mode::scan, ec);
-
-    if (ec)
-    {
-      return SendError(http::status::not_found, "File not found.");
-    }
-
-    const std::size_t file_size    = m_targetFile->size();
-    const std::string content_type = std::string(DetectMimeType(filename));
-
-    auto response = std::make_shared<http::response<http::file_body>>();
-    response->version(m_request.version());
-    response->result(http::status::ok);
-    response->set(http::field::server, "Wavy Server");
-    response->set(http::field::content_type, content_type);
-    response->content_length(file_size);
-    response->body() = std::move(*m_targetFile);
-    response->prepare_payload();
-
-    log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename, file_size,
-                              content_type);
-
-    auto self = shared_from_this();
-    http::async_write(
-      m_socket, *response,
-      [this, self, response](boost::system::error_code ec, std::size_t bytes_sent)
-      {
-        if (ec)
-        {
-          log::ERROR<ServerDownload>(LogMode::Async, "Write failed: {}", ec.message());
-        }
-        else
-        {
-          log::INFO<ServerDownload>(LogMode::Async, "Sent {} bytes to [{}]", bytes_sent, m_ip);
-        }
-
-        m_socket.async_shutdown(
-          [this, self](boost::system::error_code ec_shutdown)
-          {
-            if (ec_shutdown)
-              log::ERROR<ServerDownload>(LogMode::Async, "Shutdown error: {}",
-                                         ec_shutdown.message());
-            m_socket.lowest_layer().close();
-          });
-      });
+    return res;
   }
 
 private:
-  void SendError(http::status code, const std::string& body)
-  {
-    auto response = std::make_shared<http::response<http::string_body>>();
-    response->version(m_request.version());
-    response->result(code);
-    response->set(http::field::server, "Wavy Server");
-    response->set(http::field::content_type, "text/plain");
-    response->set(http::field::content_length, std::to_string(body.size()));
-    response->body() = body;
-    response->prepare_payload();
+  std::string          audioId;
+  const crow::request& request;
 
-    auto self = shared_from_this();
-    http::async_write(m_socket, *response,
-                      [this, self, response](boost::system::error_code ec, std::size_t)
-                      {
-                        if (ec)
-                          log::ERROR<ServerDownload>(
-                            LogMode::Async, "Error response send failed: {}", ec.message());
-                        m_socket.async_shutdown(
-                          [this, self](boost::system::error_code ec_shutdown)
-                          {
-                            if (ec_shutdown)
-                              log::ERROR<ServerDownload>(LogMode::Async,
-                                                         "Shutdown error (error response): {}",
-                                                         ec_shutdown.message());
-                            m_socket.lowest_layer().close();
-                          });
-                      });
-  }
-
-  auto DetectMimeType(const std::string& filename) -> std::string_view
+  auto detectMimeType(const std::string& filename) -> std::string
   {
     if (filename.ends_with(macros::PLAYLIST_EXT))
       return "application/vnd.apple.mpegurl";
     if (filename.ends_with(macros::TRANSPORT_STREAM_EXT))
       return "video/mp2t";
-    return macros::CONTENT_TYPE_OCTET_STREAM;
+    return macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
   }
 
-private:
-  Socket                                       m_socket;
-  http::request<http::string_body>             m_request;
-  std::shared_ptr<http::file_body::value_type> m_targetFile;
-  IPAddr                                       m_ip;
+  auto readFile(const std::string& path) -> std::string
+  {
+    std::ifstream ifs(path, std::ios::binary);
+    if (!ifs)
+      return {};
+    return {std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>()};
+  }
 };
 
 } // namespace libwavy::server::methods

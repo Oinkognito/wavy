@@ -5,3 +5,11 @@
 [submodule "external/indicators"]
 	path = external/indicators
 	url = https://github.com/p-ranav/indicators.git
+
+[submodule "external/stduuid"]
+	path = external/stduuid
+	url = https://github.com/mariusbancila/stduuid.git
+
+[submodule "external/uvw"]
+	path = external/uvw
+	url = https://github.com/skypjack/uvw.git

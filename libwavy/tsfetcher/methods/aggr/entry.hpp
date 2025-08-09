@@ -27,9 +27,9 @@
 #include <sstream>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/network/routes.h>
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
@@ -121,10 +121,10 @@ public:
     ctx.set_verify_mode(ssl::verify_none);
     libwavy::network::HttpsClient client(ioc, ctx, server);
 
-    log::TRACE<log::FETCH>("Attempting to fetch client list of owner {} through Wavy-Server at {}",
+    log::TRACE<log::FETCH>("Attempting to fetch Owners list of owner {} through Wavy-Server at {}",
                            targetNickname, server);
 
-    NetResponse response = client.get(macros::to_string(macros::SERVER_PATH_HLS_OWNERS));
+    NetResponse response = client.get(routes::SERVER_PATH_HLS_OWNERS);
 
     if (response.empty())
       return {};
@@ -173,7 +173,7 @@ private:
     -> PlaylistData
   {
     const NetTarget masterPlaylistPath =
-      "/hls/" + nickname + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
+      "/download/" + nickname + "/" + audio_id + "/" + macros::to_string(macros::MASTER_PLAYLIST);
 
     log::DBG<log::FETCH>("Fetching Master Playlist from: '{}'", masterPlaylistPath);
 
@@ -230,7 +230,7 @@ private:
       log::WARN<log::FETCH>("Exact match not found. Using max bitrate: {} BPS", max_bandwidth);
     }
 
-    const NetTarget playlist_path = "/hls/" + nickname + "/" + audio_id + "/" + selected;
+    const NetTarget playlist_path = "/download/" + nickname + "/" + audio_id + "/" + selected;
     log::INFO<log::FETCH>("Selected bitrate playlist: {}", playlist_path);
 
     auto client = make_client();
@@ -260,7 +260,7 @@ private:
 
     if (has_m4s)
     {
-      const NetTarget initMp4Url = "/hls/" + nickname + "/" + audio_id + "/init.mp4";
+      const NetTarget initMp4Url = "/download/" + nickname + "/" + audio_id + "/init.mp4";
       init_mp4_data              = client->get(initMp4Url);
       if (init_mp4_data.empty())
       {
@@ -282,7 +282,7 @@ private:
     {
       if (!line.empty() && line[0] != '#')
       {
-        const NetTarget url = "/hls/" + nickname + "/" + audio_id + "/" + line;
+        const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + line;
         log::TRACE<log::FETCH>("Fetching URL: {}", url);
         AudioData data = client->get(url);
 

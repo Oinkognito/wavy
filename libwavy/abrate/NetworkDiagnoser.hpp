@@ -27,6 +27,7 @@
 #include <cmath>
 #include <future>
 #include <libwavy/common/macros.hpp>
+#include <libwavy/common/network/routes.h>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
 #include <libwavy/network/entry.hpp>
@@ -139,8 +140,7 @@ private:
       std::async(std::launch::async,
                  [&]()
                  {
-                   return client.get(
-                     macros::to_string(macros::SERVER_PATH_PING)); // Assuming a simple ping request
+                   return client.get(routes::SERVER_PATH_PING); // Assuming a simple ping request
                  });
 
     if (future.wait_for(std::chrono::milliseconds(timeout_ms)) == std::future_status::timeout)

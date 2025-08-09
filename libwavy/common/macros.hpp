@@ -115,12 +115,6 @@ enum Macros
   X(CONTENT_TYPE_JSON, "application/json")                    \
   X(CONTENT_TYPE_GZIP, "application/gzip")                    \
                                                               \
-  /* Server Endpoints */                                      \
-  X(SERVER_PATH_HLS_OWNERS, "/hls/owners")                    \
-  X(SERVER_PATH_TOML_UPLOAD, "/toml/upload")                  \
-  X(SERVER_PATH_AUDIO_INFO, "/hls/audio-info/")               \
-  X(SERVER_PATH_PING, "/hls/ping")                            \
-                                                              \
   /* Locking & Protocol Helpers */                            \
   X(SERVER_LOCK_FILE, "/tmp/wavy_server.lock")                \
   X(NETWORK_TEXT_DELIM, "\r\n\r\n")                           \
@@ -141,7 +135,7 @@ enum Macros
   X(SERVER_ERROR_413, "HTTP/1.1 413 Payload Too Large" CRLF2)                               \
   X(SERVER_ERROR_500,                                                                       \
     "HTTP/1.1 500 Internal Server Error" CRLF2 "Unable to read file (or) File write error") \
-  X(SERVER_PONG_MSG, "HTTP/1.1 200 OK" CRLF "Content-Type: text/plain" CRLF2 "pong")
+  X(SERVER_PONG_MSG, "Wavy says pong!")
 
 namespace macros
 {
