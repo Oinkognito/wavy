@@ -17,7 +17,7 @@ jobs:
       run: |
         pacman -Syu --noconfirm
         pacman -S --noconfirm \
-          base-devel flac boost wget openssl \
+          base-devel flac boost asio wget openssl \
           ffmpeg zstd cmake make pkgconf \
           libarchive lame git onetbb
 
