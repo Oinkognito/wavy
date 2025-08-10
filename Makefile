@@ -2,6 +2,7 @@
 
 # Define the build directory
 BUILD_DIR := build
+CROW_BUILD_DIR := external/crow/build
 CMAKE := cmake
 MAKE := make
 
@@ -21,6 +22,9 @@ define configure
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" $(EXTRA_CMAKE_FLAGS) ..
 endef
+
+init:
+	@mkdir -p $(CROW_BUILD_DIR) && cd $(CROW_BUILD_DIR) && $(CMAKE) .. -DCROW_BUILD_EXAMPLES=OFF -DCROW_BUILD_TESTS=OFF && $(MAKE) install
 
 # Build all targets
 all:
