@@ -23,24 +23,23 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include "libwavy/common/network/routes.h"
 #include <archive.h>
 #include <archive_entry.h>
-#include <boost/filesystem/directory.hpp>
-#include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 #define CROW_ENABLE_SSL
 #include <crow.h>
+#include <crow/middlewares/cookie_parser.h>
 
 #include <libwavy/common/api/entry.hpp>
-#include <libwavy/common/macros.hpp>
-#include <libwavy/common/state.hpp>
-#include <libwavy/common/types.hpp>
+#include <libwavy/common/network/routes.h>
+#include <libwavy/server/health.hpp>
 #include <libwavy/server/methods/download.hpp>
-#include <libwavy/server/prototypes.hpp>
+#include <libwavy/server/methods/owners.hpp>
+#include <libwavy/server/metrics.hpp>
+#include <libwavy/server/request-timer.hpp>
 #include <libwavy/toml/toml_parser.hpp>
 #include <libwavy/unix/domainBind.hpp>
+#include <libwavy/utils/math/entry.hpp>
 #include <libwavy/zstd/decompression.h>
 #include <unistd.h>
 #include <utility>
@@ -98,11 +97,6 @@
 
 #define ARCHIVE_READ_BUFFER_SIZE 10240
 
-namespace bfs = boost::filesystem; // Refers to boost filesystem (async file I/O ops)
-
-using Server       = libwavy::log::SERVER;
-using ServerUpload = libwavy::log::SERVER_UPLD;
-
 namespace libwavy::server
 {
 
@@ -111,248 +105,220 @@ class WAVY_API WavyServer
 public:
   WavyServer(short port, AbsPath serverCert, AbsPath serverKey)
       : m_socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), m_wavySocketBind(m_socketPath),
-        m_port(port), m_serverCert(std::move(serverCert)), m_serverKey(std::move(serverKey))
+        m_port(port), m_serverCert(std::move(serverCert)), m_serverKey(std::move(serverKey)),
+        m_shutdown_requested(false), m_metrics(std::make_unique<Metrics>()),
+        m_ownerManager(*m_metrics)
   {
     m_wavySocketBind.EnsureSingleInstance();
     log::INFO<Server>("Starting Wavy Server on port {}", port);
 
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
-    std::signal(SIGHUP, signal_handler);
+    // Set up signal handlers for graceful shutdown
+    std::signal(SIGINT, [](int signo) { get_instance()->request_shutdown(signo); });
+    std::signal(SIGTERM, [](int signo) { get_instance()->request_shutdown(signo); });
+    std::signal(SIGHUP, [](int signo) { get_instance()->request_shutdown(signo); });
+
+    // Store instance for signal handling
+    s_instance = this;
   }
 
-  ~WavyServer() { m_wavySocketBind.cleanup(); }
+  ~WavyServer()
+  {
+    if (!m_shutdown_requested)
+    {
+      request_shutdown(SIGTERM);
+    }
+
+    m_wavySocketBind.cleanup();
+  }
 
   void run()
   {
-    // Initialize Crow app
-    // SSL version — you'll need to configure cert and key here
-    crow::App app;
+    try
+    {
+      m_app.get_middleware<crow::CookieParser>();
 
-    setup_routes(app);
+      setup_routes(m_app);
+      setup_health_routes(m_app);
+      setup_metrics_routes(m_app);
 
-    app.port(m_port).ssl_file(m_serverCert, m_serverKey).multithreaded().run();
+      log::INFO<Server>("Server configured successfully, starting listeners...");
+
+      m_app.port(m_port)
+        .ssl_file(m_serverCert, m_serverKey)
+        .multithreaded()
+        .timeout(30) // 30 second timeout
+        .loglevel(crow::LogLevel::DEBUG)
+        .server_name("WavyServer")
+        .run();
+    }
+    catch (const std::exception& e)
+    {
+      log::ERROR<Server>("Fatal error starting server: {}", e.what());
+      throw;
+    }
+  }
+
+  void request_shutdown(int signo)
+  {
+    log::INFO<Server>("Shutdown signal ({}) received. Initiating graceful shutdown...", signo);
+    m_shutdown_requested = true;
+    m_shutdown_cv.notify_all();
   }
 
 private:
-  FileName             m_socketPath;
-  unix::UnixSocketBind m_wavySocketBind;
-  short                m_port;
-  AbsPath              m_serverCert, m_serverKey;
+  FileName                      m_socketPath;
+  unix::UnixSocketBind          m_wavySocketBind;
+  short                         m_port;
+  AbsPath                       m_serverCert, m_serverKey;
+  crow::App<crow::CookieParser> m_app;
 
-  static void signal_handler(int signo)
+  // Shutdown management
+  std::atomic<bool>       m_shutdown_requested;
+  std::condition_variable m_shutdown_cv;
+  std::mutex              m_shutdown_mutex;
+
+  // Metrics
+  std::unique_ptr<Metrics> m_metrics;
+  methods::OwnerManager    m_ownerManager;
+
+  // Singleton for signal handling
+  static WavyServer* s_instance;
+  static auto        get_instance() -> WavyServer* { return s_instance; }
+
+  template <typename CrowApp> void setup_health_routes(CrowApp& app)
   {
-    log::INFO<Server>("Termination signal ({}) received. Cleaning up...", signo);
-    std::exit(0);
+    // Health check endpoint
+    CROW_ROUTE(app, "/health")
+      .methods(crow::HTTPMethod::GET)(
+        [this]()
+        {
+          RequestTimer timer(*m_metrics);
+
+          auto health = HealthChecker::check_system_health();
+
+          std::ostringstream response;
+          response << "{\n";
+          response << R"(  "status": ")" << health.status_message << "\",\n";
+          response << "  \"healthy\": " << (health.is_healthy ? "true" : "false") << ",\n";
+          response << "  \"checks\": {\n";
+
+          bool first = true;
+          for (const auto& check : health.checks)
+          {
+            if (!first)
+              response << ",\n";
+            response << "    \"" << check.first << "\": \"" << check.second << "\"";
+            first = false;
+          }
+
+          response << "\n  }\n}";
+
+          int status_code = health.is_healthy ? 200 : 503;
+          if (status_code == 200)
+            timer.mark_success();
+          else
+            timer.mark_failure();
+
+          crow::response res(status_code, response.str());
+          res.set_header("Content-Type", "application/json");
+          return res;
+        });
+  }
+
+  template <typename CrowApp> void setup_metrics_routes(CrowApp& app)
+  {
+    // Metrics endpoint (Prometheus-style)
+    CROW_ROUTE(app, "/metrics")
+      .methods(crow::HTTPMethod::GET)(
+        [this]()
+        {
+          RequestTimer timer(*m_metrics);
+
+          auto body = libwavy::server::MetricsSerializer::to_prometheus_format(*m_metrics);
+
+          timer.mark_success();
+
+          crow::response res(200, body);
+          res.set_header("Content-Type", "text/plain; version=0.0.4");
+          return res;
+        });
   }
 
   template <typename CrowApp> void setup_routes(CrowApp& app)
   {
     CROW_ROUTE(app, routes::SERVER_PATH_PING)
       .methods(crow::HTTPMethod::GET)(
-        []()
+        [this]()
         {
+          RequestTimer timer(*m_metrics);
           log::INFO<Server>("Sending pong to client...");
+          timer.mark_success();
           return crow::response(200, macros::to_string(macros::SERVER_PONG_MSG));
         });
 
-    CROW_ROUTE(app, "/owners")
-      .methods(crow::HTTPMethod::GET)(
-        []()
-        {
-          log::INFO<Server>(LogMode::Async, "Handling Nicknames Listing Request (NLR)");
-
-          AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
-          if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
-          {
-            log::ERROR<Server>(LogMode::Async, "Storage directory not found: {}", storage_path);
-            return crow::response(500, macros::to_string(macros::SERVER_ERROR_500));
-          }
-
-          std::ostringstream response_stream;
-          bool               entries_found = false;
-
-          for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(storage_path))
-          {
-            if (bfs::is_directory(nickname_entry.status()))
-            {
-              StorageOwnerID nickname = nickname_entry.path().filename().string();
-              response_stream << nickname << ":\n";
-
-              bool audio_found = false;
-              for (const bfs::directory_entry& audio_entry :
-                   bfs::directory_iterator(nickname_entry.path()))
-              {
-                if (bfs::is_directory(audio_entry.status()))
-                {
-                  response_stream << "  - " << audio_entry.path().filename().string() << "\n";
-                  audio_found = true;
-                }
-              }
-
-              if (!audio_found)
-                response_stream << "  (No audio IDs found)\n";
-
-              entries_found = true;
-            }
-          }
-
-          if (!entries_found)
-          {
-            log::ERROR<Server>(LogMode::Async, "No IPs or Audio-IDs found in storage!!");
-            return crow::response(404, macros::to_string(macros::SERVER_ERROR_404));
-          }
-
-          return crow::response(200, response_stream.str());
-        });
+    CROW_ROUTE(app, routes::SERVER_PATH_OWNERS)
+      .methods(crow::HTTPMethod::GET)([this]() { return m_ownerManager.list_owners(); });
 
     // Audio Metadata Listing (GET /audio/info)
     CROW_ROUTE(app, routes::SERVER_PATH_AUDIO_INFO)
-      .methods(crow::HTTPMethod::GET)(
-        []()
-        {
-          log::INFO<Server>(LogMode::Async, "Handling Audio Metadata Listing request (AMLR)");
-
-          AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
-          if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
-          {
-            log::ERROR<Server>(LogMode::Async, "Storage directory not found: {}", storage_path);
-            return crow::response(500, macros::to_string(macros::SERVER_ERROR_500));
-          }
-
-          std::ostringstream response_stream;
-          bool               entries_found = false;
-
-          auto fetch_metadata = [&](const AbsPath&        metadata_path,
-                                    const StorageAudioID& audio_id) -> bool
-          {
-            try
-            {
-              AudioMetadata metadata = parseAudioMetadata(metadata_path);
-              response_stream << "  - " << audio_id << "\n";
-              response_stream << "      1. Title: " << metadata.title << "\n";
-              response_stream << "      2. Artist: " << metadata.artist << "\n";
-              response_stream << "      3. Duration: " << metadata.duration << " secs\n";
-              response_stream << "      4. Album: " << metadata.album << "\n";
-              response_stream << "      5. Bitrate: " << metadata.bitrate << " kbps\n";
-              response_stream << "      6. Sample Rate: " << metadata.audio_stream.sample_rate
-                              << " Hz\n";
-              response_stream << "      7. Sample Format: " << metadata.audio_stream.sample_format
-                              << "\n";
-              response_stream << "      8. Audio Bitrate: " << metadata.audio_stream.bitrate
-                              << " kbps\n";
-              response_stream << "      9. Codec: " << metadata.audio_stream.codec << "\n";
-              response_stream << "      10. Available Bitrates: [";
-              for (auto br : metadata.bitrates)
-                response_stream << br << ",";
-              response_stream << "]\n";
-            }
-            catch (const std::exception& e)
-            {
-              log::ERROR<Server>(LogMode::Async, "Error parsing metadata for Audio-ID {}: {}",
-                                 audio_id, e.what());
-              return false;
-            }
-            return true;
-          };
-
-          for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(storage_path))
-          {
-            if (bfs::is_directory(nickname_entry.status()))
-            {
-              const StorageOwnerID nickname = nickname_entry.path().filename().string();
-              response_stream << nickname << ":\n";
-
-              bool audio_found = false;
-              for (const bfs::directory_entry& audio_entry :
-                   bfs::directory_iterator(nickname_entry.path()))
-              {
-                if (bfs::is_directory(audio_entry.status()))
-                {
-                  RelPath metadata_path =
-                    audio_entry.path().string() + "/" + macros::to_cstr(macros::METADATA_FILE);
-                  if (bfs::exists(metadata_path))
-                  {
-                    if (fetch_metadata(metadata_path, audio_entry.path().filename().string()))
-                      audio_found = true;
-                  }
-                }
-              }
-
-              if (!audio_found)
-                response_stream << "  (No metadata found)\n";
-
-              entries_found = true;
-            }
-          }
-
-          if (!entries_found)
-            return crow::response(404, macros::to_string(macros::SERVER_ERROR_404));
-
-          return crow::response(200, response_stream.str());
-        });
+      .methods(crow::HTTPMethod::GET)([this]() { return m_ownerManager.list_audio_info(); });
 
     // File upload (POST /upload)
     CROW_ROUTE(app, routes::SERVER_PATH_TOML_UPLOAD)
-      .methods(crow::HTTPMethod::POST)(
-        [](const crow::request& req)
-        {
-          log::INFO<ServerUpload>(LogMode::Async, "Handling GZIP file upload");
+      .methods(crow::HTTPMethod::POST)([this](const crow::request& req)
+                                       { return m_ownerManager.handle_upload(req); });
 
-          const StorageAudioID audio_id =
-            boost::uuids::to_string(boost::uuids::random_generator()());
-          const AbsPath gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" +
-                                    audio_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
-
-          bfs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
-          std::ofstream output_file(gzip_path, std::ios::binary);
-          output_file.write(req.body.data(), req.body.size());
-          output_file.close();
-
-          if (!bfs::exists(gzip_path) || bfs::file_size(gzip_path) == 0)
-          {
-            log::ERROR<ServerUpload>(LogMode::Async,
-                                     "GZIP upload failed: File is empty or missing!");
-            return crow::response(400, "GZIP upload failed");
-          }
-
-          if (helpers::extract_and_validate(gzip_path, audio_id))
-          {
-            bfs::remove(gzip_path);
-            return crow::response(200, "Audio-ID: " + audio_id);
-          }
-          else
-          {
-            bfs::remove(gzip_path);
-            return crow::response(400, macros::to_string(macros::SERVER_ERROR_400));
-          }
-        });
-
-    // Download route fallback (GET /download/<string>)
-    CROW_ROUTE(app, "/download/<string>/<string>/<string>")
+    CROW_ROUTE(app, routes::SERVER_PATH_DOWNLOAD)
       .methods(crow::HTTPMethod::GET)(
-        [](const crow::request& req, const StorageOwnerID& ownerID, const StorageAudioID& audioID,
-           const std::string& filename)
+        [this](const crow::request& req, const StorageOwnerID& ownerID,
+               const StorageAudioID& audioID, const std::string& filename)
         {
           log::INFO<Server>(LogMode::Async, "Download request received for Audio-ID: {}", audioID);
 
-          try
+          methods::DownloadManager dm(*m_metrics, audioID, req);
+          auto                     response = dm.runDirect(ownerID, filename);
+
+          return response;
+        });
+
+    CROW_ROUTE(app, routes::SERVER_PATH_DELETE)
+      .methods(crow::HTTPMethod::DELETE)(
+        [this](const crow::request& req, const StorageOwnerID& ownerID,
+               const StorageAudioID& audioID)
+        {
+          log::INFO<Server>(LogMode::Async, "Delete request by owner '{}' for Audio-ID: {}",
+                            ownerID, audioID);
+          return m_ownerManager.handle_delete(req, ownerID, audioID);
+        });
+
+    CROW_ROUTE(app, "/owner/metrics/<string>")
+      .methods(crow::HTTPMethod::GET)(
+        [this](const crow::request& req, const std::string& ownerID)
+        {
+          RequestTimer timer(*m_metrics);
+
+          auto result = m_metrics->get_owner_metrics(ownerID);
+          if (!result.has_value())
           {
-            methods::DownloadManager dm(audioID, req);
-            return dm.runDirect(ownerID,
-                                filename); // Pass actual owner ID from your auth/session
+            timer.mark_failure();
+            return crow::response(404, "Owner not found");
           }
-          catch (const std::exception& e)
-          {
-            log::ERROR<Server>(LogMode::Async, "Error handling download for '{}': {}", audioID,
-                               e.what());
-            crow::response res(500);
-            res.set_header("Content-Type", "text/plain");
-            res.write("Internal Server Error");
-            return res;
-          }
+
+          timer.mark_success();
+          crow::json::wvalue json_res;
+          json_res["owner_id"]      = ownerID;
+          json_res["uploads"]       = result->get().uploads.load();
+          json_res["downloads"]     = result->get().downloads.load();
+          json_res["deletes"]       = result->get().deletes.load();
+          json_res["songs_count"]   = result->get().songs_count.load();
+          json_res["storage_bytes"] = result->get().storage_bytes.load();
+
+          return crow::response{json_res};
         });
   }
 };
+
+// Static instance for signal handling
+WavyServer* WavyServer::s_instance = nullptr;
 
 } // namespace libwavy::server

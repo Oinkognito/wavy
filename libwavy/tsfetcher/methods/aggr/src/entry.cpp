@@ -27,7 +27,7 @@
 
 extern "C" auto create_fetcher_with_arg(const char* server) -> libwavy::fetch::ISegmentFetcher*
 {
-  return new libwavy::fetch::TSegFetcher(std::string(server));
+  return new libwavy::fetch::AggrSegFetcher(std::string(server));
 }
 
 extern "C" void destroy_fetcher(libwavy::fetch::ISegmentFetcher* ptr) { delete ptr; }

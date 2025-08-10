@@ -189,14 +189,15 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
   return valid_files_found;
 }
 
-auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id) -> bool
+auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id)
+  -> StorageOwnerID
 {
   log::INFO<SExtract>(LogMode::Async, " Validating and extracting GZIP file: {}", gzip_path);
 
   if (!bfs::exists(gzip_path))
   {
     log::ERROR<SExtract>(LogMode::Async, " File does not exist: {}", gzip_path);
-    return false;
+    return "";
   }
 
   const AbsPath temp_extract_path =
@@ -206,7 +207,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   if (!extract_payload(gzip_path, temp_extract_path))
   {
     log::ERROR<SExtract>(LogMode::Async, " Extraction failed!");
-    return false;
+    return "";
   }
 
   log::INFO<SExtract>(LogMode::Async, " Extraction complete. Scanning for owner file...");
@@ -230,7 +231,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   if (!ownerFound)
   {
     log::ERROR<SExtract>(LogMode::Async, " Missing OWNER file. Cannot determine destination path.");
-    return false;
+    return "";
   }
 
   const AbsPath storage_path =
@@ -318,11 +319,11 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   {
     log::ERROR<SExtract>(LogMode::Async,
                          " No valid files remain after validation. Extraction failed.");
-    return false;
+    return "";
   }
 
   log::INFO<SExtract>(LogMode::Async, " Extraction and validation successful.");
-  return true;
+  return ownerNickname;
 }
 
 void removeBodyPadding(std::string& body)

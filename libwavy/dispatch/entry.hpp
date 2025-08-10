@@ -572,14 +572,10 @@ private:
         return false;
       }
 
-      if (auto audio_id_it = res.find("Audio-ID"); audio_id_it != res.end())
-      {
-        log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(audio_id_it->value()));
-      }
+      log::INFO<Dispatch>("Response from server: \n{}", res.body());
 
       log::INFO<Dispatch>("Upload completed successfully ({} sent)",
                           utils::math::bytesFormat(total_sent));
-      m_socket.shutdown();
 
       return true;
     }
@@ -587,55 +583,6 @@ private:
     {
       log::ERROR<Dispatch>("Upload exception: {}", e.what());
       return false;
-    }
-  }
-
-  void send_http_request(NetMethods& method, const AbsPath& archive_path)
-  {
-    beast::error_code                  ec;
-    beast::http::file_body::value_type body;
-    body.open(archive_path.c_str(), beast::file_mode::scan, ec);
-    if (ec)
-    {
-      log::ERROR<Dispatch>("Failed to open archive file: {}", archive_path);
-      return;
-    }
-
-    http::request<http::file_body> req{http::string_to_verb(method), "/", 11};
-    req.set(http::field::host, m_server);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.set(http::field::content_type, macros::CONTENT_TYPE_GZIP);
-    req.body() = std::move(body);
-    req.prepare_payload();
-
-    http::write(m_socket, req, ec);
-    if (ec)
-    {
-      log::ERROR<Dispatch>("Failed to send request: {}", ec.message());
-      return;
-    }
-
-    // Read response from server
-    beast::flat_buffer                buffer;
-    http::response<http::string_body> res;
-    http::read(m_socket, buffer, res, ec);
-
-    if (ec)
-    {
-      log::ERROR<Dispatch>("Failed to read response: {}", ec.message());
-      return;
-    }
-
-    // Extract and log Audio-ID separately
-    const auto audio_id_it = res.find("Audio-ID");
-    if (audio_id_it != res.end())
-    {
-      const auto AUDIO_ID = audio_id_it->value();
-      log::INFO<Dispatch>("Parsed Audio-ID: {}", std::string(AUDIO_ID));
-    }
-    else
-    {
-      log::WARN<Dispatch>("Audio-ID not found in response headers.");
     }
   }
 

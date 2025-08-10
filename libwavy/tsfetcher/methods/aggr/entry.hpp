@@ -42,10 +42,10 @@
 namespace libwavy::fetch
 {
 
-class TSegFetcher : public ISegmentFetcher
+class AggrSegFetcher : public ISegmentFetcher
 {
 public:
-  TSegFetcher(IPAddr server)
+  AggrSegFetcher(IPAddr server)
       : m_ioCtx(std::make_shared<asio::io_context>()),
         m_sslCtx(std::make_shared<ssl::context>(ssl::context::tlsv12_client)),
         m_serverIP(std::move(server))
@@ -124,7 +124,7 @@ public:
     log::TRACE<log::FETCH>("Attempting to fetch Owners list of owner {} through Wavy-Server at {}",
                            targetNickname, server);
 
-    NetResponse response = client.get(routes::SERVER_PATH_HLS_OWNERS);
+    NetResponse response = client.get(routes::SERVER_PATH_OWNERS);
 
     if (response.empty())
       return {};

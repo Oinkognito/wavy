@@ -44,4 +44,5 @@ jobs:
 
     - name: Run Clang Tidy check for Wavy
       run: |
+        make init
         make tidy

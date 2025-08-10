@@ -37,4 +37,5 @@ jobs:
 
     - name: Build Release Version of Wavy with PLUGINS (x86-64 arch) - GCC (with GNU-ld)
       run: |
+        make init
         make EXTRA_CMAKE_FLAGS="-DBUILD_FETCHER_PLUGINS=ON -DBUILD_AUDIO_BACKEND_PLUGINS=ON"

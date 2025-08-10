@@ -9,16 +9,18 @@ RUN apk add --no-cache \
     bash \
     wget \
     curl \
-    boost-dev \
+    asio-dev \
     openssl-dev \
     openssl \
     zstd \
     git \
     pkgconf \
     libarchive-dev \
-    pulseaudio-dev
 
 RUN git clone --recursive https://github.com/Oinkognito/Wavy
+
+WORKDIR /app/Wavy/external/crow
+RUN mkdir -p build && cd build && cmake .. -DCROW_BUILD_EXAMPLES=OFF -DCROW_BUILD_TESTS=OFF && make install
 
 WORKDIR /app/Wavy
 

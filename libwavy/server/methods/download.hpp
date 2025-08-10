@@ -27,13 +27,15 @@
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
+#include <libwavy/server/metrics.hpp>
 #include <libwavy/server/prototypes.hpp>
+#include <libwavy/server/request-timer.hpp>
 
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <utility>
 
-namespace fs = std::filesystem;
+namespace bfs = boost::filesystem;
 
 using ServerDownload = libwavy::log::SERVER_DWNLD;
 
@@ -43,20 +45,24 @@ namespace libwavy::server::methods
 class DownloadManager
 {
 public:
-  // New constructor for direct use
-  DownloadManager(std::string audio_id, const crow::request& req)
-      : audioId(std::move(audio_id)), request(req)
+  DownloadManager(Metrics& metrics, std::string audio_id, const crow::request& req)
+      : m_metrics(metrics), audioId(std::move(audio_id)), request(req)
   {
   }
 
   auto runDirect(const StorageOwnerID& owner_id, const StorageAudioID& filename) -> crow::response
   {
-    const fs::path file_path =
-      fs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / owner_id / audioId / filename;
+    RequestTimer timer(m_metrics);
+    m_metrics.download_requests++;
+
+    m_metrics.owners[owner_id].downloads++;
+
+    const bfs::path file_path =
+      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / owner_id / audioId / filename;
 
     log::INFO<ServerDownload>(LogMode::Async, "Attempting to serve file: {}", file_path.string());
 
-    if (!fs::exists(file_path))
+    if (!bfs::exists(file_path))
     {
       log::ERROR<ServerDownload>(LogMode::Async, "File not found: {}", file_path.string());
       return {404, "File not found."};
@@ -74,12 +80,15 @@ public:
     log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename,
                               res.body.size(), content_type);
 
+    guessDownloadSize(res, timer);
+
     return res;
   }
 
 private:
   std::string          audioId;
   const crow::request& request;
+  Metrics&             m_metrics;
 
   auto detectMimeType(const std::string& filename) -> std::string
   {
@@ -96,6 +105,28 @@ private:
     if (!ifs)
       return {};
     return {std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>()};
+  }
+
+  void guessDownloadSize(crow::response& response, RequestTimer& timer)
+  {
+    // Try to estimate downloaded bytes from response
+    if (response.code == 200 && !response.body.empty())
+    {
+      m_metrics.bytes_downloaded += response.body.size();
+      timer.mark_success();
+    }
+    else if (response.code == 404)
+    {
+      timer.mark_error_404();
+    }
+    else if (response.code >= 400 && response.code < 500)
+    {
+      timer.mark_error_400();
+    }
+    else if (response.code >= 500)
+    {
+      timer.mark_error_500();
+    }
   }
 };
 

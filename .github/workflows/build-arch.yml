@@ -20,7 +20,7 @@ jobs:
           base-devel flac boost wget openssl \
           ffmpeg zstd cmake make pkgconf \
           libarchive lame git onetbb
-    
+
     - name: Checkout repository with submodules
       uses: actions/checkout@v3
       with:
@@ -28,4 +28,5 @@ jobs:
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC
       run: |
+        make init
         make
