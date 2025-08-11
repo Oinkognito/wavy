@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     zstd \
     git \
     pkgconf \
-    libarchive-dev \
+    libarchive-dev
 
 RUN git clone --recursive https://github.com/Oinkognito/Wavy
 

@@ -8,9 +8,9 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest  # No native Arch Linux runner
+    runs-on: ubuntu-latest
     container:
-      image: archlinux:latest  # Use Arch Linux container
+      image: archlinux:latest
 
     steps:
     - name: Update Pacman and Install Dependencies

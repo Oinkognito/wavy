@@ -8,9 +8,9 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest  # No native Fedora runner
+    runs-on: ubuntu-latest
     container:
-      image: fedora:latest  # Use Fedora container
+      image: fedora:latest
 
     steps:
     - name: Update DNF and Install Dependencies
