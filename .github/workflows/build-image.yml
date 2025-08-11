@@ -13,10 +13,14 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Clone Wavy
+        run: |
+          git clone --recursive https://github.com/Oinkognito/Wavy
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -43,8 +47,8 @@ jobs:
 
       - name: Test Server Response (Inside Container)
         run: |
-          RESPONSE=$(docker exec $CONTAINER_ID curl -k -sSf https://localhost:8080/hls/ping)
-          if [[ "$RESPONSE" == "pong" ]]; then
+          RESPONSE=$(docker exec $CONTAINER_ID curl -k -sSf https://localhost:8080/ping)
+          if [[ "$RESPONSE" == "Wavy says pong!" ]]; then
             echo "-- Server is running and responded with 'pong'!"
           else
             echo "**Unexpected response: $RESPONSE**" && exit 1

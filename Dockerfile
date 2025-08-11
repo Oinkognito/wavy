@@ -14,10 +14,12 @@ RUN apk add --no-cache \
     openssl \
     zstd \
     git \
+    ca-certificates \
     pkgconf \
-    libarchive-dev
+    libarchive-dev \
+    && update-ca-certificates
 
-RUN git clone --recursive https://github.com/Oinkognito/Wavy
+COPY . /app/Wavy
 
 WORKDIR /app/Wavy/external/crow
 RUN mkdir -p build && cd build && cmake .. -DCROW_BUILD_EXAMPLES=OFF -DCROW_BUILD_TESTS=OFF && make install
