@@ -74,7 +74,7 @@ static auto persist_key(const StorageAudioID& audio_id, const std::string& key) 
   {
     log::TRACE<log::SERVER_UPLD>("Found SHA256 key ({}) for Audio ID: {}", key, audio_id);
 
-    bfs::path keys_dir = bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / ".keys";
+    const bfs::path keys_dir = bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR_KEYS));
     bfs::create_directories(keys_dir);
     bfs::path key_file = keys_dir / (audio_id + ".key");
 

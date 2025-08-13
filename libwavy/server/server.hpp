@@ -268,15 +268,63 @@ private:
       .methods(crow::HTTPMethod::POST)([this](const crow::request& req)
                                        { return m_ownerManager.handle_upload(req); });
 
+    CROW_ROUTE(app, "/stream/<string>/<string>/<string>")
+    (
+      [this](crow::response& res, const StorageOwnerID& owner_id, const StorageAudioID& audio_id,
+             const std::string& filename)
+      {
+        const bfs::path file_path =
+          bfs::path(macros::SERVER_STORAGE_DIR) / owner_id / audio_id / filename;
+
+        log::INFO<Server>("Attempting to start stream for '{}'", file_path);
+
+        if (!bfs::exists(file_path))
+        {
+          res.code = 404;
+          res.end("File not found");
+          return;
+        }
+
+        res.set_header("Content-Type", "application/octet-stream");
+        res.set_header("Transfer-Encoding", "chunked");
+
+        std::thread(
+          [file_path, res = std::move(res)]() mutable
+          {
+            int fd = ::open(file_path.string().c_str(), O_RDONLY);
+            if (fd < 0)
+            {
+              res.code = 500;
+              res.end("Internal Server Error");
+              return;
+            }
+
+            constexpr size_t  CHUNK = 64 * 1024;
+            std::vector<char> buf(CHUNK);
+            ssize_t           n;
+            while ((n = ::read(fd, buf.data(), buf.size())) > 0)
+            {
+              res.write(std::string(buf.data(), n));
+            }
+
+            ::close(fd);
+            res.end();
+          })
+          .detach();
+      });
+
+    // File download (GET /download/<owner-id>/<audio-id>/<filename>)
     CROW_ROUTE(app, routes::SERVER_PATH_DOWNLOAD)
       .methods(crow::HTTPMethod::GET)(
         [this](const crow::request& req, const StorageOwnerID& ownerID,
                const StorageAudioID& audioID, const std::string& filename)
         {
-          log::INFO<Server>(LogMode::Async, "Download request received for Audio-ID: {}", audioID);
+          log::INFO<Server>(LogMode::Async,
+                            "Download request received for Audio-ID: {} by Owner: {}", audioID,
+                            ownerID);
 
-          methods::DownloadManager dm(*m_metrics, audioID, req);
-          auto                     response = dm.runDirect(ownerID, filename);
+          methods::DownloadManager dm(*m_metrics, ownerID, audioID, req);
+          auto                     response = dm.runDirect(filename);
 
           return response;
         });

@@ -22,7 +22,6 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <boost/date_time/gregorian/greg_month.hpp>
 #include <libwavy/ffmpeg/decoder/entry.hpp>
 
 using Decoder = libwavy::log::DECODER;
@@ -49,7 +48,7 @@ void MediaDecoder::print_audio_metadata(AVFormatContext* formatCtx, AVCodecParam
   log::DBG<Decoder>("Channels: {}", codecParams->ch_layout.nb_channels);
   log::DBG<Decoder>("Format: {}", formatCtx->iformat->long_name);
   log::DBG<Decoder>("{}", (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
-                                                         : "This is a lossy codec"));
+                                                                    : "This is a lossy codec"));
 }
 
 auto MediaDecoder::decode(TotalAudioData& ts_segments, TotalDecodedAudioData& output_audio) -> bool
@@ -223,7 +222,8 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
         size_t actual_added  = output.size() - before_size;
         if (expected_size != actual_added)
         {
-          log::WARN<Decoder>("Size mismatch in planar data: expected {}, got {}", expected_size, actual_added);
+          log::WARN<Decoder>("Size mismatch in planar data: expected {}, got {}", expected_size,
+                             actual_added);
         }
       }
       else
@@ -236,7 +236,8 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
           size_t actual_added = output.size() - before_size;
           if (actual_added != dataSize)
           {
-            log::WARN<Decoder>("Size mismatch in interleaved data: expected {}, got {}", dataSize, actual_added);
+            log::WARN<Decoder>("Size mismatch in interleaved data: expected {}, got {}", dataSize,
+                               actual_added);
           }
         }
       }
@@ -284,8 +285,11 @@ auto MediaDecoder::process_packets(AVFormatContext* ctx, AVCodecContext* codec_c
   av_frame_free(&frame);
   av_packet_free(&packet);
 
-  log::INFO<Decoder>("Decoding complete: {} bytes of raw audio data generated!", libwavy::utils::math::bytesFormat(output.size()));
-  log::INFO<Decoder>("Sample format: {}, Bytes per sample: {}", av_get_sample_fmt_name(codec_ctx->sample_fmt), av_get_bytes_per_sample(codec_ctx->sample_fmt));
+  log::INFO<Decoder>("Decoding complete: {} bytes of raw audio data generated!",
+                     libwavy::utils::math::bytesFormat(output.size()));
+  log::INFO<Decoder>("Sample format: {}, Bytes per sample: {}",
+                     av_get_sample_fmt_name(codec_ctx->sample_fmt),
+                     av_get_bytes_per_sample(codec_ctx->sample_fmt));
 
   return !output.empty();
 }

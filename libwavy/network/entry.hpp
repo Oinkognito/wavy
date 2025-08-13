@@ -71,6 +71,91 @@ public:
     return makeRequest(http::verb::post, target, body);
   }
 
+  auto streamChunked(const NetTarget&                              target,
+                     std::function<void(const char*, std::size_t)> on_chunk) -> bool
+  {
+    try
+    {
+      tcp::resolver resolver{m_ioCtx};
+      m_socket = std::make_unique<beast::ssl_stream<tcp::socket>>(m_ioCtx, m_sslCtx);
+
+      auto results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
+      asio::connect(beast::get_lowest_layer(*m_socket), results.begin(), results.end());
+      m_socket->handshake(ssl::stream_base::client);
+
+      // Prepare GET request
+      http::request<http::empty_body> req{http::verb::get, target, 11};
+      req.set(http::field::host, m_server);
+      req.set(http::field::user_agent, "WavyClient");
+
+      // Send the request
+      http::write(*m_socket, req);
+
+      // Prepare parser for chunked response
+      beast::flat_buffer                        buffer;
+      http::response_parser<http::dynamic_body> parser;
+      parser.body_limit((std::numeric_limits<std::uint64_t>::max)()); // No body size limit
+      parser.get().body().clear();
+      parser.get().body().shrink_to_fit();
+
+      beast::error_code ec;
+      // Read header first
+      http::read_header(*m_socket, buffer, parser, ec);
+      if (ec)
+      {
+        log::ERROR<log::NET>("Failed to read headers: {}", ec.message());
+        return false;
+      }
+
+      // Check if transfer-encoding is chunked
+      if (!parser.get().chunked())
+      {
+        log::WARN<log::NET>("Response not chunked — streaming might not be incremental");
+      }
+
+      // Incrementally read chunks
+      while (!parser.is_done())
+      {
+        http::read_some(*m_socket, buffer, parser, ec);
+
+        if (ec == http::error::need_buffer)
+        {
+          continue; // More data is needed
+        }
+        else if (ec && ec != asio::error::eof)
+        {
+          log::ERROR<log::NET>("Error while streaming: {}", ec.message());
+          return false;
+        }
+
+        // Extract chunk data
+        auto& body = parser.get().body();
+        for (auto const& seq : body.data())
+        {
+          const char* data_ptr = static_cast<const char*>(seq.data());
+          std::size_t data_len = seq.size();
+          if (data_len > 0 && on_chunk)
+          {
+            on_chunk(data_ptr, data_len);
+          }
+        }
+        body.clear();
+      }
+
+      beast::error_code shutdown_ec;
+      m_socket->shutdown(shutdown_ec);
+      if (shutdown_ec == asio::error::eof)
+        shutdown_ec.clear();
+
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      log::ERROR<log::NET>("Chunked streaming failed: {}", e.what());
+      return false;
+    }
+  }
+
 private:
   asio::io_context&    m_ioCtx;
   ssl::context&        m_sslCtx;

@@ -39,6 +39,9 @@
 #include <libwavy/utils/io/dbg/entry.hpp>
 #include <memory>
 
+#include <indicators/cursor_control.hpp>
+#include <indicators/progress_bar.hpp>
+
 namespace libwavy::fetch
 {
 
@@ -245,6 +248,7 @@ private:
     std::string        line;
     bool               has_m4s = false;
 
+    // Check if playlist contains m4s files
     while (std::getline(stream, line))
     {
       if (!line.empty() && line[0] != '#' && line.ends_with(macros::M4S_FILE_EXT))
@@ -254,10 +258,10 @@ private:
       }
     }
 
-    auto client = make_client();
+    auto                         client = make_client();
+    std::unique_ptr<GlobalState> gs     = nullptr;
 
-    std::unique_ptr<GlobalState> gs = nullptr;
-
+    // Fetch init.mp4 if needed
     if (has_m4s)
     {
       const NetTarget initMp4Url = "/download/" + nickname + "/" + audio_id + "/init.mp4";
@@ -275,37 +279,82 @@ private:
       gs = std::make_unique<GlobalState>(); // default constructor for MP3 case
     }
 
+    // Rewind stream and collect all segment lines
     stream.clear();
     stream.seekg(0);
 
+    std::vector<std::string> segment_lines;
     while (std::getline(stream, line))
     {
       if (!line.empty() && line[0] != '#')
       {
-        const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + line;
-        log::TRACE<log::FETCH>("Fetching URL: {}", url);
-        AudioData data = client->get(url);
-
-        if (!data.empty())
-        {
-          if (line.ends_with(macros::M4S_FILE_EXT))
-          {
-            m4s_segments.push_back(std::move(data));
-          }
-          else if (line.ends_with(macros::TRANSPORT_STREAM_EXT))
-          {
-            gs->appendSegment(std::move(data));
-          }
-
-          log::DBG<log::FETCH>("Fetched segment: {}", line);
-        }
-        else
-        {
-          log::WARN<log::FETCH>("Failed to fetch segment: {}", line);
-        }
+        segment_lines.push_back(line);
       }
     }
 
+    if (segment_lines.empty())
+    {
+      log::WARN<log::FETCH>("No segments found in playlist for {}/{}", nickname, audio_id);
+      return gs;
+    }
+
+    // Setup progress bar
+    indicators::ProgressBar bar{indicators::option::BarWidth{40},
+                                indicators::option::Start{"["},
+                                indicators::option::Fill{"="},
+                                indicators::option::Lead{">"},
+                                indicators::option::Remainder{" "},
+                                indicators::option::End{"]"},
+                                indicators::option::ForegroundColor{indicators::Color::blue},
+                                indicators::option::ShowElapsedTime{true},
+                                indicators::option::ShowRemainingTime{true},
+                                indicators::option::MaxProgress{segment_lines.size()}};
+
+    auto   start_time       = std::chrono::steady_clock::now();
+    size_t fetched_segments = 0;
+    size_t total_segments   = segment_lines.size();
+
+    // Fetch each segment
+    for (const auto& seg_line : segment_lines)
+    {
+      const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
+      log::TRACE<log::FETCH>("Fetching URL: {}", url);
+
+      auto      seg_start = std::chrono::steady_clock::now();
+      AudioData data      = client->get(url);
+      auto      seg_end   = std::chrono::steady_clock::now();
+
+      if (!data.empty())
+      {
+        if (seg_line.ends_with(macros::M4S_FILE_EXT))
+        {
+          m4s_segments.push_back(std::move(data));
+        }
+        else if (seg_line.ends_with(macros::TRANSPORT_STREAM_EXT))
+        {
+          gs->appendSegment(std::move(data));
+        }
+
+        log::DBG<log::FETCH>("Fetched segment: {}", seg_line);
+      }
+      else
+      {
+        log::WARN<log::FETCH>("Failed to fetch segment: {}", seg_line);
+      }
+
+      // Update progress info
+      fetched_segments++;
+      double avg_time_per_seg =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count() /
+        fetched_segments;
+
+      bar.set_progress(fetched_segments);
+      bar.set_option(indicators::option::PrefixText{
+        std::format("Segments: {}/{} ETA: {:.1f}s", fetched_segments, total_segments,
+                    avg_time_per_seg * (total_segments - fetched_segments))});
+    }
+
+    bar.mark_as_completed();
     return gs;
   }
 };

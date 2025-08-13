@@ -125,6 +125,7 @@ enum Macros
                                                               \
   /* Directories */                                           \
   X(SERVER_TEMP_STORAGE_DIR, "/tmp/wavy_temp")                \
+  X(SERVER_STORAGE_DIR_KEYS, "/tmp/wavy_storage/.keys")       \
   X(SERVER_STORAGE_DIR, "/tmp/wavy_storage") // tmp of server filesystem
 
 #define PROTOCOL_CONSTANTS(X)                                                               \

@@ -45,20 +45,22 @@ namespace libwavy::server::methods
 class DownloadManager
 {
 public:
-  DownloadManager(Metrics& metrics, std::string audio_id, const crow::request& req)
-      : m_metrics(metrics), audioId(std::move(audio_id)), request(req)
+  DownloadManager(Metrics& metrics, StorageOwnerID owner_id, StorageAudioID audio_id,
+                  const crow::request& req)
+      : m_metrics(metrics), m_ownerID(std::move(owner_id)), m_audioID(std::move(audio_id)),
+        m_request(req)
   {
   }
 
-  auto runDirect(const StorageOwnerID& owner_id, const StorageAudioID& filename) -> crow::response
+  auto runDirect(const AbsPath& filename) -> crow::response
   {
     RequestTimer timer(m_metrics);
     m_metrics.download_requests++;
 
-    m_metrics.owners[owner_id].downloads++;
+    m_metrics.owners[m_ownerID].downloads++;
 
     const bfs::path file_path =
-      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / owner_id / audioId / filename;
+      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
 
     log::INFO<ServerDownload>(LogMode::Async, "Attempting to serve file: {}", file_path.string());
 
@@ -86,11 +88,12 @@ public:
   }
 
 private:
-  std::string          audioId;
-  const crow::request& request;
+  StorageOwnerID       m_ownerID;
+  StorageAudioID       m_audioID;
+  const crow::request& m_request;
   Metrics&             m_metrics;
 
-  auto detectMimeType(const std::string& filename) -> std::string
+  auto detectMimeType(const AbsPath& filename) -> std::string
   {
     if (filename.ends_with(macros::PLAYLIST_EXT))
       return "application/vnd.apple.mpegurl";
@@ -99,7 +102,7 @@ private:
     return macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
   }
 
-  auto readFile(const std::string& path) -> std::string
+  auto readFile(const AbsPath& path) -> std::string
   {
     std::ifstream ifs(path, std::ios::binary);
     if (!ifs)
