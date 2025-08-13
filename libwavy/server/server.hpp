@@ -276,7 +276,7 @@ private:
         const bfs::path file_path =
           bfs::path(macros::SERVER_STORAGE_DIR) / owner_id / audio_id / filename;
 
-        log::INFO<Server>("Attempting to start stream for '{}'", file_path);
+        log::INFO<Server>("Attempting to start stream for '{}'", file_path.string());
 
         if (!bfs::exists(file_path))
         {
