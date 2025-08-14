@@ -317,12 +317,20 @@ private:
     // Fetch each segment
     for (const auto& seg_line : segment_lines)
     {
-      const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
+      //const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
+      const NetTarget url = "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
       log::TRACE<log::FETCH>("Fetching URL: {}", url);
-
+      AudioData data;
       auto      seg_start = std::chrono::steady_clock::now();
-      AudioData data      = client->get(url);
-      auto      seg_end   = std::chrono::steady_clock::now();
+      //data      = client->get(url);
+      client->get_chunked(url,
+                          [&data](const std::string& chunk)
+                          {
+                            data.append(chunk);
+                            log::TRACE<log::FETCH>("Appended {} bytes to audio data.",
+                                                   chunk.size());
+                          });
+      auto seg_end = std::chrono::steady_clock::now();
 
       if (!data.empty())
       {

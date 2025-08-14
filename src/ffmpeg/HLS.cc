@@ -28,7 +28,7 @@
 #include <regex>
 
 namespace fs = std::filesystem;
-using HLS = libwavy::log::HLS;
+using HLS    = libwavy::log::HLS;
 
 namespace libwavy::ffmpeg::hls
 {
@@ -214,13 +214,14 @@ void HLS_Segmenter::createMasterPlaylistMP3(const Directory& input_dir, const Di
 
   for (size_t i = 0; i < playlists.size(); i++)
   {
-    m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << bitrates[i] << "," << macros::MP3_CODEC << "\"\n";
+    m3u8 << "#EXT-X-STREAM-INF:BANDWIDTH=" << bitrates[i] << "," << macros::MP3_CODEC << "\n";
     m3u8 << playlists[i] << "\n";
   }
 
   m3u8.close();
 
-  log::INFO<HLS>("Created HLS segments for LOSSY with references written to master playlist: {}", macros::to_string(macros::MASTER_PLAYLIST));
+  log::INFO<HLS>("Created HLS segments for LOSSY with references written to master playlist: {}",
+                 macros::to_string(macros::MASTER_PLAYLIST));
 }
 
 auto HLS_Segmenter::encode_variant(CStrRelPath input_file, CStrRelPath output_playlist, int bitrate)

@@ -42,6 +42,15 @@ using ServerDownload = libwavy::log::SERVER_DWNLD;
 namespace libwavy::server::methods
 {
 
+inline auto detectStreamMIMEType(const AbsPath& filename) -> const std::string
+{
+  if (filename.ends_with(macros::PLAYLIST_EXT))
+    return "application/vnd.apple.mpegurl";
+  if (filename.ends_with(macros::TRANSPORT_STREAM_EXT))
+    return "video/mp2t";
+  return macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
+}
+
 class DownloadManager
 {
 public:
@@ -70,7 +79,7 @@ public:
       return {404, "File not found."};
     }
 
-    std::string content_type = detectMimeType(filename);
+    std::string content_type = detectStreamMIMEType(filename);
 
     crow::response res;
     res.code = 200;
@@ -92,15 +101,6 @@ private:
   StorageAudioID       m_audioID;
   const crow::request& m_request;
   Metrics&             m_metrics;
-
-  auto detectMimeType(const AbsPath& filename) -> std::string
-  {
-    if (filename.ends_with(macros::PLAYLIST_EXT))
-      return "application/vnd.apple.mpegurl";
-    if (filename.ends_with(macros::TRANSPORT_STREAM_EXT))
-      return "video/mp2t";
-    return macros::to_string(macros::CONTENT_TYPE_OCTET_STREAM);
-  }
 
   auto readFile(const AbsPath& path) -> std::string
   {

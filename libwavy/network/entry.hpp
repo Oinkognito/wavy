@@ -40,6 +40,8 @@ namespace http  = beast::http;
 namespace asio  = boost::asio;
 using tcp       = asio::ip::tcp;
 
+using Network = libwavy::log::NET;
+
 namespace libwavy::network
 {
 
@@ -71,88 +73,116 @@ public:
     return makeRequest(http::verb::post, target, body);
   }
 
-  auto streamChunked(const NetTarget&                              target,
-                     std::function<void(const char*, std::size_t)> on_chunk) -> bool
+  void get_chunked(const std::string& target, std::function<void(const std::string&)> on_chunk)
   {
     try
     {
-      tcp::resolver resolver{m_ioCtx};
-      m_socket = std::make_unique<beast::ssl_stream<tcp::socket>>(m_ioCtx, m_sslCtx);
+      asio::io_context ioc;
+      ssl::context     ctx(ssl::context::sslv23_client);
+      ctx.set_verify_mode(ssl::verify_none); // allow self-signed for now
 
-      auto results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
-      asio::connect(beast::get_lowest_layer(*m_socket), results.begin(), results.end());
-      m_socket->handshake(ssl::stream_base::client);
+      tcp::resolver                        resolver(ioc);
+      beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
 
-      // Prepare GET request
-      http::request<http::empty_body> req{http::verb::get, target, 11};
-      req.set(http::field::host, m_server);
-      req.set(http::field::user_agent, "WavyClient");
+      auto const results = resolver.resolve(m_server, WAVY_SERVER_PORT_NO_STR);
 
-      // Send the request
-      http::write(*m_socket, req);
+      beast::get_lowest_layer(stream).connect(results);
 
-      // Prepare parser for chunked response
-      beast::flat_buffer                        buffer;
-      http::response_parser<http::dynamic_body> parser;
-      parser.body_limit((std::numeric_limits<std::uint64_t>::max)()); // No body size limit
-      parser.get().body().clear();
-      parser.get().body().shrink_to_fit();
+      if (!SSL_set_tlsext_host_name(stream.native_handle(), m_server.c_str()))
+      {
+        beast::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
+        throw beast::system_error{ec};
+      }
+
+      stream.handshake(ssl::stream_base::client);
+      log::INFO<Network>("Connecting to '{}'", m_server);
+
+      // Send raw GET request
+      std::string req = "GET " + target +
+                        " HTTP/1.1\r\n"
+                        "Host: " +
+                        m_server +
+                        "\r\n"
+                        "User-Agent: WavyClient/1.0\r\n"
+                        "Accept: */*\r\n"
+                        "Connection: close\r\n\r\n";
+      asio::write(stream, asio::buffer(req));
+
+      // Read headers
+      asio::streambuf header_buf;
+      asio::read_until(stream, header_buf, "\r\n\r\n");
+
+      std::istream header_stream(&header_buf);
+      std::string  status_line;
+      std::getline(header_stream, status_line);
+      if (!status_line.empty() && status_line.back() == '\r')
+        status_line.pop_back();
+      log::INFO<Network>("Status line: {}", status_line);
+
+      std::string header_line;
+      while (std::getline(header_stream, header_line) && header_line != "\r")
+      {
+        if (!header_line.empty() && header_line.back() == '\r')
+          header_line.pop_back();
+        log::DBG<Network>("Header: {}", header_line);
+      }
+
+      asio::streambuf buffer;
+      if (header_buf.size() > 0)
+        buffer.commit(asio::buffer_copy(buffer.prepare(header_buf.size()), header_buf.data()));
+
+      // Read chunks
+      std::size_t total_bytes = 0;
+      while (true)
+      {
+        asio::read_until(stream, buffer, CRLF);
+        std::istream size_stream(&buffer);
+        std::string  chunk_size_line;
+        std::getline(size_stream, chunk_size_line);
+        if (!chunk_size_line.empty() && chunk_size_line.back() == '\r')
+          chunk_size_line.pop_back();
+
+        std::size_t chunk_size = 0;
+        try
+        {
+          chunk_size = std::stoul(chunk_size_line, nullptr, 16);
+        }
+        catch (...)
+        {
+          log::ERROR<Network>("Invalid chunk size '{}'", chunk_size_line);
+          break;
+        }
+
+        if (chunk_size == 0)
+        {
+          log::INFO<Network>("Final chunk received");
+          asio::read_until(stream, buffer, CRLF);
+          break;
+        }
+
+        while (buffer.size() < chunk_size + 2)
+          asio::read(stream, buffer, asio::transfer_at_least(chunk_size + 2 - buffer.size()));
+
+        std::string chunk_data(chunk_size, '\0');
+        buffer.sgetn(&chunk_data[0], chunk_size);
+
+        on_chunk(chunk_data);
+
+        buffer.consume(2);
+        total_bytes += chunk_size;
+        log::DBG<Network>("Read {} bytes (total: {})", chunk_size, total_bytes);
+      }
 
       beast::error_code ec;
-      // Read header first
-      http::read_header(*m_socket, buffer, parser, ec);
+      stream.shutdown(ec);
+      if (ec == asio::error::eof || ec == ssl::error::stream_truncated)
+        ec = {};
       if (ec)
-      {
-        log::ERROR<log::NET>("Failed to read headers: {}", ec.message());
-        return false;
-      }
-
-      // Check if transfer-encoding is chunked
-      if (!parser.get().chunked())
-      {
-        log::WARN<log::NET>("Response not chunked — streaming might not be incremental");
-      }
-
-      // Incrementally read chunks
-      while (!parser.is_done())
-      {
-        http::read_some(*m_socket, buffer, parser, ec);
-
-        if (ec == http::error::need_buffer)
-        {
-          continue; // More data is needed
-        }
-        else if (ec && ec != asio::error::eof)
-        {
-          log::ERROR<log::NET>("Error while streaming: {}", ec.message());
-          return false;
-        }
-
-        // Extract chunk data
-        auto& body = parser.get().body();
-        for (auto const& seq : body.data())
-        {
-          const char* data_ptr = static_cast<const char*>(seq.data());
-          std::size_t data_len = seq.size();
-          if (data_len > 0 && on_chunk)
-          {
-            on_chunk(data_ptr, data_len);
-          }
-        }
-        body.clear();
-      }
-
-      beast::error_code shutdown_ec;
-      m_socket->shutdown(shutdown_ec);
-      if (shutdown_ec == asio::error::eof)
-        shutdown_ec.clear();
-
-      return true;
+        throw beast::system_error{ec};
     }
-    catch (const std::exception& e)
+    catch (std::exception& e)
     {
-      log::ERROR<log::NET>("Chunked streaming failed: {}", e.what());
-      return false;
+      log::ERROR<Network>("Exception in get_chunked: {}", e.what());
     }
   }
 
@@ -214,7 +244,7 @@ private:
 
       if (timed_out)
       {
-        log::ERROR<log::NET>("Request timed out");
+        log::ERROR<Network>("Request timed out");
         return "";
       }
 
@@ -229,7 +259,7 @@ private:
     }
     catch (const std::exception& e)
     {
-      log::ERROR<log::NET>("HTTPS request failed: {}", e.what());
+      log::ERROR<Network>("HTTPS request failed: {}", e.what());
       return "";
     }
   }
