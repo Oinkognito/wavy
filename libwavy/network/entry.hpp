@@ -95,7 +95,6 @@ public:
       }
 
       stream.handshake(ssl::stream_base::client);
-      log::INFO<Network>("Connecting to '{}'", m_server);
 
       // Send raw GET request
       std::string req = "GET " + target +
@@ -117,7 +116,6 @@ public:
       std::getline(header_stream, status_line);
       if (!status_line.empty() && status_line.back() == '\r')
         status_line.pop_back();
-      log::INFO<Network>("Status line: {}", status_line);
 
       std::string header_line;
       while (std::getline(header_stream, header_line) && header_line != "\r")
@@ -155,7 +153,6 @@ public:
 
         if (chunk_size == 0)
         {
-          log::INFO<Network>("Final chunk received");
           asio::read_until(stream, buffer, CRLF);
           break;
         }

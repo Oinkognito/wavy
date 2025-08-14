@@ -76,7 +76,9 @@ public:
 
       AudioData      init_mp4_data;
       TotalAudioData m4s_segments;
-      auto gs = process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments);
+      const bool     use_chunked_stream = true;
+      auto           gs = process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments,
+                                           use_chunked_stream);
       if (!gs)
       {
         log::ERROR<log::FETCH>(
@@ -242,7 +244,8 @@ private:
 
   auto process_segments(const PlaylistData& playlist, const StorageOwnerID& nickname,
                         const StorageAudioID& audio_id, AudioData& init_mp4_data,
-                        TotalAudioData& m4s_segments) -> std::unique_ptr<GlobalState>
+                        TotalAudioData& m4s_segments, bool use_chunked = false)
+    -> std::unique_ptr<GlobalState>
   {
     std::istringstream stream(playlist);
     std::string        line;
@@ -317,19 +320,26 @@ private:
     // Fetch each segment
     for (const auto& seg_line : segment_lines)
     {
-      //const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
-      const NetTarget url = "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
-      log::TRACE<log::FETCH>("Fetching URL: {}", url);
       AudioData data;
+      NetTarget url;
       auto      seg_start = std::chrono::steady_clock::now();
-      //data      = client->get(url);
-      client->get_chunked(url,
-                          [&data](const std::string& chunk)
-                          {
-                            data.append(chunk);
-                            log::TRACE<log::FETCH>("Appended {} bytes to audio data.",
-                                                   chunk.size());
-                          });
+      if (!use_chunked)
+      {
+        const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
+        data                = client->get(url);
+      }
+      else
+      {
+        const NetTarget url = "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
+        client->get_chunked(url,
+                            [&data](const std::string& chunk)
+                            {
+                              data.append(chunk);
+                              log::TRACE<log::FETCH>("Appended {} bytes to audio data.",
+                                                     chunk.size());
+                            });
+      }
+      log::TRACE<log::FETCH>("Fetching URL: {}", url);
       auto seg_end = std::chrono::steady_clock::now();
 
       if (!data.empty())
