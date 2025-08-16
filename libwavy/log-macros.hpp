@@ -4,7 +4,13 @@
 #include <libwavy/logger.hpp>
 #undef WAVY__INTERNAL_LOGGING_IMPL
 
+#if __cpp_lib_format >= 201907L
 #include <format>
+namespace lwfmt = std;
+#else
+#include <fmt/format.h>
+namespace lwfmt = fmt;
+#endif
 
 #define INIT_WAVY_LOGGER_MACROS() \
   namespace lwlog = libwavy::log; \
@@ -54,7 +60,7 @@ inline void INFO(LogMode mode, std::string_view fmt, Args&&... args)
 {
   LOG_ARGS_TYPE_CHECK();
 
-  auto formatted = std::vformat(fmt, std::make_format_args(args...));
+  auto formatted = lwfmt::vformat(fmt, lwfmt::make_format_args(args...));
   if (mode == LogMode::Async)
     LOG_INFO_ASYNC << log_prefix<Tag>() << formatted;
   else
@@ -67,7 +73,7 @@ inline void ERROR(LogMode mode, std::string_view fmt, Args&&... args)
 {
   LOG_ARGS_TYPE_CHECK();
 
-  auto formatted = std::vformat(fmt, std::make_format_args(args...));
+  auto formatted = lwfmt::vformat(fmt, lwfmt::make_format_args(args...));
   if (mode == LogMode::Async)
     LOG_ERROR_ASYNC << log_prefix<Tag>() << formatted;
   else
@@ -80,7 +86,7 @@ inline void DBG(LogMode mode, std::string_view fmt, Args&&... args)
 {
   LOG_ARGS_TYPE_CHECK();
 
-  auto formatted = std::vformat(fmt, std::make_format_args(args...));
+  auto formatted = lwfmt::vformat(fmt, lwfmt::make_format_args(args...));
   if (mode == LogMode::Async)
     LOG_DEBUG_ASYNC << log_prefix<Tag>() << formatted;
   else
@@ -93,7 +99,7 @@ inline void TRACE(LogMode mode, std::string_view fmt, Args&&... args)
 {
   LOG_ARGS_TYPE_CHECK();
 
-  auto formatted = std::vformat(fmt, std::make_format_args(args...));
+  auto formatted = lwfmt::vformat(fmt, lwfmt::make_format_args(args...));
   if (mode == LogMode::Async)
     LOG_TRACE_ASYNC << log_prefix<Tag>() << formatted;
   else
@@ -106,7 +112,7 @@ inline void WARN(LogMode mode, std::string_view fmt, Args&&... args)
 {
   LOG_ARGS_TYPE_CHECK();
 
-  auto formatted = std::vformat(fmt, std::make_format_args(args...));
+  auto formatted = lwfmt::vformat(fmt, lwfmt::make_format_args(args...));
   if (mode == LogMode::Async)
     LOG_WARNING_ASYNC << log_prefix<Tag>() << formatted;
   else

@@ -36,6 +36,7 @@ option(BUILD_NINJA "Use Ninja to build the project" OFF)
 option(BUILD_EXAMPLES "Compile examples for the project" OFF)
 option(BUILD_UI "Build Wavy-UI using libquwrof" OFF)
 option(AUTOGEN_HEADER "Autogenerate Config Header for the project" ON)
+option(USE_FMT "Use fmt library for logging" OFF)
 
 set(WAVY_AUDIO_BACKEND_PLUGIN_OUTPUT_PATH ${CMAKE_BINARY_DIR}/plugins/audio)
 set(WAVY_AUDIO_PLUGIN_ENTRIES "")
@@ -52,6 +53,11 @@ if (DEFINED BUILD_NINJA AND BUILD_NINJA)
     set(CMAKE_MAKE_PROGRAM ninja)
 else()
   message(STATUS "Using ${CMAKE_GENERATOR}...")
+endif()
+
+if(USE_FMT)
+    find_package(fmt REQUIRED)
+    message(STATUS "Using ${BLUE}${BOLD}fmt library${RESET} for Wavy Logger")
 endif()
 
 # Option to enable mold linker
@@ -108,6 +114,9 @@ add_library(wavy-server SHARED ${LIBWAVY_SERVER_SRC})
 target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 # Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
 target_link_libraries(wavy-server PUBLIC ${LMDB_LIBRARIES} wavy-logger OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+if(USE_FMT)
+    target_link_libraries(wavy-logger PUBLIC fmt::fmt)
+endif()
 ########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
 
 if (DEFINED NO_FFMPEG AND NO_FFMPEG)
