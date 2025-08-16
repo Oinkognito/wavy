@@ -103,11 +103,12 @@ namespace libwavy::server
 class WAVY_API WavyServer
 {
 public:
-  WavyServer(short port, AbsPath serverCert, AbsPath serverKey)
+  WavyServer(short port, AbsPath serverCert, AbsPath serverKey,
+             db::LMDBKV<AudioMetadataPlain>& kvStore)
       : m_socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), m_wavySocketBind(m_socketPath),
         m_port(port), m_serverCert(std::move(serverCert)), m_serverKey(std::move(serverKey)),
-        m_shutdown_requested(false), m_metrics(std::make_unique<Metrics>()),
-        m_ownerManager(*m_metrics)
+        m_shutdown_requested(false), m_metrics(std::make_unique<Metrics>()), m_kvStore(kvStore),
+        m_ownerManager(*m_metrics, m_kvStore)
   {
     m_wavySocketBind.EnsureSingleInstance();
     log::INFO<Server>("Starting Wavy Server on port {}", port);
@@ -176,6 +177,9 @@ private:
   std::atomic<bool>       m_shutdown_requested;
   std::condition_variable m_shutdown_cv;
   std::mutex              m_shutdown_mutex;
+
+  // db
+  db::LMDBKV<AudioMetadataPlain>& m_kvStore;
 
   // Metrics
   std::unique_ptr<Metrics> m_metrics;
@@ -270,77 +274,11 @@ private:
 
     CROW_ROUTE(app, routes::SERVER_PATH_STREAM)
     (
-      [this](crow::response& res, const StorageOwnerID& owner_id, const StorageAudioID& audio_id,
-             const AbsPath& filename)
+      [this](const crow::request& req, crow::response& res, const StorageOwnerID& owner_id,
+             const StorageAudioID& audio_id, const AbsPath& filename)
       {
-        const bfs::path file_path =
-          bfs::path(macros::SERVER_STORAGE_DIR) / owner_id / audio_id / filename;
-        log::INFO<Server>("Attempting to start stream for '{}'", file_path.string());
-
-        if (!bfs::exists(file_path))
-        {
-          log::ERROR<Server>("File not found: {}", file_path.string());
-          res.code = 404;
-          res.end("File not found");
-          return;
-        }
-
-        std::ifstream file(file_path.string(), std::ios::binary);
-        if (!file.is_open())
-        {
-          log::ERROR<Server>("Failed to open file: {}", file_path.string());
-          res.code = 500;
-          res.end("Internal Server Error");
-          return;
-        }
-
-        // Set appropriate content type
-        const std::string content_type = methods::detectStreamMIMEType(file_path.string());
-        const std::string ext          = file_path.extension().string();
-
-        res.set_header("Content-Type", content_type);
-        res.set_header("Transfer-Encoding", "chunked");
-
-        // Helper function to write a chunk
-        auto L_WriteChunk = [&res](const std::string& data)
-        {
-          if (!data.empty())
-          {
-            // Write chunk size in hex followed by CRLF
-            std::stringstream hex_size;
-            hex_size << std::hex << data.size();
-            res.write(hex_size.str() + CRLF);
-
-            // Write chunk data followed by CRLF
-            res.write(data + CRLF);
-          }
-        };
-
-        constexpr size_t  CHUNK = 64 * 1024;
-        std::vector<char> buf(CHUNK);
-        size_t            total_bytes_sent = 0;
-
-        while (file)
-        {
-          file.read(buf.data(), buf.size());
-          std::streamsize count = file.gcount();
-
-          if (count <= 0)
-            break;
-
-          std::string chunk_data(buf.data(), static_cast<size_t>(count));
-          L_WriteChunk(chunk_data);
-
-          total_bytes_sent += static_cast<size_t>(count);
-          log::DBG<Server>("Wrote {} bytes to response (total: {})", count, total_bytes_sent);
-        }
-
-        // Write the final chunk (empty chunk to signal end)
-        res.write(std::format("0{}", CRLF2));
-
-        log::INFO<Server>("Finished sending {} bytes for '{}'", total_bytes_sent,
-                          file_path.string());
-        res.end();
+        methods::DownloadManager dm(*m_metrics, owner_id, audio_id, req, m_kvStore);
+        dm.runStream(filename, res);
       });
 
     // File download (GET /download/<owner-id>/<audio-id>/<filename>)
@@ -353,7 +291,7 @@ private:
                             "Download request received for Audio-ID: {} by Owner: {}", audioID,
                             ownerID);
 
-          methods::DownloadManager dm(*m_metrics, ownerID, audioID, req);
+          methods::DownloadManager dm(*m_metrics, ownerID, audioID, req, m_kvStore);
           auto                     response = dm.runDirect(filename);
 
           return response;

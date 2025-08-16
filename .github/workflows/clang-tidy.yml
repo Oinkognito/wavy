@@ -32,7 +32,7 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev qt6-base-dev libpulse-dev
+            libmp3lame-dev libtbb-dev qt6-base-dev libpulse-dev liblmdb-dev
 
     - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
       run: |

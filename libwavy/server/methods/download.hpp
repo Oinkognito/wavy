@@ -31,7 +31,6 @@
 #include <libwavy/server/prototypes.hpp>
 #include <libwavy/server/request-timer.hpp>
 
-#include <boost/filesystem.hpp>
 #include <fstream>
 #include <utility>
 
@@ -55,9 +54,9 @@ class DownloadManager
 {
 public:
   DownloadManager(Metrics& metrics, StorageOwnerID owner_id, StorageAudioID audio_id,
-                  const crow::request& req)
+                  const crow::request& req, db::LMDBKV<AudioMetadataPlain>& kvStore)
       : m_metrics(metrics), m_ownerID(std::move(owner_id)), m_audioID(std::move(audio_id)),
-        m_request(req)
+        m_request(req), m_kvStore(kvStore)
   {
   }
 
@@ -65,27 +64,29 @@ public:
   {
     RequestTimer timer(m_metrics);
     m_metrics.download_requests++;
-
     m_metrics.owners[m_ownerID].downloads++;
 
-    const bfs::path file_path =
-      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
+    // Compose the key in the LMDB
+    const db::Key key = db::make_kv_key(m_ownerID, m_audioID, filename);
 
-    log::INFO<ServerDownload>(LogMode::Async, "Attempting to serve file: {}", file_path.string());
-
-    if (!bfs::exists(file_path))
+    // Fetch the value from the KV store
+    db::Value file_val = m_kvStore.get(key);
+    if (file_val.empty())
     {
-      log::ERROR<ServerDownload>(LogMode::Async, "File not found: {}", file_path.string());
+      log::ERROR<ServerDownload>(LogMode::Async, "File not found in KV store: {}", filename);
       return {404, "File not found."};
     }
 
     std::string content_type = detectStreamMIMEType(filename);
 
+    // Convert vector<char> (db::Value) to std::string for response body
+    std::string body = as::str(file_val);
+
     crow::response res;
     res.code = 200;
     res.set_header("Server", "Wavy Server");
     res.set_header("Content-Type", content_type);
-    res.body = readFile(file_path.string());
+    res.body = std::move(body);
     res.set_header("Content-Length", std::to_string(res.body.size()));
 
     log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename,
@@ -96,11 +97,79 @@ public:
     return res;
   }
 
+  auto runStream(const AbsPath& filename, crow::response& res) -> void
+  {
+    RequestTimer timer(m_metrics);
+    m_metrics.download_requests++;
+    m_metrics.owners[m_ownerID].downloads++;
+
+    // Compose the key for KV store
+    const db::Key key = db::make_kv_key(m_ownerID, m_audioID, filename);
+
+    // Fetch the value from LMDB
+    db::Value file_val = m_kvStore.get(key);
+    if (file_val.empty())
+    {
+      log::ERROR<ServerDownload>("File not found in KV store: {}", filename);
+      res.code = 404;
+      res.end("File not found");
+      return;
+    }
+
+    // Set content type
+    const std::string content_type = detectStreamMIMEType(filename);
+    res.set_header("Content-Type", content_type);
+    res.set_header("Transfer-Encoding", "chunked");
+
+    // Helper lambda to write a chunk
+    auto L_WriteChunk = [&res](const std::string& data)
+    {
+      if (!data.empty())
+      {
+        std::stringstream hex_size;
+        hex_size << std::hex << data.size();
+        res.write(hex_size.str() + CRLF);
+        res.write(data + CRLF);
+      }
+    };
+
+    constexpr size_t CHUNK            = 64 * 1024;
+    size_t           total_bytes_sent = 0;
+
+    // Stream from vector<char> in chunks
+    const char* ptr       = file_val.data();
+    size_t      remaining = file_val.size();
+
+    while (remaining > 0)
+    {
+      size_t chunk_size = std::min(remaining, CHUNK);
+      L_WriteChunk(std::string(ptr, chunk_size));
+
+      ptr += chunk_size;
+      remaining -= chunk_size;
+      total_bytes_sent += chunk_size;
+
+      log::DBG<ServerDownload>("Wrote {} bytes to response (total: {})", chunk_size,
+                               total_bytes_sent);
+    }
+
+    // Final empty chunk
+    res.write(std::format("0{}", CRLF2));
+
+    log::INFO<ServerDownload>("Finished streaming {} bytes for '{}'", total_bytes_sent, filename);
+    res.end();
+
+    // Update metrics
+    m_metrics.bytes_downloaded += total_bytes_sent;
+    timer.mark_success();
+  }
+
 private:
-  StorageOwnerID       m_ownerID;
-  StorageAudioID       m_audioID;
-  const crow::request& m_request;
-  Metrics&             m_metrics;
+  StorageOwnerID                  m_ownerID;
+  StorageAudioID                  m_audioID;
+  const crow::request&            m_request;
+  Metrics&                        m_metrics;
+  db::LMDBKV<AudioMetadataPlain>& m_kvStore;
 
   auto readFile(const AbsPath& path) -> std::string
   {

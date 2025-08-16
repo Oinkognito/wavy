@@ -35,7 +35,7 @@ jobs:
         # Ensure any dependencies are installed before building
 
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake make ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev libssl-dev libboost-all-dev zstd libarchive-dev libtbb-dev libasio-dev
+        sudo apt-get install -y build-essential cmake make ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev libssl-dev libboost-all-dev zstd libarchive-dev libtbb-dev libasio-dev liblmdb-dev
         sudo make init
         make all
 

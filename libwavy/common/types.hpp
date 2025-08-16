@@ -25,6 +25,7 @@
 
 // Contains typedefs for the entire project (aside from Audio related ones in global state)
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -39,6 +40,8 @@ using ui8  = std::uint8_t;
 using ui16 = std::uint16_t;
 using ui32 = std::uint32_t;
 using ui64 = std::uint64_t;
+
+template <std::size_t N> using chararr = std::array<char, N>;
 
 //[ NETWORKING DEFS ]//
 using IPAddr      = std::string;       // IP Address typedef (typically for server ip)

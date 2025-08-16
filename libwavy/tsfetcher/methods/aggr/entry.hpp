@@ -132,7 +132,10 @@ public:
     NetResponse response = client.get(routes::SERVER_PATH_OWNERS);
 
     if (response.empty())
+    {
+      log::ERROR<log::FETCH>("Owners fetched are empty. Check logs for more context!");
       return {};
+    }
 
     std::istringstream iss(response);
     std::string        line;

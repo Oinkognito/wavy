@@ -26,6 +26,8 @@
 #error "Wavy-Server requires C++20 or later."
 #endif
 
+#include <libwavy/common/state.hpp>
+#include <libwavy/db/entry.hpp>
 #include <libwavy/server/server.hpp>
 
 auto main() -> int
@@ -37,8 +39,10 @@ auto main() -> int
     // always have fallback to trace for more detailed logs
     lwlog::set_log_level(libwavy::log::__TRACE__);
 
+    libwavy::db::LMDBKV<AudioMetadataPlain> kvStore(macros::SERVER_STORAGE_DIR);
+
     libwavy::server::WavyServer server(WAVY_SERVER_PORT_NO, macros::to_string(macros::SERVER_CERT),
-                                       macros::to_string(macros::SERVER_PRIVATE_KEY));
+                                       macros::to_string(macros::SERVER_PRIVATE_KEY), kvStore);
     server.run();
   }
   catch (std::exception& e)

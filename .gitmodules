@@ -13,7 +13,3 @@
 [submodule "external/crow"]
 	path = external/crow
 	url = https://github.com/CrowCpp/Crow.git
-
-[submodule "external/uvw"]
-	path = external/uvw
-	url = https://github.com/skypjack/uvw.git

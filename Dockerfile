@@ -17,6 +17,7 @@ RUN apk add --no-cache \
     ca-certificates \
     pkgconf \
     libarchive-dev \
+    lmdb-dev \
     && update-ca-certificates
 
 COPY . /app/Wavy

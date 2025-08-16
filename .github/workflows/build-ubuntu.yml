@@ -29,7 +29,7 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev
+            libmp3lame-dev libtbb-dev liblmdb-dev
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC (with GNU-ld)
       run: |
