@@ -25,7 +25,7 @@
 
 #include <libwavy/common/state.hpp>
 #include <libwavy/common/types.hpp>
-#include <libwavy/db/entry.hpp>
+#include <libwavy/db/db.h>
 #include <vector>
 
 namespace libwavy::server::helpers
@@ -36,7 +36,8 @@ auto is_valid_extension(const AbsPath& filename) -> bool;
 auto validate_m3u8_format(const PlaylistData& content) -> bool;
 auto validate_ts_file(const std::vector<ui8>& data) -> bool;
 auto validate_m4s(const AbsPath& m4s_path) -> bool;
+void populate_db_from_storage(OwnerAudioIDMap& db, const AbsPath& storage_path);
 auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id,
-                          db::LMDBKV<AudioMetadataPlain>& kv) -> StorageOwnerID;
+                          OwnerAudioIDMap& g_owner_audio_db) -> StorageOwnerID;
 
 } // namespace libwavy::server::helpers

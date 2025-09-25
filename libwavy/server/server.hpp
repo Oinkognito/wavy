@@ -32,6 +32,7 @@
 
 #include <libwavy/common/api/entry.hpp>
 #include <libwavy/common/network/routes.h>
+#include <libwavy/db/db.h>
 #include <libwavy/server/health.hpp>
 #include <libwavy/server/methods/download.hpp>
 #include <libwavy/server/methods/owners.hpp>
@@ -103,12 +104,11 @@ namespace libwavy::server
 class WAVY_API WavyServer
 {
 public:
-  WavyServer(short port, AbsPath serverCert, AbsPath serverKey,
-             db::LMDBKV<AudioMetadataPlain>& kvStore)
+  WavyServer(short port, AbsPath serverCert, AbsPath serverKey, OwnerAudioIDMap& g_owner_audio_db)
       : m_socketPath(macros::to_string(macros::SERVER_LOCK_FILE)), m_wavySocketBind(m_socketPath),
         m_port(port), m_serverCert(std::move(serverCert)), m_serverKey(std::move(serverKey)),
-        m_shutdown_requested(false), m_metrics(std::make_unique<Metrics>()), m_kvStore(kvStore),
-        m_ownerManager(*m_metrics, m_kvStore)
+        m_shutdown_requested(false), m_metrics(std::make_unique<Metrics>()),
+        m_owner_audio_db(g_owner_audio_db), m_ownerManager(*m_metrics, m_owner_audio_db)
   {
     m_wavySocketBind.EnsureSingleInstance();
     log::INFO<Server>("Starting Wavy Server on port {}", port);
@@ -117,6 +117,9 @@ public:
     std::signal(SIGINT, [](int signo) { get_instance()->request_shutdown(signo); });
     std::signal(SIGTERM, [](int signo) { get_instance()->request_shutdown(signo); });
     std::signal(SIGHUP, [](int signo) { get_instance()->request_shutdown(signo); });
+
+    helpers::populate_db_from_storage(m_owner_audio_db,
+                                      macros::to_string(macros::SERVER_STORAGE_DIR));
 
     // Store instance for signal handling
     s_instance = this;
@@ -172,14 +175,12 @@ private:
   short                         m_port;
   AbsPath                       m_serverCert, m_serverKey;
   crow::App<crow::CookieParser> m_app;
+  OwnerAudioIDMap&              m_owner_audio_db;
 
   // Shutdown management
   std::atomic<bool>       m_shutdown_requested;
   std::condition_variable m_shutdown_cv;
   std::mutex              m_shutdown_mutex;
-
-  // db
-  db::LMDBKV<AudioMetadataPlain>& m_kvStore;
 
   // Metrics
   std::unique_ptr<Metrics> m_metrics;
@@ -272,12 +273,16 @@ private:
       .methods(crow::HTTPMethod::POST)([this](const crow::request& req)
                                        { return m_ownerManager.handle_upload(req); });
 
+    // File chunked stream download ( /stream/<owner-id>/<audio-id>/<filename>)
     CROW_ROUTE(app, routes::SERVER_PATH_STREAM)
     (
-      [this](const crow::request& req, crow::response& res, const StorageOwnerID& owner_id,
-             const StorageAudioID& audio_id, const AbsPath& filename)
+      [this](const crow::request& req, crow::response& res, const StorageOwnerID& ownerID,
+             const StorageAudioID& audioID, const FileName& filename)
       {
-        methods::DownloadManager dm(*m_metrics, owner_id, audio_id, req, m_kvStore);
+        log::INFO<Server>(LogMode::Async,
+                          "Chunked stream request received for Audio-ID: {} by Owner: {}", audioID,
+                          ownerID);
+        methods::DownloadManager dm(*m_metrics, ownerID, audioID, req);
         dm.runStream(filename, res);
       });
 
@@ -285,13 +290,13 @@ private:
     CROW_ROUTE(app, routes::SERVER_PATH_DOWNLOAD)
       .methods(crow::HTTPMethod::GET)(
         [this](const crow::request& req, const StorageOwnerID& ownerID,
-               const StorageAudioID& audioID, const std::string& filename)
+               const StorageAudioID& audioID, const FileName& filename)
         {
           log::INFO<Server>(LogMode::Async,
                             "Download request received for Audio-ID: {} by Owner: {}", audioID,
                             ownerID);
 
-          methods::DownloadManager dm(*m_metrics, ownerID, audioID, req, m_kvStore);
+          methods::DownloadManager dm(*m_metrics, ownerID, audioID, req);
           auto                     response = dm.runDirect(filename);
 
           return response;

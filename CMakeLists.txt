@@ -101,7 +101,6 @@ find_package(Boost REQUIRED COMPONENTS log log_setup system thread filesystem da
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_library(ARCHIVE_LIB archive)
-pkg_check_modules(LMDB REQUIRED lmdb)
 
 ########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
 add_library(wavy-logger SHARED ${LIBWAVY_LOGGER_SRC})
@@ -113,7 +112,7 @@ target_link_libraries(wavy-logger PUBLIC Boost::log Boost::log_setup Boost::syst
 add_library(wavy-server SHARED ${LIBWAVY_SERVER_SRC})
 target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 # Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
-target_link_libraries(wavy-server PUBLIC ${LMDB_LIBRARIES} wavy-logger OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
+target_link_libraries(wavy-server PUBLIC wavy-logger OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 if(USE_FMT)
     target_link_libraries(wavy-logger PUBLIC fmt::fmt)
 endif()
@@ -230,7 +229,6 @@ if (DEFINED BUILD_EXAMPLES AND BUILD_EXAMPLES)
   add_subdirectory(examples/decoder)
   add_subdirectory(examples/m3u8parser)
   add_subdirectory(examples/dispatcher)
-  add_subdirectory(examples/db)
 endif()
 
 if (DEFINED BUILD_UI AND BUILD_UI)

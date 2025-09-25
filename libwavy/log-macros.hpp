@@ -1,5 +1,6 @@
 #pragma once
 
+#include <libwavy/common/error.hpp>
 #define WAVY__INTERNAL_LOGGING_IMPL
 #include <libwavy/logger.hpp>
 #undef WAVY__INTERNAL_LOGGING_IMPL
@@ -129,6 +130,10 @@ template <typename Tag, typename... Args> inline void INFO(std::string_view fmt,
 template <typename Tag, typename... Args> inline void ERROR(std::string_view fmt, Args&&... args)
 {
   ERROR<Tag>(LogMode::Sync, fmt, std::forward<Args>(args)...);
+  libwavy::StackTrace st;
+  std::cerr << "Exception call graph: "
+            << "\n"
+            << st.to_string() << std::endl;
 }
 
 template <typename Tag, typename... Args> inline void DBG(std::string_view fmt, Args&&... args)

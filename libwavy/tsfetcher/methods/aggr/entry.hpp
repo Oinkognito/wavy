@@ -62,6 +62,7 @@ public:
   {
     try
     {
+      log::INFO<log::FETCH>("------------ FETCH AND PLAY ------------");
       log::INFO<log::FETCH>("Request Owner: {}", nickname);
       log::INFO<log::FETCH>("Audio-ID: {}", audio_id);
       log::INFO<log::FETCH>("Bitrate: {}", desired_bandwidth);
@@ -238,7 +239,7 @@ private:
       log::WARN<log::FETCH>("Exact match not found. Using max bitrate: {} BPS", max_bandwidth);
     }
 
-    const NetTarget playlist_path = "/download/" + nickname + "/" + audio_id + "/" + selected;
+    NetTarget playlist_path = "/download/" + nickname + "/" + audio_id + "/" + selected;
     log::INFO<log::FETCH>("Selected bitrate playlist: {}", playlist_path);
 
     auto client = make_client();
@@ -324,16 +325,17 @@ private:
     for (const auto& seg_line : segment_lines)
     {
       AudioData data;
-      NetTarget url;
-      auto      seg_start = std::chrono::steady_clock::now();
+      NetTarget url = !use_chunked ? "/download/" + nickname + "/" + audio_id + "/" + seg_line
+                                   : "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
+      ;
+      log::TRACE<log::FETCH>("Fetching URL: {}", url);
+      auto seg_start = std::chrono::steady_clock::now();
       if (!use_chunked)
       {
-        const NetTarget url = "/download/" + nickname + "/" + audio_id + "/" + seg_line;
-        data                = client->get(url);
+        data = client->get(url);
       }
       else
       {
-        const NetTarget url = "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
         client->get_chunked(url,
                             [&data](const std::string& chunk)
                             {
@@ -342,7 +344,6 @@ private:
                                                      chunk.size());
                             });
       }
-      log::TRACE<log::FETCH>("Fetching URL: {}", url);
       auto seg_end = std::chrono::steady_clock::now();
 
       if (!data.empty())

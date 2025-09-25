@@ -190,8 +190,39 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
   return valid_files_found;
 }
 
+void populate_db_from_storage(OwnerAudioIDMap& db, const AbsPath& storage_path)
+{
+  db.update_db(
+    [&](auto& db_instance)
+    {
+      bfs::path root(storage_path);
+
+      if (!bfs::exists(root) || !bfs::is_directory(root))
+        return;
+
+      for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(root))
+      {
+        if (!bfs::is_directory(nickname_entry.status()))
+          continue;
+
+        const auto owner = nickname_entry.path().filename().string();
+
+        for (const bfs::directory_entry& audio_entry :
+             bfs::directory_iterator(nickname_entry.path()))
+        {
+          if (!bfs::is_directory(audio_entry.status()))
+            continue;
+
+          const auto audio_id = audio_entry.path().filename().string();
+
+          db_instance.insert(owner, audio_id);
+        }
+      }
+    });
+}
+
 auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_id,
-                          db::LMDBKV<AudioMetadataPlain>& kv) -> StorageOwnerID
+                          OwnerAudioIDMap& g_owner_audio_db) -> StorageOwnerID
 {
   log::INFO<SExtract>(LogMode::Async, " Validating and extracting GZIP file: {}", gzip_path);
 
@@ -235,18 +266,20 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     return "";
   }
 
+  const AbsPath storage_path =
+    macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ownerNickname + "/" + audio_id;
+
+  bfs::create_directories(storage_path);
+
   log::INFO<SExtract>(LogMode::Async, " Validating and moving extracted files...");
 
-  int           valid_file_count  = 0;
-  int           metadataFileCount = 0;
-  AudioMetadata metadata;
-  db::MutValue  db_val;
+  int valid_file_count  = 0;
+  int metadataFileCount = 0;
 
   // Second pass: validate and move files
   for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
   {
-    FileName      fname = file.path().filename().string();
-    const db::Key key   = db::make_kv_key(ownerNickname, audio_id, fname);
+    FileName fname = file.path().filename().string();
 
     // Skip the owner file, we already handled it
     if (fname.ends_with(macros::OWNER_FILE_EXT))
@@ -262,9 +295,36 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
 
     AudioBuffer data((std::istreambuf_iterator<char>(infile)), {});
 
-    db_val = db::MutValue(data.begin(), data.end());
-
-    if (fname.ends_with(macros::TOML_FILE_EXT))
+    if (fname.ends_with(macros::PLAYLIST_EXT))
+    {
+      if (!validate_m3u8_format(std::string(data.begin(), data.end())))
+      {
+        log::WARN<SExtract>(LogMode::Async, " Invalid M3U8 file, removing: {}", fname);
+        bfs::remove(file.path());
+        continue;
+      }
+    }
+    else if (fname.ends_with(macros::TRANSPORT_STREAM_EXT))
+    {
+      if (!validate_ts_file(data))
+      {
+        log::WARN<SExtract>(LogMode::Async, " Invalid TS file, removing: {}", fname);
+        bfs::remove(file.path());
+        continue;
+      }
+    }
+    else if (fname.ends_with(macros::M4S_FILE_EXT))
+    {
+      if (!validate_m4s(file.path().string()))
+      {
+        log::TRACE<SExtract>(LogMode::Async, " Possibly invalid M4S segment: {}", fname);
+      }
+    }
+    else if (fname.ends_with(macros::MP4_FILE_EXT))
+    {
+      log::DBG<SExtract>(LogMode::Async, " Found MP4 file: {}", fname);
+    }
+    else if (fname.ends_with(macros::TOML_FILE_EXT))
     {
       if (metadataFileCount++ > 0)
       {
@@ -274,54 +334,16 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
       }
 
       log::DBG<SExtract>(LogMode::Async, " Found metadata TOML file: {}", fname);
-
-      if (db_val.empty())
-        log::WARN<SExtract>("Found metadata.toml to be null!");
-
-      metadata = parseAudioMetadata(file.path().string());
     }
     else
     {
-      if (fname.ends_with(macros::PLAYLIST_EXT))
-      {
-        if (!validate_m3u8_format(as::str(data)))
-        {
-          log::WARN<SExtract>(LogMode::Async, " Invalid M3U8 file, removing: {}", fname);
-          bfs::remove(file.path());
-          continue;
-        }
-      }
-      else if (fname.ends_with(macros::TRANSPORT_STREAM_EXT))
-      {
-        if (!validate_ts_file(data))
-        {
-          log::WARN<SExtract>(LogMode::Async, " Invalid TS file, removing: {}", fname);
-          bfs::remove(file.path());
-          continue;
-        }
-      }
-      else if (fname.ends_with(macros::M4S_FILE_EXT))
-      {
-        if (!validate_m4s(file.path().string()))
-        {
-          log::TRACE<SExtract>(LogMode::Async, " Possibly invalid M4S segment: {}", fname);
-        }
-      }
-      else if (fname.ends_with(macros::MP4_FILE_EXT))
-      {
-        log::DBG<SExtract>(LogMode::Async, " Found MP4 file: {}", fname);
-      }
-      else
-      {
-        log::WARN<SExtract>(" Unknown file, removing: {}", fname);
-        bfs::remove(file.path());
-        continue;
-      }
+      log::WARN<SExtract>(" Unknown file, removing: {}", fname);
+      bfs::remove(file.path());
+      continue;
     }
 
-    kv.put(key, db_val);
-    kv.update_meta(key, metadata.to_plain());
-
+    // Move to storage
+    bfs::rename(file.path(), storage_path + "/" + fname);
     log::INFO<SExtract>(LogMode::Async, " File stored: {}", fname);
     valid_file_count++;
   }
@@ -332,6 +354,10 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
                          " No valid files remain after validation. Extraction failed.");
     return "";
   }
+
+  g_owner_audio_db.insert(ownerNickname, audio_id);
+  log::DBG<SExtract>(LogMode::Async, " Relation stored: owner={} -> audio_id={}", ownerNickname,
+                     audio_id);
 
   log::INFO<SExtract>(LogMode::Async, " Extraction and validation successful.");
   return ownerNickname;

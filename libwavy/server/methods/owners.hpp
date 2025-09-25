@@ -27,8 +27,6 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <crow.h>
 #include <libwavy/common/macros.hpp>
-#include <libwavy/common/network/routes.h>
-#include <libwavy/db/entry.hpp>
 #include <libwavy/log-macros.hpp>
 #include <libwavy/server/auth.hpp>
 #include <libwavy/server/prototypes.hpp>
@@ -45,37 +43,9 @@ namespace libwavy::server::methods
 class OwnerManager
 {
 public:
-  OwnerManager(Metrics& metrics, db::LMDBKV<AudioMetadataPlain>& kv)
-      : m_metrics(metrics), m_kvStore(kv)
+  OwnerManager(Metrics& metrics, OwnerAudioIDMap& g_owner_audio_db)
+      : m_metrics(metrics), m_owner_audio_db(g_owner_audio_db)
   {
-  }
-
-  // Returns true if owner_map was updated
-  auto populateOwnerMap() -> bool
-  {
-    owner_map.clear();
-
-    m_kvStore.for_(
-      [&](const db::Key& key, const db::Value& val)
-      {
-        // key format: "<nickname>/<audio_id>/filename"
-        log::TRACE<Server>("Key: {}", key);
-        auto first_sep = key.find('/');
-        if (first_sep == std::string::npos)
-          return;
-
-        StorageOwnerID nickname = key.substr(0, first_sep);
-
-        auto second_sep = key.find('/', first_sep + 1);
-        if (second_sep == std::string::npos)
-          return;
-
-        StorageAudioID audio_id = key.substr(first_sep + 1, second_sep - first_sep - 1);
-
-        owner_map[nickname].insert(audio_id);
-      });
-
-    return true; // cache updated
   }
 
   auto list_owners() -> crow::response
@@ -89,27 +59,29 @@ public:
       std::ostringstream response_stream;
       bool               entries_found = false;
 
-      if (!populateOwnerMap())
-      {
-        log::TRACE<Server>("Owner map cache is up-to-date, skipping LMDB iteration.");
-      }
+      // Traverse DB owner by owner
+      m_owner_audio_db.for_each_owner(
+        [&](const StorageOwnerID&                                    owner,
+            const MiniDB<StorageOwnerID, StorageAudioID>::audio_set& audios)
+        {
+          response_stream << owner << ":\n";
+          if (audios.empty())
+          {
+            response_stream << "  (No audio IDs found)\n";
+          }
+          else
+          {
+            for (const auto& audio_id : audios)
+              response_stream << "  - " << audio_id << "\n";
+          }
+          entries_found = true;
+        });
 
-      if (owner_map.empty())
+      if (!entries_found)
       {
-        log::ERROR<Server>(LogMode::Async, "No owners or Audio-IDs found in LMDB storage!!");
+        log::ERROR<Server>(LogMode::Async, "No Owners or Audio-IDs in DB!!");
         timer.mark_error_404();
         return {404, macros::to_string(macros::SERVER_ERROR_404)};
-      }
-
-      // iterate owner_map_cache as before
-      for (const auto& [nickname, audio_ids] : owner_map)
-      {
-        response_stream << nickname << ":\n";
-        if (audio_ids.empty())
-          response_stream << "  (No audio IDs found)\n";
-        else
-          for (const auto& audio_id : audio_ids)
-            response_stream << "  - " << audio_id << "\n";
       }
 
       timer.mark_success();
@@ -134,54 +106,51 @@ public:
       std::ostringstream response_stream;
       bool               entries_found = false;
 
-      populateOwnerMap(); // updates owner_map_cache if needed
-
-      if (owner_map.empty())
-      {
-        log::WARN<Server>(LogMode::Async, "Owner Map found to be empty...");
-        timer.mark_error_404();
-        return {404, macros::to_string(macros::SERVER_ERROR_404)};
-      }
-
-      // iterate owner_map_cache for metadata
-      for (const auto& [nickname, audio_ids] : owner_map)
-      {
-        response_stream << nickname << ":\n";
-        for (const auto& audio_id : audio_ids)
+      m_owner_audio_db.for_each_owner(
+        [&](const StorageOwnerID& owner, const auto& audio_ids)
         {
-          const db::Key metadata_key =
-            db::make_kv_key(nickname, audio_id, macros::to_string(macros::METADATA_FILE));
+          response_stream << owner << ":\n";
 
-          auto plain = m_kvStore.get(metadata_key);
-          if (plain.empty())
+          for (const auto& audio_id : audio_ids)
           {
-            log::WARN<Server>(LogMode::Async, "Metadata missing for key in store: '{}'",
-                              metadata_key);
-            continue;
+            // build metadata path from storage directory
+            AbsPath metadata_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + owner +
+                                    "/" + audio_id + "/" + macros::to_cstr(macros::METADATA_FILE);
+
+            if (bfs::exists(metadata_path))
+            {
+              try
+              {
+                AudioMetadata metadata = parseAudioMetadata(metadata_path);
+
+                response_stream << "  - " << audio_id << "\n";
+                response_stream << "      1. Title: " << metadata.title << "\n";
+                response_stream << "      2. Artist: " << metadata.artist << "\n";
+                response_stream << "      3. Duration: " << metadata.duration << " secs\n";
+                response_stream << "      4. Album: " << metadata.album << "\n";
+                response_stream << "      5. Bitrate: " << metadata.bitrate << " kbps\n";
+                response_stream << "      6. Sample Rate: " << metadata.audio_stream.sample_rate
+                                << " Hz\n";
+                response_stream << "      7. Sample Format: " << metadata.audio_stream.sample_format
+                                << "\n";
+                response_stream << "      8. Audio Bitrate: " << metadata.audio_stream.bitrate
+                                << " kbps\n";
+                response_stream << "      9. Codec: " << metadata.audio_stream.codec << "\n";
+                response_stream << "      10. Available Bitrates: [";
+                for (auto br : metadata.bitrates)
+                  response_stream << br << ",";
+                response_stream << "]\n";
+
+                entries_found = true;
+              }
+              catch (const std::exception& e)
+              {
+                log::ERROR<Server>(LogMode::Async, "Error parsing metadata for Audio-ID {}: {}",
+                                   audio_id, e.what());
+              }
+            }
           }
-
-          auto metadata = parseAudioMetadataFromDataString(as::str(plain));
-
-          response_stream << "  - " << audio_id << "\n";
-          response_stream << "      1. Title: " << metadata.title << "\n";
-          response_stream << "      2. Artist: " << metadata.artist << "\n";
-          response_stream << "      3. Duration: " << metadata.duration << " secs\n";
-          response_stream << "      4. Album: " << metadata.album << "\n";
-          response_stream << "      5. Bitrate: " << metadata.bitrate << " kbps\n";
-          response_stream << "      6. Sample Rate: " << metadata.audio_stream.sample_rate
-                          << " Hz\n";
-          response_stream << "      7. Sample Format: " << metadata.audio_stream.sample_format
-                          << "\n";
-          response_stream << "      8. Audio Bitrate: " << metadata.audio_stream.bitrate
-                          << " kbps\n";
-          response_stream << "      9. Codec: " << metadata.audio_stream.codec << "\n";
-          response_stream << "      10. Available Bitrates: [";
-          for (auto br : metadata.bitrates)
-            response_stream << br << ",";
-          response_stream << "]\n";
-        }
-        entries_found = true;
-      }
+        });
 
       if (!entries_found)
       {
@@ -194,8 +163,7 @@ public:
     }
     catch (const std::exception& e)
     {
-      log::ERROR<Server>(LogMode::Async, "Exception in {} endpoint: {}",
-                         routes::SERVER_PATH_AUDIO_INFO, e.what());
+      log::ERROR<Server>(LogMode::Async, "Exception in audio info endpoint: {}", e.what());
       timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
@@ -248,7 +216,8 @@ public:
         return {400, "GZIP upload failed"};
       }
 
-      StorageOwnerID ownerNickname = helpers::extract_and_validate(gzip_path, audio_id, m_kvStore);
+      StorageOwnerID ownerNickname =
+        helpers::extract_and_validate(gzip_path, audio_id, m_owner_audio_db);
       m_metrics.record_owner_upload(ownerNickname, req.body.size());
 
       if (!ownerNickname.empty())
@@ -322,7 +291,7 @@ public:
       }
       else
       {
-        log::ERROR<Server>("Missing sha256 parameter");
+        log::ERROR<Server>(LogMode::Async, "Missing sha256 parameter");
         timer.mark_error_400();
         return {400, "Missing 'sha256' parameter"};
       }
@@ -333,7 +302,7 @@ public:
 
       if (!bfs::exists(key_file))
       {
-        log::ERROR<Server>("No key file for Audio-ID: {}", audio_id);
+        log::ERROR<Server>(LogMode::Async, "No key file for Audio-ID: {}", audio_id);
         timer.mark_error_404();
         return {404, "Audio-ID not found"};
       }
@@ -346,25 +315,24 @@ public:
 
       if (stored_key != provided_key)
       {
-        log::WARN<Server>("SHA256 key mismatch for Audio-ID: {}", audio_id);
+        log::WARN<Server>(LogMode::Async, "SHA256 key mismatch for Audio-ID: {}", audio_id);
         timer.mark_error_403();
         return {403, "Invalid key"};
       }
 
-      // Delete all KV entries under <owner-id>/<audio-id> prefix
-      const std::string prefix = ownerID + "/" + audio_id + "/";
-      m_kvStore.for_(
-        [&](const db::Key& key, const db::Value&)
-        {
-          if (key.starts_with(prefix))
-          {
-            m_kvStore.erase(key);
-            log::DBG<Server>("Deleted key from KV store: {}", key);
-          }
-        });
+      // Delete the audio directory
+      const bfs::path audio_dir =
+        bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / ownerID / audio_id;
+      if (bfs::exists(audio_dir) && bfs::is_directory(audio_dir))
+      {
+        bfs::remove_all(audio_dir);
+      }
+
+      // Remove the key file
+      bfs::remove(key_file);
 
       timer.mark_success();
-      log::INFO<Server>("Successfully deleted Audio-ID: {} for owner {}", audio_id, ownerID);
+      log::INFO<Server>(LogMode::Async, "Successfully deleted Audio-ID: {}", audio_id);
 
       crow::response res;
       res.code = 200;
@@ -374,16 +342,15 @@ public:
     }
     catch (const std::exception& e)
     {
-      log::ERROR<Server>("Exception in delete endpoint: {}", e.what());
+      log::ERROR<Server>(LogMode::Async, "Exception in delete endpoint: {}", e.what());
       timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
   }
 
 private:
-  Metrics&                                                                   m_metrics;
-  db::LMDBKV<AudioMetadataPlain>&                                            m_kvStore;
-  inline static std::unordered_map<StorageOwnerID, std::set<StorageAudioID>> owner_map;
+  Metrics&         m_metrics;
+  OwnerAudioIDMap& m_owner_audio_db;
 };
 
 } // namespace libwavy::server::methods
