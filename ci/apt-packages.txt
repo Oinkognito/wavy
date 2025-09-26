@@ -2,6 +2,7 @@ build-essential
 cmake
 make
 ffmpeg
+libflac++-dev
 libavcodec-dev
 libavformat-dev
 libavutil-dev

@@ -13,14 +13,18 @@ jobs:
       image: archlinux:latest
 
     steps:
+    - name: Update Pacman
+      run: |
+        pacman -Syu --noconfirm
+        sudo pacman -S git
+
     - name: Checkout repository with submodules
       uses: actions/checkout@v3
       with:
         submodules: recursive
 
-    - name: Update Pacman and Install Dependencies
+    - name: Install dependencies
       run: |
-        pacman -Syu --noconfirm
         xargs -a ci/pacman-packages.txt sudo pacman -S --noconfirm
 
     - name: Build Release Version of Wavy (x86-64 arch) - GCC
