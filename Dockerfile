@@ -19,10 +19,14 @@ RUN apk add --no-cache \
     libarchive-dev \
     && update-ca-certificates
 
+RUN git submodule update --init --recursive
+
 COPY . /app/Wavy
 
 WORKDIR /app/Wavy/external/crow
 RUN rm -rf build && mkdir -p build && cd build && cmake .. -DCROW_BUILD_EXAMPLES=OFF -DCROW_BUILD_TESTS=OFF && make install
+WORKDIR /app/Wavy/external/libbacktrace
+RUN rm -rf build && mkdir -p build && cd build && ../configure && $(MAKE) && $(MAKE) install
 
 WORKDIR /app/Wavy
 
