@@ -11,5 +11,4 @@ make
 pkgconf
 libarchive
 lame
-git
 onetbb
