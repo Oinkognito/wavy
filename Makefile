@@ -3,6 +3,7 @@
 # Define the build directory
 BUILD_DIR := build
 CROW_BUILD_DIR := external/crow/build
+LIBBACKTRACE_BUILD_DIR := external/libbacktrace/build
 CMAKE := cmake
 MAKE := make
 
@@ -23,8 +24,15 @@ define configure
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_TARGET="$(1)" -DCMAKE_BUILD_TYPE="$(2)" $(EXTRA_CMAKE_FLAGS) ..
 endef
 
-init:
+crow:
 	@mkdir -p $(CROW_BUILD_DIR) && cd $(CROW_BUILD_DIR) && $(CMAKE) .. -DCROW_BUILD_EXAMPLES=OFF -DCROW_BUILD_TESTS=OFF && $(MAKE) install
+
+libbacktrace:
+	@mkdir -p $(LIBBACKTRACE_BUILD_DIR) && cd $(LIBBACKTRACE_BUILD_DIR) && ../configure && $(MAKE) && $(MAKE) install
+
+init:
+	$(MAKE) crow
+	$(MAKE) libbacktrace
 
 # Build all targets
 all:

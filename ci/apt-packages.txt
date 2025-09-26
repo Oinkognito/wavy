@@ -14,4 +14,3 @@ zstd
 libarchive-dev
 libtbb-dev
 libasio-dev
-libbacktrace
