@@ -29,7 +29,7 @@ jobs:
             libzstd-dev \
             cmake make pkg-config \
             libarchive-dev \
-            libmp3lame-dev libtbb-dev liblmdb-dev
+            libmp3lame-dev libtbb-dev libbacktrace-dev
 
     - name: Install Default Audio Backend Dependencies
       run: |

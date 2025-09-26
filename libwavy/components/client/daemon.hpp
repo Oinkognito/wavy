@@ -49,6 +49,6 @@ public:
   {
   }
 
-  auto start(bool flac_found, int index) -> int;
+  auto start(bool flac_found, int index, const bool& use_chunked_stream) -> int;
 };
 } // namespace libwavy::components::client

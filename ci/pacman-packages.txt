@@ -1,0 +1,16 @@
+base-devel
+flac
+boost
+asio
+wget
+openssl
+ffmpeg
+zstd
+cmake
+make
+pkgconf
+libbacktrace
+libarchive
+lame
+git
+onetbb

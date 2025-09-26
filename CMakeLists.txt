@@ -100,17 +100,20 @@ find_package(PkgConfig REQUIRED)
 find_package(Boost REQUIRED COMPONENTS log log_setup system thread filesystem date_time regex)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_library(BACKTRACE_LIB backtrace REQUIRED)
 find_library(ARCHIVE_LIB archive)
 
 ########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
 add_library(wavy-logger SHARED ${LIBWAVY_LOGGER_SRC})
 target_include_directories(wavy-logger PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(wavy-logger PUBLIC Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex)
+target_compile_options(wavy-logger PRIVATE -g)
+target_link_libraries(wavy-logger PUBLIC ${BACKTRACE_LIB} Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex)
 ########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
 
 ########################### -- WAVY SERVER (SHARED OBJ) -- #########################################
 add_library(wavy-server SHARED ${LIBWAVY_SERVER_SRC})
 target_include_directories(wavy-server PRIVATE ${ZSTD_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_compile_options(wavy-server PRIVATE -g)
 # Link required libraries (PUBLIC as we need these symbols to be read by server.cpp at runtime)
 target_link_libraries(wavy-server PUBLIC wavy-logger OpenSSL::SSL OpenSSL::Crypto ${ARCHIVE_LIB} ${ZSTD_LIBRARIES})
 if(USE_FMT)
@@ -191,6 +194,7 @@ endif()
 file(GLOB WAVY_UTILS_SOURCES "src/utils/*.cc")
 add_library(wavy-utils SHARED ${WAVY_UTILS_SOURCES})
 target_include_directories(wavy-utils PRIVATE ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_compile_options(wavy-utils PRIVATE -g)
 target_link_libraries(wavy-utils PUBLIC ${FFMPEG_LIBRARIES} wavy-logger)
 ########################### -- MISC CPP FILES (WAVY-UTILS) -- #########################################
 

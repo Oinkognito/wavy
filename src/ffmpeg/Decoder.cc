@@ -41,14 +41,14 @@ auto MediaDecoder::is_lossless_codec(AVCodecID codec_id) -> bool
 
 void MediaDecoder::print_audio_metadata(AVFormatContext* formatCtx, AVCodecParameters* codecParams)
 {
-  log::DBG<Decoder>("Audio File Metadata:");
-  log::DBG<Decoder>("Codec: {}", avcodec_get_name(codecParams->codec_id));
-  log::DBG<Decoder>("Bitrate: {} kbps", (double)codecParams->bit_rate / 1000.0);
-  log::DBG<Decoder>("Sample Rate: {} Hz", codecParams->sample_rate);
-  log::DBG<Decoder>("Channels: {}", codecParams->ch_layout.nb_channels);
-  log::DBG<Decoder>("Format: {}", formatCtx->iformat->long_name);
-  log::DBG<Decoder>("{}", (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
-                                                                    : "This is a lossy codec"));
+  log::DBG<Decoder>("-------------- Audio File Metadata -----------------");
+  log::DBG<Decoder>("Codec:           {}", avcodec_get_name(codecParams->codec_id));
+  log::DBG<Decoder>("Bitrate:         {} kbps", (double)codecParams->bit_rate / 1000.0);
+  log::DBG<Decoder>("Sample Rate:     {} Hz", codecParams->sample_rate);
+  log::DBG<Decoder>("Channels:        {}", codecParams->ch_layout.nb_channels);
+  log::DBG<Decoder>("Format:          {}", formatCtx->iformat->long_name);
+  log::DBG<Decoder>("--> {}", (is_lossless_codec(codecParams->codec_id) ? "This is a lossless codec"
+                                                                        : "This is a lossy codec"));
 }
 
 auto MediaDecoder::decode(TotalAudioData& ts_segments, TotalDecodedAudioData& output_audio) -> bool
@@ -83,7 +83,9 @@ auto MediaDecoder::decode(TotalAudioData& ts_segments, TotalDecodedAudioData& ou
     return false;
   }
 
+#ifdef WAVY_DBG_RUN
   libwavy::dbg::FileWriter<DecodedAudioData>::write(output_audio, "final.pcm");
+#endif
 
   cleanup(input_ctx, codec_ctx);
   return true;

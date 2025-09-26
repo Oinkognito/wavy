@@ -38,7 +38,8 @@ public:
 
   virtual auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id,
                             int desired_bandwidth, bool& flac_found,
-                            const RelPath& audio_backend_lib_path) -> bool = 0;
+                            const RelPath& audio_backend_lib_path, const bool& use_chunked_stream)
+    -> bool = 0;
 
   virtual auto fetchOwnersList(const IPAddr& server, const StorageOwnerID& targetNickname)
     -> Owners = 0;

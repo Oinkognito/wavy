@@ -41,7 +41,7 @@ public:
     using FetcherCreateFunc = ISegmentFetcher* (*)(const char*);
 
     log::INFO<log::PLUGIN>("Found fetcher plugin path: '{}'!", WAVY_FETCHER_PLUGIN_OUTPUT_PATH);
-    log::INFO<log::PLUGIN>("Attempting to load fetcher plugin from: {}", plugin_path);
+    log::DBG<log::PLUGIN>("Attempting to load fetcher plugin from: {}", plugin_path);
 
     // Load the plugin shared object
     void* handle = dlopen(plugin_path.c_str(), RTLD_LAZY);
@@ -60,8 +60,8 @@ public:
       throw std::runtime_error("Failed to load symbol: create_fetcher_with_arg");
     }
 
-    log::INFO<log::PLUGIN>("Symbol 'create_fetcher_with_arg' resolved successfully.");
-    log::INFO<log::PLUGIN>("Creating fetcher instance with server: {}", server);
+    log::DBG<log::PLUGIN>("Symbol 'create_fetcher_with_arg' resolved successfully.");
+    log::DBG<log::PLUGIN>("Creating fetcher instance with server: {}", server);
 
     // Create the fetcher instance
     ISegmentFetcher* fetcher_ptr = create_fn(server.c_str());

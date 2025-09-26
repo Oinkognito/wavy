@@ -26,18 +26,12 @@ jobs:
     - name: Install dependencies for Wavy
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          build-essential libflac++-dev libasio-dev libboost-log-dev libboost-system-dev libboost-filesystem-dev libssl-dev \
-          libavformat-dev libavutil-dev libswresample-dev libavcodec-dev \
-            libzstd-dev \
-            cmake make pkg-config \
-            libarchive-dev \
-            libmp3lame-dev libtbb-dev qt6-base-dev libpulse-dev liblmdb-dev
+        xargs -a ci/apt-packages.txt sudo apt-get install -y
 
-    - name: Compile Wavy + Wavy-UI for x86-64 Ubuntu
+    - name: Compile Wavy for x86-64 Ubuntu
       run: |
         sudo make init
-        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=ON -DBUILD_FETCHER_PLUGINS=ON -DBUILD_AUDIO_BACKEND_PLUGINS=ON"
+        make EXTRA_CMAKE_FLAGS="-DBUILD_UI=OFF -DBUILD_FETCHER_PLUGINS=ON -DBUILD_AUDIO_BACKEND_PLUGINS=ON"
 
     - name: Strip errorneous compilation flags
       run: |

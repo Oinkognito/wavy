@@ -20,7 +20,7 @@ jobs:
           @development-tools gcc-c++ flac-devel boost-devel asio-devel openssl-devel \
           ffmpeg-free-devel libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
           zstd cmake make pkgconf \
-          libarchive-devel lame-devel git wget tbb-devel lmdb-devel
+          libarchive-devel lame-devel git wget tbb-devel libbacktrace-devel
 
     - name: Checkout repository with submodules
       uses: actions/checkout@v3

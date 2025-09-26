@@ -1,0 +1,17 @@
+build-essential
+cmake
+make
+ffmpeg
+libavcodec-dev
+libavformat-dev
+libavutil-dev
+libavfilter-dev
+libswscale-dev
+libswresample-dev
+libssl-dev
+libboost-all-dev
+zstd
+libarchive-dev
+libtbb-dev
+libasio-dev
+libbacktrace-dev

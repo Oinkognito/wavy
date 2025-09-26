@@ -57,15 +57,16 @@ public:
   }
 
   auto fetchAndPlay(const StorageOwnerID& nickname, const StorageAudioID& audio_id,
-                    int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path)
-    -> bool override
+                    int desired_bandwidth, bool& flac_found, const RelPath& audio_backend_lib_path,
+                    const bool& use_chunked_stream) -> bool override
   {
     try
     {
       log::INFO<log::FETCH>("------------ FETCH AND PLAY ------------");
-      log::INFO<log::FETCH>("Request Owner: {}", nickname);
-      log::INFO<log::FETCH>("Audio-ID: {}", audio_id);
-      log::INFO<log::FETCH>("Bitrate: {}", desired_bandwidth);
+      log::INFO<log::FETCH>("Nickname (owner):        {}", nickname);
+      log::INFO<log::FETCH>("Audio-ID:                {}", audio_id);
+      log::INFO<log::FETCH>("Bitrate:                 {}", desired_bandwidth);
+      log::INFO<log::FETCH>("Chunked Request:         {}", use_chunked_stream ? "true" : "false");
 
       auto master_playlist = fetch_master_playlist(nickname, audio_id);
       if (master_playlist.empty())
@@ -77,7 +78,6 @@ public:
 
       AudioData      init_mp4_data;
       TotalAudioData m4s_segments;
-      const bool     use_chunked_stream = true;
       auto           gs = process_segments(content, nickname, audio_id, init_mp4_data, m4s_segments,
                                            use_chunked_stream);
       if (!gs)
@@ -93,11 +93,13 @@ public:
         gs->appendSegments(std::move(m4s_segments));
       }
 
+#ifdef WAVY_DBG_RUN
       if (!libwavy::dbg::FileWriter<AudioData>::write(gs->getAllSegments(), "audio.raw"))
       {
         log::ERROR<log::FETCH>("Error writing transport segments to file!!");
         return false;
       }
+#endif
 
       log::INFO<log::FETCH>("Stored {} transport segments in memory.", gs->segSizeAll());
 
@@ -159,7 +161,7 @@ public:
         size_t pos = line.find("- ");
         if (pos != std::string::npos)
         {
-          StorageOwnerID client_id = line.substr(pos + 2); // Extract client ID
+          const StorageOwnerID client_id = line.substr(pos + 2); // Extract client ID
           owners.push_back(client_id);
         }
       }
@@ -248,7 +250,7 @@ private:
 
   auto process_segments(const PlaylistData& playlist, const StorageOwnerID& nickname,
                         const StorageAudioID& audio_id, AudioData& init_mp4_data,
-                        TotalAudioData& m4s_segments, bool use_chunked = false)
+                        TotalAudioData& m4s_segments, const bool& use_chunked_stream = true) /*  */
     -> std::unique_ptr<GlobalState>
   {
     std::istringstream stream(playlist);
@@ -271,8 +273,8 @@ private:
     // Fetch init.mp4 if needed
     if (has_m4s)
     {
-      const NetTarget initMp4Url = "/download/" + nickname + "/" + audio_id + "/init.mp4";
-      init_mp4_data              = client->get(initMp4Url);
+      NetTarget initMp4Url = "/download/" + nickname + "/" + audio_id + "/init.mp4";
+      init_mp4_data        = client->get(initMp4Url);
       if (init_mp4_data.empty())
       {
         log::ERROR<log::FETCH>("Failed to fetch init.mp4 for {}/{}", nickname, audio_id);
@@ -325,12 +327,13 @@ private:
     for (const auto& seg_line : segment_lines)
     {
       AudioData data;
-      NetTarget url = !use_chunked ? "/download/" + nickname + "/" + audio_id + "/" + seg_line
-                                   : "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
+      NetTarget url = !use_chunked_stream
+                        ? "/download/" + nickname + "/" + audio_id + "/" + seg_line
+                        : "/stream/" + nickname + "/" + audio_id + "/" + seg_line;
       ;
       log::TRACE<log::FETCH>("Fetching URL: {}", url);
       auto seg_start = std::chrono::steady_clock::now();
-      if (!use_chunked)
+      if (!use_chunked_stream)
       {
         data = client->get(url);
       }

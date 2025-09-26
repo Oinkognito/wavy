@@ -305,3 +305,10 @@ The Wavy logging system combines:
 * Auto-rotating log files
 
 It’s **thread-safe**, **customizable**, and **designed for large modular C++ applications**.
+
+> [!IMPORTANT]
+>
+> Calling ERROR log also prints a minimal stack trace for now!
+>
+> In the future the aim is for it to be a very reliable trace through the entire Wavy project.
+>

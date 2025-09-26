@@ -64,7 +64,9 @@ auto main(int argc, char* argv[]) -> int
      {{"audioBackendLibPath", "abl"}, "Specify the Audio Backend Shared Library Path."},
      {{"fetchMode"}, "Specify the fetch mode (currently only Aggressive is implemented!)"},
      {{"fetchLib"}, "Specify the fetch mode' shared library"},
-     {{"playFlac"}, "Whether to playback as FLAC stream or not. (Boolean flag)"}
+     {{"playFlac"}, "Whether to playback as FLAC stream or not. (Boolean flag)"},
+     {{"useChunkedStream"},
+      "Use chunked streaming (for possibly faster streaming of transport segments.)"}
 
     });
 
@@ -78,9 +80,10 @@ auto main(int argc, char* argv[]) -> int
     parser.get_or<std::string>("fetchMode", "Aggressive"); // Default to "default" if not specified
   const RelPath fetch_lib = *parser.get<RelPath>("fetchLib"); // Default to empty if not specified
 
-  const bool flac_found = parser.get_bool("playFlac");
+  const bool flac_found         = parser.get_bool("playFlac");
+  const bool use_chunked_stream = parser.get_bool("useChunkedStream");
 
-  parser.requireMinArgs(5, argc);
+  parser.requireMinArgs(6, argc);
 
   // Check if index or bitrate is valid
   if (index == -1)
@@ -137,5 +140,5 @@ auto main(int argc, char* argv[]) -> int
   libwavy::components::client::WavyClient wavyClient(nickname, server, plugin_path, bitrate,
                                                      audioBackendLibPath);
 
-  return wavyClient.start(flac_found, index);
+  return wavyClient.start(flac_found, index, use_chunked_stream);
 }

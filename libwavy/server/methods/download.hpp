@@ -124,21 +124,30 @@ public:
     constexpr size_t CHUNK            = 64 * 1024;
     size_t           total_bytes_sent = 0;
 
-    // Stream from vector<char> in chunks
-    const char* ptr       = file_path.string().data();
-    size_t      remaining = file_path.string().size();
-
-    while (remaining > 0)
+    std::ifstream file(file_path.string(), std::ios::binary);
+    if (!file)
     {
-      size_t chunk_size = std::min(remaining, CHUNK);
-      L_WriteChunk(std::string(ptr, chunk_size));
+      log::ERROR<ServerDownload>("Failed to open file '{}'", file_path.string());
+      timer.mark_error_404();
+      res.code = 404;
+      res.end();
+      return;
+    }
 
-      ptr += chunk_size;
-      remaining -= chunk_size;
-      total_bytes_sent += chunk_size;
+    std::vector<char> buffer(CHUNK);
 
-      log::DBG<ServerDownload>("Wrote {} bytes to response (total: {})", chunk_size,
-                               total_bytes_sent);
+    while (file)
+    {
+      file.read(buffer.data(), buffer.size());
+      std::streamsize bytes_read = file.gcount();
+      if (bytes_read > 0)
+      {
+        L_WriteChunk(std::string(buffer.data(), static_cast<size_t>(bytes_read)));
+        total_bytes_sent += static_cast<size_t>(bytes_read);
+
+        log::DBG<ServerDownload>("Wrote {} bytes to response (total: {})", bytes_read,
+                                 total_bytes_sent);
+      }
     }
 
     // Final empty chunk
