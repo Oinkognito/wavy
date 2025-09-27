@@ -40,7 +40,6 @@ namespace beast = boost::beast;
 namespace http  = beast::http;
 namespace net   = boost::asio;
 namespace ssl   = boost::asio::ssl;
-namespace bfs   = boost::filesystem;
 using tcp       = net::ip::tcp;
 
 class PlaylistParser

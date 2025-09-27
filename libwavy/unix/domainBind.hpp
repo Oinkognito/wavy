@@ -34,8 +34,8 @@
 #include <libwavy/log-macros.hpp>
 
 /*
- * @UnixSocketBind 
- * 
+ * @UnixSocketBind
+ *
  * For now it just binds a UNIX domain socket for the server and cleans up after exit.
  *
  */
@@ -60,7 +60,9 @@ public:
 
   void EnsureSingleInstance()
   {
-    struct sockaddr_un addr{};
+    struct sockaddr_un addr
+    {
+    };
     addr.sun_family = AF_UNIX;
     std::strncpy(addr.sun_path, m_socketPath.c_str(), sizeof(addr.sun_path) - 1);
 
@@ -76,7 +78,7 @@ public:
       throw std::runtime_error("Another instance is already running!");
     }
 
-    log::INFO<log::UNIX>("Lock acquired: {}", m_socketPath);
+    log::INFO<log::UNIX>("Lock acquired: {}", m_socketPath.str());
   }
 
   void cleanup()
@@ -85,7 +87,7 @@ public:
     {
       close(m_lockFD);
       unlink(m_socketPath.c_str());
-      log::INFO<log::UNIX>("Lock file removed: {}", m_socketPath);
+      log::INFO<log::UNIX>("Lock file removed: {}", m_socketPath.str());
       m_lockFD = LOCK_REMOVED_FD;
     }
   }

@@ -45,11 +45,11 @@ auto HLS_Segmenter::createSegmentsFLAC(const AbsPath& input_file, const Director
   AVPacket*        pkt = nullptr;
   int              ret;
   AudioStreamIdx   audio_stream_idx    = -1;
-  const AbsPath    segment_file_format = output_dir + "/hls_flac_%d.m4s";
-  const AbsPath    output_playlist_str = output_dir + "/" + output_playlist;
+  const AbsPath    segment_file_format = AbsPath(output_dir) / "hls_flac_%d.m4s";
+  const AbsPath    output_playlist_str = AbsPath(output_dir) / output_playlist;
 
-  log::DBG<HLS>("Segments format: {}", segment_file_format);
-  log::DBG<HLS>("Playlist destination: {}", output_playlist_str);
+  log::DBG<HLS>("Segments format:      {}", segment_file_format.str());
+  log::DBG<HLS>("Playlist destination: {}", output_playlist_str.str());
 
   if ((ret = avformat_open_input(&input_ctx, input_file.c_str(), nullptr, nullptr)) < 0)
     return ret;

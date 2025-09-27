@@ -50,7 +50,7 @@ public:
 
   auto list_owners() -> crow::response
   {
-    RequestTimer timer(m_metrics);
+    RequestTimer req_timer(m_metrics);
 
     try
     {
@@ -80,24 +80,24 @@ public:
       if (!entries_found)
       {
         log::ERROR<Server>(LogMode::Async, "No Owners or Audio-IDs in DB!!");
-        timer.mark_error_404();
+        req_timer.mark_error_404();
         return {404, macros::to_string(macros::SERVER_ERROR_404)};
       }
 
-      timer.mark_success();
+      req_timer.mark_success();
       return {200, response_stream.str()};
     }
     catch (const std::exception& e)
     {
       log::ERROR<Server>(LogMode::Async, "Exception in owners endpoint: {}", e.what());
-      timer.mark_error_500();
+      req_timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
   }
 
   auto list_audio_info() -> crow::response
   {
-    RequestTimer timer(m_metrics);
+    RequestTimer req_timer(m_metrics);
 
     try
     {
@@ -114,10 +114,10 @@ public:
           for (const auto& audio_id : audio_ids)
           {
             // build metadata path from storage directory
-            AbsPath metadata_path = macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + owner +
-                                    "/" + audio_id + "/" + macros::to_cstr(macros::METADATA_FILE);
+            AbsPath metadata_path =
+              AbsPath(macros::SERVER_STORAGE_DIR) / owner / audio_id / macros::METADATA_FILE;
 
-            if (bfs::exists(metadata_path))
+            if (fs::exists(metadata_path))
             {
               try
               {
@@ -154,24 +154,24 @@ public:
 
       if (!entries_found)
       {
-        timer.mark_error_404();
+        req_timer.mark_error_404();
         return {404, macros::to_string(macros::SERVER_ERROR_404)};
       }
 
-      timer.mark_success();
+      req_timer.mark_success();
       return {200, response_stream.str()};
     }
     catch (const std::exception& e)
     {
       log::ERROR<Server>(LogMode::Async, "Exception in audio info endpoint: {}", e.what());
-      timer.mark_error_500();
+      req_timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
   }
 
   auto handle_upload(const crow::request& req) -> crow::response
   {
-    RequestTimer timer(m_metrics);
+    RequestTimer req_timer(m_metrics);
 
     try
     {
@@ -181,38 +181,38 @@ public:
       if (req.body.empty())
       {
         log::ERROR<ServerUpload>(LogMode::Async, "Upload request with empty body");
-        timer.mark_error_400();
+        req_timer.mark_error_400();
         return {400, "Empty upload request"};
       }
 
       if (req.body.size() > WAVY_SERVER_UPLOAD_SIZE_LIMIT * 1024 * 1024)
       { // 100MB limit
         log::ERROR<ServerUpload>(LogMode::Async, "Upload too large: {} bytes", req.body.size());
-        timer.mark_error_400();
+        req_timer.mark_error_400();
         return {413, "Upload too large"};
       }
 
-      const StorageAudioID audio_id  = boost::uuids::to_string(boost::uuids::random_generator()());
-      const AbsPath        gzip_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" +
-                                audio_id + macros::to_string(macros::COMPRESSED_ARCHIVE_EXT);
+      const StorageAudioID audio_id = boost::uuids::to_string(boost::uuids::random_generator()());
+      const AbsPath        gzip_path =
+        AbsPath(macros::SERVER_TEMP_STORAGE_DIR) / audio_id + macros::COMPRESSED_ARCHIVE_EXT;
 
-      boost::filesystem::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
+      fs::create_directories(macros::SERVER_TEMP_STORAGE_DIR);
 
       std::ofstream output_file(gzip_path, std::ios::binary);
       if (!output_file)
       {
-        log::ERROR<ServerUpload>(LogMode::Async, "Failed to create temp file: {}", gzip_path);
-        timer.mark_error_500();
+        log::ERROR<ServerUpload>(LogMode::Async, "Failed to create temp file: {}", gzip_path.str());
+        req_timer.mark_error_500();
         return {500, "Failed to create temporary file"};
       }
 
       output_file.write(req.body.data(), req.body.size());
       output_file.close();
 
-      if (!boost::filesystem::exists(gzip_path) || boost::filesystem::file_size(gzip_path) == 0)
+      if (!fs::exists(gzip_path) || fs::file_size(gzip_path) == 0)
       {
         log::ERROR<ServerUpload>(LogMode::Async, "GZIP upload failed: File is empty or missing!");
-        timer.mark_error_400();
+        req_timer.mark_error_400();
         return {400, "GZIP upload failed"};
       }
 
@@ -222,22 +222,22 @@ public:
 
       if (!ownerNickname.empty())
       {
-        log::INFO<ServerUpload>("Computing HASH for Owner: {}", ownerNickname);
+        log::TRACE<ServerUpload>("Computing HASH for Owner: {}", ownerNickname);
 
         auto sha_opt = auth::compute_sha256_hex(gzip_path);
         if (!sha_opt)
         {
-          log::WARN<ServerUpload>(LogMode::Async, "Failed to compute SHA-256 for Audio-ID: {}",
-                                  audio_id);
+          log::ERROR<ServerUpload>(LogMode::Async, "Failed to compute SHA-256 for Audio-ID: {}",
+                                   audio_id);
         }
         bool key_persisted = false;
         if (sha_opt)
           key_persisted = auth::persist_key(audio_id, *sha_opt);
 
         // Clean up temporary archive
-        boost::filesystem::remove(gzip_path);
+        fs::remove(gzip_path);
 
-        timer.mark_success();
+        req_timer.mark_success();
         log::INFO<ServerUpload>(LogMode::Async, "Upload successful, Audio-ID: {}", audio_id);
 
         std::ostringstream body;
@@ -262,15 +262,15 @@ public:
       }
       else
       {
-        boost::filesystem::remove(gzip_path);
-        timer.mark_error_400();
+        fs::remove(gzip_path);
+        req_timer.mark_error_400();
         return {400, macros::to_string(macros::SERVER_ERROR_400)};
       }
     }
     catch (const std::exception& e)
     {
       log::ERROR<ServerUpload>(LogMode::Async, "Exception in upload endpoint: {}", e.what());
-      timer.mark_error_500();
+      req_timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
   }
@@ -278,7 +278,7 @@ public:
   auto handle_delete(const crow::request& req, const StorageOwnerID& ownerID,
                      const StorageAudioID& audio_id) -> crow::response
   {
-    RequestTimer timer(m_metrics);
+    RequestTimer req_timer(m_metrics);
     m_metrics.record_owner_delete(ownerID);
 
     try
@@ -292,18 +292,17 @@ public:
       else
       {
         log::ERROR<Server>(LogMode::Async, "Missing sha256 parameter");
-        timer.mark_error_400();
+        req_timer.mark_error_400();
         return {400, "Missing 'sha256' parameter"};
       }
 
-      namespace bfs      = boost::filesystem;
-      bfs::path keys_dir = bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / ".keys";
-      bfs::path key_file = keys_dir / (audio_id + ".key");
+      fs::path keys_dir = fs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / ".keys";
+      fs::path key_file = keys_dir / (audio_id + ".key");
 
-      if (!bfs::exists(key_file))
+      if (!fs::exists(key_file))
       {
         log::ERROR<Server>(LogMode::Async, "No key file for Audio-ID: {}", audio_id);
-        timer.mark_error_404();
+        req_timer.mark_error_404();
         return {404, "Audio-ID not found"};
       }
 
@@ -316,22 +315,21 @@ public:
       if (stored_key != provided_key)
       {
         log::WARN<Server>(LogMode::Async, "SHA256 key mismatch for Audio-ID: {}", audio_id);
-        timer.mark_error_403();
+        req_timer.mark_error_403();
         return {403, "Invalid key"};
       }
 
       // Delete the audio directory
-      const bfs::path audio_dir =
-        bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / ownerID / audio_id;
-      if (bfs::exists(audio_dir) && bfs::is_directory(audio_dir))
+      const AbsPath audio_dir = AbsPath(macros::SERVER_STORAGE_DIR) / ownerID / audio_id;
+      if (fs::exists(audio_dir) && fs::is_directory(audio_dir))
       {
-        bfs::remove_all(audio_dir);
+        fs::remove_all(audio_dir);
       }
 
       // Remove the key file
-      bfs::remove(key_file);
+      fs::remove(key_file);
 
-      timer.mark_success();
+      req_timer.mark_success();
       log::INFO<Server>(LogMode::Async, "Successfully deleted Audio-ID: {}", audio_id);
 
       crow::response res;
@@ -343,7 +341,7 @@ public:
     catch (const std::exception& e)
     {
       log::ERROR<Server>(LogMode::Async, "Exception in delete endpoint: {}", e.what());
-      timer.mark_error_500();
+      req_timer.mark_error_500();
       return {500, "Internal Server Error"};
     }
   }

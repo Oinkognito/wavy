@@ -34,7 +34,7 @@
 #include <fstream>
 #include <utility>
 
-namespace bfs = boost::filesystem;
+namespace fs = std::filesystem;
 
 using ServerDownload = libwavy::log::SERVER_DWNLD;
 
@@ -67,12 +67,12 @@ public:
 
     m_metrics.owners[m_ownerID].downloads++;
 
-    const bfs::path file_path =
-      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
+    const fs::path file_path =
+      fs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
 
     log::INFO<ServerDownload>(LogMode::Async, "Attempting to serve file: {}", file_path.string());
 
-    if (!bfs::exists(file_path))
+    if (!fs::exists(file_path))
     {
       log::ERROR<ServerDownload>(LogMode::Async, "File not found: {}", file_path.string());
       return {404, "File not found."};
@@ -87,7 +87,7 @@ public:
     res.body = readFile(file_path.string());
     res.set_header("Content-Length", std::to_string(res.body.size()));
 
-    log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename,
+    log::INFO<ServerDownload>(LogMode::Async, "Serving '{}' ({} bytes) [{}]", filename.str(),
                               res.body.size(), content_type);
 
     guessDownloadSize(res, timer);
@@ -101,8 +101,8 @@ public:
     m_metrics.download_requests++;
     m_metrics.owners[m_ownerID].downloads++;
 
-    const bfs::path file_path =
-      bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
+    const fs::path file_path =
+      fs::path(macros::to_string(macros::SERVER_STORAGE_DIR)) / m_ownerID / m_audioID / filename;
 
     // Set content type
     const std::string content_type = detectStreamMIMEType(filename);
@@ -153,7 +153,8 @@ public:
     // Final empty chunk
     res.write(std::format("0{}", CRLF2));
 
-    log::INFO<ServerDownload>("Finished streaming {} bytes for '{}'", total_bytes_sent, filename);
+    log::INFO<ServerDownload>("Finished streaming {} bytes for '{}'", total_bytes_sent,
+                              filename.str());
     res.end();
 
     // Update metrics

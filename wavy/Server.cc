@@ -28,7 +28,7 @@
 #endif
 
 #include <libwavy/common/state.hpp>
-#include <libwavy/db/entry.hpp>
+#include <libwavy/db/db.h>
 #include <libwavy/server/server.hpp>
 
 CREATE_WAVY_MINI_DB();
@@ -40,7 +40,7 @@ auto main() -> int
     INIT_WAVY_LOGGER_ALL();
 
     // always have fallback to trace for more detailed logs
-    lwlog::set_log_level(libwavy::log::__TRACE__);
+    lwlog::set_log_level(lwlog::__TRACE__);
 
     libwavy::server::WavyServer server(WAVY_SERVER_PORT_NO, macros::to_string(macros::SERVER_CERT),
                                        macros::to_string(macros::SERVER_PRIVATE_KEY),

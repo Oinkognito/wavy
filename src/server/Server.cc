@@ -22,10 +22,12 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include <filesystem>
 #include <libwavy/common/api/entry.hpp>
 #include <libwavy/log-macros.hpp>
 #include <libwavy/server/server.hpp>
 
+namespace fs   = std::filesystem;
 using SExtract = libwavy::log::SERVER_EXTRACT;
 using SDwnld   = libwavy::log::SERVER_DWNLD;
 using SUpload  = libwavy::log::SERVER_UPLD;
@@ -125,10 +127,10 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
   {
     RelPath filename    = archive_entry_pathname(entry);
-    AbsPath output_file = extract_path + "/" + filename;
+    AbsPath output_file = AbsPath(extract_path) / filename;
 
     log::TRACE<SExtract>("Extracting file: {}",
-                         bfs::relative(output_file, macros::SERVER_STORAGE_DIR).string());
+                         fs::relative(output_file, macros::SERVER_STORAGE_DIR).string());
 
     archive_entry_set_pathname(entry, output_file.c_str());
 
@@ -137,7 +139,7 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
       std::ofstream ofs(output_file, std::ios::binary);
       if (!ofs)
       {
-        log::ERROR<SExtract>("Failed to open file for writing: {}", output_file);
+        log::ERROR<SExtract>("Failed to open file for writing: {}", output_file.str());
         continue;
       }
 
@@ -155,10 +157,10 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
       if (output_file.substr(output_file.find_last_of(".") + 1) == macros::ZSTD_FILE_EXT)
       {
         log::TRACE<log::NONE>("[ZSTD] Decompressing .zst file: {}",
-                              bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+                              fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         if (!ZSTD_decompress_file(output_file.c_str()))
         {
-          log::ERROR<log::NONE>("[ZSTD] Failed to decompress .zst file: {}", output_file);
+          log::ERROR<log::NONE>("[ZSTD] Failed to decompress .zst file: {}", output_file.str());
           continue;
         }
 
@@ -166,19 +168,19 @@ auto extract_payload(const RelPath& payload_path, const RelPath& extract_path) -
           output_file.substr(0, output_file.find_last_of(".")); // remove .zst extension
         log::INFO<SExtract>(
           "Decompressed file: {}",
-          bfs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR).string());
+          fs::relative(decompressed_filename, macros::SERVER_TEMP_STORAGE_DIR).string());
 
         if (std::remove(output_file.c_str()) == 0)
         {
           log::TRACE<log::NONE>(
             "[ZSTD] Deleted the original .zst file: {}",
-            bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+            fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
         else
         {
           log::ERROR<log::NONE>(
             "[ZSTD] Failed to delete .zst file: {}",
-            bfs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
+            fs::relative(output_file, macros::SERVER_TEMP_STORAGE_DIR).string());
         }
       }
     }
@@ -195,22 +197,21 @@ void populate_db_from_storage(OwnerAudioIDMap& db, const AbsPath& storage_path)
   db.update_db(
     [&](auto& db_instance)
     {
-      bfs::path root(storage_path);
+      fs::path root(storage_path);
 
-      if (!bfs::exists(root) || !bfs::is_directory(root))
+      if (!fs::exists(root) || !fs::is_directory(root))
         return;
 
-      for (const bfs::directory_entry& nickname_entry : bfs::directory_iterator(root))
+      for (const fs::directory_entry& nickname_entry : fs::directory_iterator(root))
       {
-        if (!bfs::is_directory(nickname_entry.status()))
+        if (!fs::is_directory(nickname_entry.status()))
           continue;
 
         const auto owner = nickname_entry.path().filename().string();
 
-        for (const bfs::directory_entry& audio_entry :
-             bfs::directory_iterator(nickname_entry.path()))
+        for (const fs::directory_entry& audio_entry : fs::directory_iterator(nickname_entry.path()))
         {
-          if (!bfs::is_directory(audio_entry.status()))
+          if (!fs::is_directory(audio_entry.status()))
             continue;
 
           const auto audio_id = audio_entry.path().filename().string();
@@ -226,7 +227,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
 {
   log::INFO<SExtract>(LogMode::Async, " Validating and extracting GZIP file: {}", gzip_path);
 
-  if (!bfs::exists(gzip_path))
+  if (!fs::exists(gzip_path))
   {
     log::ERROR<SExtract>(LogMode::Async, " File does not exist: {}", gzip_path);
     return "";
@@ -234,7 +235,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
 
   const AbsPath temp_extract_path =
     macros::to_string(macros::SERVER_TEMP_STORAGE_DIR) + "/" + audio_id;
-  bfs::create_directories(temp_extract_path);
+  fs::create_directories(temp_extract_path);
 
   if (!extract_payload(gzip_path, temp_extract_path))
   {
@@ -248,7 +249,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   bool           ownerFound = false;
 
   // First pass: find the owner file
-  for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
+  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path))
   {
     FileName fname = file.path().filename().string();
     if (fname.ends_with(macros::OWNER_FILE_EXT))
@@ -269,7 +270,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   const AbsPath storage_path =
     macros::to_string(macros::SERVER_STORAGE_DIR) + "/" + ownerNickname + "/" + audio_id;
 
-  bfs::create_directories(storage_path);
+  fs::create_directories(storage_path);
 
   log::INFO<SExtract>(LogMode::Async, " Validating and moving extracted files...");
 
@@ -277,7 +278,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
   int metadataFileCount = 0;
 
   // Second pass: validate and move files
-  for (const bfs::directory_entry& file : bfs::directory_iterator(temp_extract_path))
+  for (const fs::directory_entry& file : fs::directory_iterator(temp_extract_path))
   {
     FileName fname = file.path().filename().string();
 
@@ -289,7 +290,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     if (!infile)
     {
       log::WARN<SExtract>(LogMode::Async, " Could not open file: {}", fname);
-      bfs::remove(file.path());
+      fs::remove(file.path());
       continue;
     }
 
@@ -300,7 +301,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
       if (!validate_m3u8_format(std::string(data.begin(), data.end())))
       {
         log::WARN<SExtract>(LogMode::Async, " Invalid M3U8 file, removing: {}", fname);
-        bfs::remove(file.path());
+        fs::remove(file.path());
         continue;
       }
     }
@@ -309,7 +310,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
       if (!validate_ts_file(data))
       {
         log::WARN<SExtract>(LogMode::Async, " Invalid TS file, removing: {}", fname);
-        bfs::remove(file.path());
+        fs::remove(file.path());
         continue;
       }
     }
@@ -329,7 +330,7 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
       if (metadataFileCount++ > 0)
       {
         log::WARN<SExtract>(LogMode::Async, " Extra metadata TOML file ignored: {}", fname);
-        bfs::remove(file.path());
+        fs::remove(file.path());
         continue;
       }
 
@@ -338,12 +339,12 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     else
     {
       log::WARN<SExtract>(" Unknown file, removing: {}", fname);
-      bfs::remove(file.path());
+      fs::remove(file.path());
       continue;
     }
 
     // Move to storage
-    bfs::rename(file.path(), storage_path + "/" + fname);
+    fs::rename(file.path(), storage_path / fname);
     log::INFO<SExtract>(LogMode::Async, " File stored: {}", fname);
     valid_file_count++;
   }

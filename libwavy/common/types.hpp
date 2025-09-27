@@ -27,6 +27,7 @@
 
 #include <array>
 #include <cstdint>
+#include <libwavy/common/path.hpp>
 #include <string>
 #include <vector>
 
@@ -54,7 +55,7 @@ using NetResponse = std::string;       // Response from server
 //[ DIRECTORY AND PATHS DEFS ]//
 using Directory = std::string; // Directory represented as a string
 using RelPath   = std::string; // Relative Path as a string (need not be of a file)
-using AbsPath   = std::string; // Absolute Path as a string (need not be of a file)
+// using AbsPath   = std::string; // Absolute Path as a string (need not be of a file)
 using FileName =
   std::string; // Just the filename as a string (only use this when it is just a file name)
 using DirPathHolder = std::

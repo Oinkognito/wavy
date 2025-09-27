@@ -23,13 +23,13 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
 #include <string>
 #include <unordered_map>
 
-namespace bfs = boost::filesystem;
+namespace fs = std::filesystem;
 
 namespace libwavy::server
 {
@@ -50,7 +50,7 @@ public:
 
     // Check storage directory
     AbsPath storage_path = macros::to_string(macros::SERVER_STORAGE_DIR);
-    if (!bfs::exists(storage_path) || !bfs::is_directory(storage_path))
+    if (!fs::exists(storage_path) || !fs::is_directory(storage_path))
     {
       status.is_healthy        = false;
       status.checks["storage"] = "FAIL - Directory not accessible";
@@ -64,7 +64,7 @@ public:
     AbsPath temp_path = macros::to_string(macros::SERVER_TEMP_STORAGE_DIR);
     try
     {
-      bfs::create_directories(temp_path);
+      fs::create_directories(temp_path);
       status.checks["temp_storage"] = "OK";
     }
     catch (const std::exception& e)
@@ -76,7 +76,7 @@ public:
     // Check disk space (simplified)
     try
     {
-      auto   space   = bfs::space(storage_path);
+      auto   space   = fs::space(storage_path);
       double free_gb = static_cast<double>(space.free) / (1024 * 1024 * 1024);
       if (free_gb < 1.0)
       { // Less than 1GB free

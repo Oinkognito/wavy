@@ -1,6 +1,9 @@
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <libwavy/logger.hpp>
+
+namespace fs = std::filesystem;
 
 namespace libwavy::log
 {
@@ -28,7 +31,6 @@ auto get_current_timestamp() -> std::string
 
 void init_logging()
 {
-  namespace bfs     = boost::filesystem;
   namespace logging = boost::log;
   namespace trivial = boost::log::trivial;
   namespace sinks   = boost::log::sinks;
@@ -57,11 +59,11 @@ void init_logging()
   const char* home;
   GET_HOME_OR_RETURN(home);
 
-  bfs::path log_dir = bfs::path(home) / REL_PATH_LOGS;
+  fs::path log_dir = fs::path(home) / REL_PATH_LOGS;
 
-  if (!bfs::exists(log_dir))
+  if (!fs::exists(log_dir))
   {
-    if (!bfs::create_directories(log_dir))
+    if (!fs::create_directories(log_dir))
     {
       std::cerr << "ERROR: Failed to create log directory: " << log_dir.string() << std::endl;
       return;

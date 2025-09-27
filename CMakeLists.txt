@@ -107,7 +107,7 @@ find_library(ARCHIVE_LIB archive)
 add_library(wavy-logger SHARED ${LIBWAVY_LOGGER_SRC})
 target_include_directories(wavy-logger PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_options(wavy-logger PRIVATE -g)
-target_link_libraries(wavy-logger PUBLIC ${BACKTRACE_LIB} Boost::log Boost::log_setup Boost::system Boost::thread Boost::filesystem Boost::date_time Boost::regex)
+target_link_libraries(wavy-logger PUBLIC ${BACKTRACE_LIB} Boost::log Boost::log_setup Boost::system Boost::thread Boost::date_time Boost::regex)
 ########################### -- WAVY LOGGER (SHARED OBJ) -- #########################################
 
 ########################### -- WAVY SERVER (SHARED OBJ) -- #########################################

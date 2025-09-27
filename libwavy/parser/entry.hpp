@@ -25,7 +25,7 @@
 
 #include <algorithm>
 #include <autogen/config.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include <libwavy/common/api/entry.hpp>
 #include <libwavy/common/types.hpp>
@@ -36,8 +36,8 @@
 #include <string_view>
 #include <type_traits>
 
-namespace bfs = boost::filesystem;
-using M3U8    = libwavy::log::M3U8_PARSER;
+namespace fs = std::filesystem;
+using M3U8   = libwavy::log::M3U8_PARSER;
 
 // Template-based playlist parser that can handle both file paths and string content
 //
@@ -67,7 +67,7 @@ public:
     {
       // If a base path is not provided, use current directory
       AbsPath base = base_path.value_or(".");
-      log::DBG<M3U8>("Using provided base path '{}' for master playlist.", base);
+      log::DBG<M3U8>("Using provided base path '{}' for master playlist.", base.str());
       return parseMaster(std::string(source), base);
     }
     else
@@ -91,8 +91,8 @@ public:
       else
       {
         // Derive base path from the file path
-        bfs::path derived_base = bfs::path(source).parent_path();
-        base                   = derived_base.string();
+        fs::path derived_base = fs::path(source).parent_path();
+        base                  = derived_base.string();
       }
 
       log::DBG<M3U8>("Using base path '{}' for master playlist.", base);
@@ -109,7 +109,7 @@ public:
                   std::is_same_v<std::decay_t<T>, std::string_view>)
     {
       // Direct content
-      bfs::path base_path = bfs::path(base_dir).lexically_normal();
+      fs::path base_path = fs::path(base_dir).lexically_normal();
       log::DBG<M3U8>("Using base path for media segments: {}", base_path.string());
       return parseMedia(std::string(source), bitrate, base_path.string());
     }
@@ -126,7 +126,7 @@ public:
       std::stringstream buffer;
       buffer << file.rdbuf();
 
-      bfs::path base_path = bfs::path(base_dir).lexically_normal();
+      fs::path base_path = fs::path(base_dir).lexically_normal();
       log::DBG<M3U8>("Using base path for media segments: '{}'", base_path.string());
 
       return parseMedia(buffer.str(), bitrate, base_path.string());
@@ -152,7 +152,7 @@ private:
       }
       else if (!sv.empty() && sv[0] != '#' && pending)
       {
-        bfs::path uri_path = bfs::path(base_path) / std::string(sv);
+        fs::path uri_path = fs::path(base_path) / std::string(sv);
         log::DBG<M3U8>("Found URI Path: '{}'", uri_path.string());
         pending->uri = uri_path.lexically_normal().string();
         master.variants.push_back(*pending);
@@ -193,7 +193,7 @@ private:
             if (quote_pos != std::string_view::npos)
             {
               std::string map_uri   = std::string(uri_sub.substr(0, quote_pos));
-              bfs::path   full_path = bfs::path(base_path) / map_uri;
+              fs::path    full_path = fs::path(base_path) / map_uri;
               media.map_uri         = full_path.lexically_normal().string();
               map_found             = true;
               log::DBG<M3U8>("Found EXT-X-MAP URI: {}", media.map_uri.value());
@@ -225,7 +225,7 @@ private:
         if (pending_duration.has_value())
         {
           std::string seg_uri   = std::string(sv);
-          bfs::path   full_path = bfs::path(base_path) / seg_uri;
+          fs::path    full_path = fs::path(base_path) / seg_uri;
           std::string norm_uri  = full_path.lexically_normal().string();
 
           media.segments.emplace_back(ast::Segment{.duration = *pending_duration, .uri = norm_uri});

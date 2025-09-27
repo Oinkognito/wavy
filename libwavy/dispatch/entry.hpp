@@ -181,12 +181,12 @@ public:
     {
       log::DBG<Dispatch>("Payload already exists, checking for {}...",
                          macros::DISPATCH_ARCHIVE_NAME);
-      AbsPath archive_path = fs::path(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
+      AbsPath archive_path = AbsPath(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
       if (fs::exists(archive_path))
         return upload_to_server(archive_path);
     }
 
-    const AbsPath master_playlist_path = fs::path(m_directory) / m_playlistName;
+    const AbsPath master_playlist_path = AbsPath(m_directory) / m_playlistName;
 
     if (!verify_master_playlist(master_playlist_path))
     {
@@ -200,19 +200,19 @@ public:
       return false;
     }
 
-    const AbsPath metadata_path = fs::path(m_directory) / macros::to_string(macros::METADATA_FILE);
+    const AbsPath metadata_path = AbsPath(m_directory) / macros::to_string(macros::METADATA_FILE);
     if (!fs::exists(metadata_path))
     {
       log::ERROR<Dispatch>("Missing metadata.toml in: {}", m_directory);
       return false;
     }
-    log::INFO<Dispatch>("Found metadata.toml: {}", metadata_path);
+    log::INFO<Dispatch>("Found metadata.toml: {}", metadata_path.str());
 
 #ifdef DEBUG_RUN
     print_hierarchy();
 #endif
 
-    const AbsPath archive_path  = fs::path(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
+    const AbsPath archive_path  = AbsPath(m_directory) / macros::DISPATCH_ARCHIVE_NAME;
     bool          applyZSTDComp = true;
     if (m_playlistFmt == PlaylistFormat::FMP4)
     {
@@ -240,20 +240,20 @@ private:
   DirPathHolder    m_directory, m_playlistName;
   StorageOwnerID   m_nickname;
 
-  std::unordered_map<AbsPath, TotalAudioData> m_refPlaylists;
-  TotalAudioData                              m_transportStreams;
-  PlaylistData                                m_masterPlaylistContent;
+  std::unordered_map<AbsPathStr, TotalAudioData> m_refPlaylists;
+  TotalAudioData                                 m_transportStreams;
+  PlaylistData                                   m_masterPlaylistContent;
 
   auto verify_master_playlist(const AbsPath& path) -> bool
   {
     std::ifstream file(path);
     if (!file.is_open())
     {
-      log::ERROR<Dispatch>("Failed to open master playlist: '{}'", path);
+      log::ERROR<Dispatch>("Failed to open master playlist: '{}'", path.str());
       return false;
     }
 
-    log::INFO<Dispatch>("Found master playlist: '{}'!", path);
+    log::INFO<Dispatch>("Found master playlist: '{}'!", path.str());
 
     std::string line;
     bool        has_m_socketinf = false;
@@ -268,9 +268,9 @@ private:
           log::ERROR<Dispatch>("Invalid reference playlist in master!");
           return false;
         }
-        const AbsPath playlist_path   = fs::path(m_directory) / line;
+        const AbsPath playlist_path   = AbsPath(m_directory) / line;
         m_refPlaylists[playlist_path] = {}; // Store referenced playlists
-        log::INFO<Dispatch>("Found reference playlist: {}", playlist_path);
+        log::INFO<Dispatch>("Found reference playlist: {}", playlist_path.str());
       }
     }
 
@@ -302,7 +302,7 @@ private:
 
       while (std::getline(file, line))
       {
-        const AbsPath segment_path = fs::path(m_directory) / line;
+        const AbsPath segment_path = AbsPath(m_directory) / line;
 
         if (line.find(macros::TRANSPORT_STREAM_EXT) != std::string::npos)
         {
@@ -318,7 +318,7 @@ private:
           std::ifstream ts_file(segment_path, std::ios::binary);
           if (!ts_file.is_open())
           {
-            log::ERROR<Dispatch>("Failed to open transport stream: {}", segment_path);
+            log::ERROR<Dispatch>("Failed to open transport stream: {}", segment_path.str());
             return false;
           }
 
@@ -327,13 +327,13 @@ private:
           if (sync_byte != TRANSPORT_STREAM_START_BYTE)
           {
             log::ERROR<Dispatch>("Invalid transport stream: {} (Missing 0x47 sync byte)!",
-                                 segment_path);
+                                 segment_path.str());
             return false;
           }
 
           segments.push_back(segment_path);
           m_transportStreams.push_back(segment_path);
-          log::TRACE<Dispatch>("Found valid transport stream: {}", segment_path);
+          log::TRACE<Dispatch>("Found valid transport stream: {}", segment_path.str());
         }
         else if (line.find(macros::M4S_FILE_EXT) != std::string::npos)
         {
@@ -349,7 +349,7 @@ private:
           std::ifstream m4s_file(segment_path, std::ios::binary);
           if (!m4s_file.is_open())
           {
-            log::ERROR<Dispatch>("Failed to open .m4s file: {}", segment_path);
+            log::ERROR<Dispatch>("Failed to open .m4s file: {}", segment_path.str());
             return false;
           }
 
@@ -360,7 +360,7 @@ private:
           }
 
           mp4_segments_.push_back(segment_path);
-          log::TRACE<Dispatch>("Found valid .m4s segment: {}", segment_path);
+          log::TRACE<Dispatch>("Found valid .m4s segment: {}", segment_path.str());
         }
       }
     }
@@ -415,7 +415,7 @@ private:
 
   auto compress_files(const AbsPath& output_archive_path, const bool applyZSTDComp) -> bool
   {
-    log::DBG<Dispatch>("Beginning Compression Job in: {} from {}", output_archive_path,
+    log::DBG<Dispatch>("Beginning Compression Job in: {} from {}", output_archive_path.str(),
                        fs::absolute(m_directory).string());
     /* ZSTD_compressFilesInDirectory is a C source function (FFI) */
     if (applyZSTDComp)
@@ -435,7 +435,7 @@ private:
 
     if (archive_write_open_filename(archive, output_archive_path.c_str()) != ARCHIVE_OK)
     {
-      log::ERROR<Dispatch>("Failed to create archive: {}", output_archive_path);
+      log::ERROR<Dispatch>("Failed to create archive: {}", output_archive_path.str());
       return false;
     }
 
@@ -495,7 +495,7 @@ private:
 
     archive_write_free(archive);
     log::INFO<Dispatch>("ZSTD compression of {} to {} with final GNU TAR job done.", m_directory,
-                        output_archive_path);
+                        output_archive_path.str());
     return true;
   }
 
@@ -510,7 +510,7 @@ private:
       std::ifstream file(archive_path, std::ios::binary | std::ios::ate);
       if (!file.is_open())
       {
-        log::ERROR<Dispatch>("Could not open file for upload: {}", archive_path);
+        log::ERROR<Dispatch>("Could not open file for upload: {}", archive_path.str());
         return false;
       }
 

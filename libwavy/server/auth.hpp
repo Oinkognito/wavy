@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include <libwavy/common/macros.hpp>
 #include <libwavy/common/types.hpp>
@@ -8,7 +8,7 @@
 #include <openssl/evp.h>
 #include <optional>
 
-namespace bfs = boost::filesystem;
+namespace fs = std::filesystem;
 
 namespace libwavy::server::auth
 {
@@ -69,24 +69,23 @@ static auto compute_sha256_hex(const std::string& file_path) -> std::optional<st
 // helper: persist key to keystore
 static auto persist_key(const StorageAudioID& audio_id, const std::string& key) -> bool
 {
-  namespace bfs = boost::filesystem;
   try
   {
     log::TRACE<log::SERVER_UPLD>("Found SHA256 key ({}) for Audio ID: {}", key, audio_id);
 
-    const bfs::path keys_dir = bfs::path(macros::to_string(macros::SERVER_STORAGE_DIR_KEYS));
-    bfs::create_directories(keys_dir);
-    bfs::path key_file = keys_dir / (audio_id + ".key");
+    const fs::path keys_dir = fs::path(macros::to_string(macros::SERVER_STORAGE_DIR_KEYS));
+    fs::create_directories(keys_dir);
+    fs::path key_file = keys_dir / (audio_id + ".key");
 
     // Atomic write: write to temp and rename
-    bfs::path tmp = key_file;
+    fs::path tmp = key_file;
     tmp += ".tmp";
     std::ofstream ofs(tmp, std::ios::binary | std::ios::trunc);
     if (!ofs)
       return false;
     ofs << key;
     ofs.close();
-    bfs::rename(tmp, key_file);
+    fs::rename(tmp, key_file);
     return true;
   }
   catch (...)
