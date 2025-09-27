@@ -34,6 +34,7 @@
 #include <libwavy/common/types.hpp>
 #include <libwavy/log-macros.hpp>
 #include <libwavy/network/entry.hpp>
+#include <libwavy/timer/timer.h>
 #include <libwavy/tsfetcher/interface.hpp>
 #include <libwavy/utils/audio/entry.hpp>
 #include <libwavy/utils/io/dbg/entry.hpp>
@@ -253,6 +254,7 @@ private:
                         TotalAudioData& m4s_segments, const bool& use_chunked_stream = true) /*  */
     -> std::unique_ptr<GlobalState>
   {
+    MEASURE_FUNC(std::chrono::milliseconds);
     std::istringstream stream(playlist);
     std::string        line;
     bool               has_m4s = false;

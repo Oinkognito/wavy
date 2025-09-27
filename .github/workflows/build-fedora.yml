@@ -16,7 +16,7 @@ jobs:
     - name: Update DNF and Install Dependencies
       run: |
         dnf upgrade -y
-        xargs -a ci/rpm-pacakges.txt dnf install -y
+        xargs -a ci/rpm-packages.txt dnf install -y
 
     - name: Checkout repository with submodules
       uses: actions/checkout@v3

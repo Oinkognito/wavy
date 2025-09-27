@@ -43,7 +43,7 @@ extern "C"
 inline constexpr const ByteCount DefaultAVIOBufferSize = 32768;
 
 // Custom AVIO read function
-static auto readAVIO(void* opaque, AudioByte* buf, int buf_size) -> int
+inline static auto readAVIO(void* opaque, AudioByte* buf, int buf_size) -> int
 {
   auto*              segments      = static_cast<TotalAudioData*>(opaque);
   static size_t      segment_index = 0;

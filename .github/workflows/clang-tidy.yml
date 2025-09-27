@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies for Wavy
       run: |
         sudo apt-get update
-        xargs -a ci/apt-packages.txt sudo apt-get install -y
+        xargs -a ci/apt-packages.txt sudo apt-get install -y libpulse-dev
 
     - name: Compile Wavy for x86-64 Ubuntu
       run: |

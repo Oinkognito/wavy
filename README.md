@@ -61,8 +61,9 @@ To build and run **Wavy**, install the following dependencies:
 | **Pkg-Config** | Build system tools helper |
 | **Libarchive** | Handling `.tar`, `.gz`, `.zst` compressed files |
 | **libmp3lame** | MP3 encoding support |
+| **libbacktrace** | For verbose and clean backtraces |
 
-### **Optional Dependencies (for Lossless Support)**
+### **Optional Dependencies**
 
 | Dependency  | Purpose |
 |-------------|---------|
@@ -86,31 +87,29 @@ Here are the dependencies installation command for some common distributions:
 > Hence, you would need to install `libboost-dev` and replace it with `libboost`.
 >
 
+To install these packages to your distro, it is recommended you go check out [ci](https://github.com/Oinkognito/wavy/blob/main/ci) that has the packages listed for each package manager.
+
 ### **Arch Linux**
 
+> [!CAUTION]
+>
+> Run these from the root directory of Wavy!
+>
+
 ```bash
-sudo pacman -S --needed \
-  ffmpeg base-devel openssl boost tbb-devel zstd cmake make pkgconf \
-  libarchive lame flac++
+xargs -a ci/pacman-packages.txt sudo pacman -S --needed
 ```
 
 ### **Ubuntu / Debian**
 
 ```bash
-sudo apt update && sudo apt install -y \
-  ffmpeg build-essential libssl-dev libboost-all-dev libtbb-dev \
-  libzstd-dev cmake make pkg-config libarchive-dev \
-  libmp3lame-dev libflac++-dev
+sudo apt update && xargs -a ci/apt-packages.txt sudo apt install -y
 ```
 
 ### **Fedora**
 
 ```bash
-sudo dnf install -y \
-    @development-tools gcc-c++ flac-devel boost-devel openssl-devel \
-    ffmpeg-free-devel libavcodec-free-devel libavutil-free-devel libavformat-free-devel libswresample-free-devel \
-    zstd cmake make pkgconf \
-    libarchive-devel lame-devel git wget tbb-devel
+xargs -a ci/rpm-packages.txt sudo dnf install -y
 ```
 
 ## **Building**
