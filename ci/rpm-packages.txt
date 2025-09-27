@@ -15,6 +15,5 @@ make
 pkgconf
 libarchive-devel
 lame-devel
-git
 wget
 tbb-devel
