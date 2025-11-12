@@ -22,6 +22,7 @@
  *  See LICENSE file for full legal details.                                    *
  ********************************************************************************/
 
+#include "libwavy/utils/io/file/entry.hpp"
 #include <filesystem>
 #include <libwavy/common/api/entry.hpp>
 #include <libwavy/log-macros.hpp>
@@ -344,7 +345,9 @@ auto extract_and_validate(const RelPath& gzip_path, const StorageAudioID& audio_
     }
 
     // Move to storage
-    fs::rename(file.path(), storage_path / fname);
+    //
+    // will account for EXDEV errors internally (e.g., cross-device moves)
+    utils::rename_with_fallback(file.path(), storage_path / fname);
     log::INFO<SExtract>(LogMode::Async, " File stored: {}", fname);
     valid_file_count++;
   }
